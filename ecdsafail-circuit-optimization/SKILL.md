@@ -767,30 +767,38 @@ Optimization lesson:
 
 ### Recent 1285q -> 1211q Frontier (verified exact-knob ladder)
 
-This is the most actionable current ladder. **Current public #1 = `5d7044c0` (commit `186d9d7`),
-score 1,699,653,032 = 1211 q x 1,403,512 T** -- `DIALOG_GCD_WIDTH_SLOPE_X1000` 1016->1017 + a
-re-hunted `DIALOG_TAIL_NONCE`.
+This is the most actionable current ladder. **Current public #1 = `833642fe` (commit `6953d1b`),
+score 1,697,398,113 = 1211 q x 1,401,650 T.**
 
-**The 1211q frontier is now a `WIDTH_SLOPE` walk** (the single most important current fact). The
-leaders increment `DIALOG_GCD_WIDTH_SLOPE_X1000` one notch at a time and re-hunt the tail nonce each
-step. It is a **peak-neutral structural Toffoli cut** (qubits stay 1211): a steeper affine
-active-width taper for the GCD `u,v` registers does fewer GCD ops. Measured emitted-CCX per notch on
-the 1211 base (verified, peak=1211 throughout):
+**The `WIDTH_SLOPE` walk DEAD-ENDED -- the most important current lesson.** The leaders walked
+`DIALOG_GCD_WIDTH_SLOPE_X1000` 1015->1016->1017, but each notch **craters island density ~25x**
+(measured: slope1016 base ~0.5/Mnonce; slope1017 ~0.02; slope1018 = 0 GCD-clean in 10M). Past 1017
+the frontier is effectively unfindable at ~100k nonce/s. So the leaders **reverted slope 1017->1015**
+(looser = far higher density) and bought the Toffoli back a different way. **Walking slope past the
+live frontier is a trap: emitted drops ~-530/notch but density drops ~25x/notch -- the island-hunt
+cost explodes far faster than the score gain.**
 
-```
-slope 1015 -> 1,482,860      1018 -> 1,481,192
-slope 1016 -> 1,482,332      1019 -> 1,480,700
-slope 1017 -> 1,481,696      1020 -> 1,480,108
-```
+**The current SOTA `6953d1b` (slope1015) is a multi-lever retune, not a slope step.** vs the prior
+`186d9d7`: `DIALOG_GCD_WIDTH_SLOPE_X1000` 1017->**1015**, `SQUARE_ROW_MAX_SEG` 184->**176**,
+`DIALOG_GCD_FOLD_CARRY_TRUNC_W` 18->**17**, new knob **`DIALOG_GCD_K5_CLEAN_BLOCK=1`**, a
+`round763` compressor-inverse code change, and a re-hunted nonce. Net avg-executed Toffoli
+1,403,512 -> **1,401,650** (-1,862).
 
-i.e. **~-500..-640 emitted T per notch (~-580k..-730k score), with lots of headroom above 1017** --
-1018, 1019, 1020 are unclaimed. Each notch reseeds the Fiat-Shamir island, so it needs a fresh
-`DIALOG_TAIL_NONCE`; the GCD-convergence/width prefilter screens the expected failure (classical
-width-envelope/carry escape), so islands are findable. Promoted slope-walk steps:
-`03a1550` (slope1015, 1,701,048,104) -> `f804ee0` (slope1016, 1,700,420,806) ->
-`186d9d7` (slope1017, 1,699,653,032). **To beat the current SOTA, push slope to 1018+ and re-hunt**
-(bigger, more durable than the `DIALOG_GCD_COMPARE_BITS` 46->45/44 trims, which only buy -272/-584
-emitted T per notch and sit on the same island-hunt budget).
+**Key insight -- emitted UP, executed DOWN.** This retune *raised* emitted CCX (1,481,696 ->
+**1,489,336**, +7,640) while *lowering* avg-executed (frac 0.94724 -> **0.94114**). The score is
+`round(avg_executed) x qubits`, so the win came entirely from a lower executed *fraction* (more
+conditional-replay / clean-block ops that fire on only a sub-set of shots), not fewer emitted gates.
+**Stop optimizing emitted CCX in isolation at this frontier; the lever is the executed fraction.**
+`DIALOG_GCD_K5_CLEAN_BLOCK` and the conditional-replay family (`*_CONDITIONAL_REPLAY`, all baked) are
+the model; look for more clean-block / measured-uncompute opportunities that convert always-executed
+Toffolis into fire-on-a-fraction ones.
+
+Promoted ladder: `03a1550` (slope1015, 1,701,048,104) -> `f804ee0` (slope1016, 1,700,420,806) ->
+`186d9d7` (slope1017, 1,699,653,032) -> `6953d1b` (slope1015 + K5_CLEAN_BLOCK retune, 1,697,398,113).
+To beat it: apply a *findable* cut on the looser slope1015 base (`DIALOG_GCD_COMPARE_BITS` is gentle
+on density; a deeper compare notch on this base lowers emitted ~-960 and stays huntable), then
+collect islands and submit the lowest avg-executed one -- the avg-T swings with the nonce, so banked
+margin comes from both the cut and a lucky conditional-replay draw.
 
 (Our own promoted `d83d19c`, 1221 q / 1,743,174,081, is no longer the frontier; competitors
 pushed below it via the qubit drops below. A 1216q branch at 1,740,350,144 is also NOT
@@ -828,7 +836,12 @@ Exact promoted sequence (id : qubits : knob introduced):
   this as a steeper affine active-width taper for GCD `u,v`; dropped high bits are zero on the
   searched verifier support. Expected failure mode is classical width-envelope/carry escape, which
   the GCD-convergence/width prefilter can screen, rather than a broad phase-wall increase.
-- `186d9d7` : 1211 (T-cut, **#1**) : `DIALOG_GCD_WIDTH_SLOPE_X1000` 1016->1017 + re-hunted nonce
+- `186d9d7` : 1211 (T-cut) : `DIALOG_GCD_WIDTH_SLOPE_X1000` 1016->1017 + re-hunted nonce
+  `6100000089014596`. **End of the slope-walk** (1018+ unfindable, ~0.02/Mn).
+- `6953d1b` : 1211 (T-cut, **#1**) : slope reverted 1017->**1015** + `DIALOG_GCD_K5_CLEAN_BLOCK=1` +
+  `SQUARE_ROW_MAX_SEG` 184->176 + `DIALOG_GCD_FOLD_CARRY_TRUNC_W` 18->17 + round763 code change +
+  nonce `9600076011007`. avg-T 1,401,650. Emitted *rose* (1,481,696->1,489,336) but executed
+  *fraction* fell (0.94724->0.94114) -- the score win is all in the executed fraction.
   `6100000089014596`. Same lever as `f804ee0`, one more notch -- the slope-walk continues (see the
   measured per-notch emit table above; 1018+ is open).
 
@@ -1062,11 +1075,15 @@ or compare-bit tightening as island-gated (needs a fresh `DIALOG_TAIL_NONCE`).
 - `DIALOG_GCD_ACTIVE_ITERATIONS` (399->258-260) -- truncated K2 step-blocks per inversion; dropping
   one cuts ~2,861 T AND can free peak scratch. Historically the largest single lever.
 - `DIALOG_GCD_WIDTH_MARGIN` (32->7-12) -- GCD active-width cushion; tightening frees peak but raises island rarity.
-- `DIALOG_GCD_WIDTH_SLOPE_X1000` (948 -> 1015 -> 1016 -> 1017 -> **1018+ open**) -- slope of the GCD
-  active-width affine envelope. In the qubit-frontier era it helped free peak; **at the 1211q frontier it
-  is now THE active peak-neutral Toffoli-cut lever**: each +1 notch removes ~500-640 emitted T (~-580k..
-  -730k score), needs a fresh `DIALOG_TAIL_NONCE`, GCD-prefilterable. The current SOTA ladder is a walk
-  up this knob (1015->1016->1017). Walk it further before reaching for `COMPARE_BITS`.
+- `DIALOG_GCD_WIDTH_SLOPE_X1000` (948 -> 1015..1017, **walked then reverted to 1015**) -- slope of the
+  GCD active-width affine envelope. Each +1 notch removes ~500-640 emitted T BUT **craters island
+  density ~25x/notch** (slope1016 ~0.5/Mn, 1017 ~0.02, 1018 = 0 in 10M). The 1015->1016->1017 walk
+  hit that wall; the current SOTA `6953d1b` **reverted to 1015** and took the Toffoli back via
+  `K5_CLEAN_BLOCK` etc. **Do NOT walk slope past the live frontier -- density dies far faster than
+  the score gain.** Prefer `COMPARE_BITS` (gentle on density) for a findable cut.
+- `DIALOG_GCD_K5_CLEAN_BLOCK` (=1 in SOTA `6953d1b`) -- K5 clean-block lever; part of the multi-knob
+  slope1015 retune that lowered avg-executed by raising emitted but cutting the executed fraction
+  (the average-executed game). Pairs with the `round763` compressor-inverse code path.
 - `DIALOG_GCD_HOST_GATED` / `_BRANCH_BITS_HOST_COMPARATOR` / `_COMPOSITE_SCRATCH` -- host
   gated/comparator/Euclidean scratch on idle future-log + inactive high u/v lanes.
 - `DIALOG_GCD_K2_PAIR_COMPRESS` -- encode 2 K2 steps in 5 sidecar bits (was 3 steps/8 bits).
