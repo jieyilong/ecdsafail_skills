@@ -1233,6 +1233,21 @@ auditing. Full annotated index + abstracts + local PDFs: `research/index.json`,
    **Luo et al. 2026 location-controlled / bit-length-tracked variable-width arithmetic**
    (`external-literature:43-46`) — exact-reversible peak-floor on the GCD pillar without jumpdivsteps'
    quantum-matrix penalty.
+
+   **SCOPED 2026-06-12 — conditionally-clean square is an ENABLER, score-neutral ALONE.** The active
+   square (`schoolbook_square_symmetric_lowq_selfhosted`, `multiply.rs:897`) ALREADY self-hosts: it
+   borrows carry lanes from `tmp_ext`'s clean-zero high tail, uncomputes rows via measured HMR+`cz_if`
+   (0-Toffoli, `multiply.rs:978`), and the carry uncompute is CZ-only/quadratic (`const_arith.rs:598`).
+   What conditionally-clean (Laddered Toggle Detection) ADDS: lift "borrowed lane must be clean-zero"
+   (`SQUARE_SELFHOST_SAFE_LANE_REUSE`, `multiply.rs:528`) → "borrowed lane may be idle-DIRTY and is
+   restored to its input," widening the donor pool to any idle register (e.g. GCD-side) — and it's
+   **Toffoli-neutral** (laddered structure removes the 2× dirty-borrow tax). BUT: Toffoli-neutral +
+   peak co-pinned ⇒ **a square-only rewrite moves NEITHER score factor** — it only frees headroom that
+   doesn't bind the peak. It pays off ONLY coupled with a GCD-pillar width drop that consumes that
+   headroom to lower the joint peak. The single new obligation is "prove donor idle-over-window" (not
+   just disjoint) — extend `assert_qubit_slices_disjoint` to idleness; everything else (chain carry,
+   quadratic CZ-only uncompute, value-exactness) is already satisfied. Unit of work that actually
+   moves the score = {conditionally-clean square headroom} + {variable-width GCD peak drop}, together.
 3. **Automated uncompute scheduling** *(Meuli–Soeken–Roetteler SAT/QBF 1904.02121; Unqomp; spooky
    DAG solver 2401.10579)* — could replace hand-tuned venting/hosting/recompute decisions at the
    peak phase. Tooling investment, not a one-off lever.
