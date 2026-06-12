@@ -262,6 +262,63 @@ Continue a route when:
 - Failure fingerprints vary across candidates instead of repeating structurally.
 Exact equality is common on dirty candidates but is not required. Any invariant violation is serious; report the offending nonce and both triples prominently.
 
+### Structural-Floor Diagnosis: the Failing-Shot Overlap Test
+
+**Symptom:** a residual coordinate (usually `cls`, sometimes `pha`) plateaus at a small floor `K`
+and never breaks below it over many candidates — e.g. best is `2 / * / 0` across hundreds of
+validated candidates, no `cls <= 1` ever appears. This is the single most important
+go/no-go question for a route: is `K` a **structural floor** (a fixed set of shots that mismatch
+for *every* nonce → `0/0/0` is unreachable → the route is dead) or just a **deep statistical
+tail** (`cls=0` reachable at rate `~e^-lambda`, the route is fine, just slow)?
+
+**Weak first-pass signal (histogram shape) — suggestive, not conclusive.** Build the `cls`
+histogram. A **pile-up** at `K` (count at `cls=K` *exceeds* the smooth-tail extrapolation; e.g.
+`cls=K` is as large or larger than `cls=K+1`) hints at a floor. A **smooth taper** through `K`
+hints at a tail. But at a few hundred candidates this is genuinely ambiguous — do not trust it.
+Quantitatively, for a Poisson-ish tail `P(cls=K)/P(cls=K+1) ≈ (K+1)/lambda`; an observed ratio
+well above that is a mild pile-up warning. Use this only to decide whether to run the real test.
+
+**Decisive test — dump the failing shot indices and check overlap.** The local `eval_circuit`
+helper records only the *first* failing shot; patch it (local tool, never submitted, reset by
+`ecdsafail sync`) to emit them all, env-gated:
+
+```rust
+// in the classical-mismatch branch of eval_circuit.rs:
+if std::env::var("DUMP_FAIL_SHOTS").is_ok() { eprintln!("FAILSHOT {i}"); }
+```
+
+`cargo build --release --bin eval_circuit`, then for **3-5 of the lowest-`cls` candidates** build
+the circuit and eval with `DUMP_FAIL_SHOTS=1`, collecting the failing shot indices for each. (Run
+under **bash**, not zsh — a multi-var `CFG` like `"DIALOG_GCD_WIDTH_SLOPE_X1000=1016
+DIALOG_GCD_COMPARE_BITS=43"` only word-splits into separate `env` assignments under bash; under
+zsh `env $CFG ...` passes it as one bogus var and silently builds the *base* config, which all
+your island nonces fail — a false all-dirty alarm.)
+
+Then compare the sets:
+
+- **Same shots recur across candidates** (high overlap) → **STRUCTURAL floor**: there is a fixed,
+  nonce-independent bad set. `0/0/0` is impossible. **Abandon the route.**
+- **Different shots each candidate** (little/no overlap) → **STATISTICAL tail**: each shot fails
+  independently with small `p`; a nonce where all 9024 pass exists. **Keep hunting** (it is just a
+  deep tail).
+
+**Verified examples:** the dead 1210q route `SEG182+FOLD17+DIALOGFOLD17` floored at `cls=2` with a
+clear pile-up (11 at `cls=2`, none below over 392 candidates) — structural. The live
+`slope1016+compare43` route also sat at best `cls=2`, but the failing shots for four `cls=2`
+candidates were `{2879,6741}`, `{2689,3336}`, `{589,7961}`, `{1062,8584}` — **zero overlap** →
+statistical, `0/0/0` reachable, just deep.
+
+**Depth estimate once you confirm statistical.** With `cls ~ Binomial(9024, p)` and mode `~lambda`
+(read it off the histogram), `P(cls=0) ≈ e^-lambda`. So `cls`-mode `~8` ⇒ `~1/3000` GCD-clean
+candidates are `cls=0`; multiply by the analogous `pha=0` rate (weaker if `cls`/`pha` are
+positively correlated, which they usually are near a true island) to estimate time-to-island.
+A deep but finite tail is a *patience* decision, not a route-kill — report the honest ETA.
+
+**Why a floor can exist at all** (since the tail nonce reseeds all 9024 shots): a structural floor
+requires shots whose inputs are *nonce-independent*. Most truncation error is driven by
+nonce-derived inputs (no floor), but some stacked apply-side truncations create a fixed bad set
+anyway (the 1210q case). Reseeding does **not** guarantee no floor — run the test.
+
 ## Remote Validation Hygiene
 
 Prefer remote parallel validation for large batches because local CPU validation is slow.
