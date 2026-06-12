@@ -1203,18 +1203,36 @@ auditing. Full annotated index + abstracts + local PDFs: `research/index.json`,
 
 ### Top external levers to try (ranked by expected fit)
 
-1. **`jumpdivsteps` — the unexplored generalization of our `ACTIVE_ITERATIONS`/`K2` win.**
+1. **`jumpdivsteps` — TESTED 2026-06-12: NO-GO for our route (cost-modelled + measured-K3-consistent).**
    *(Bernstein–Yang safegcd, eprint 2019/266.)* Batch `T` binary-GCD `divstep`s computed on the
    low `k` bits into one `(k+2)`-bit 2×2 transition matrix, then apply that matrix to the
-   full-width operands ~`n/T` times. Our route pays a full-width apply per recorded step
-   (`ACTIVE_ITERATIONS` × 256-wide); `K2` is the degenerate "strip ≤2 zeros/step" case. A true
-   jump-`T` records one matrix per `T` steps → far fewer full-width applies, trading transcript
-   width for full-width-op count. Watch the same failure mode as our measured K3 loss: the matrix
-   decode/apply must be cheaper than the steps it replaces.
-2. **`conditionally-clean ancilla` — the principled version of our dirty/vented `ROUND84` tricks.**
+   full-width operands ~`n/T` times. **Why it loses HERE (not in trailmix):** trailmix's route pays
+   a genuine full-width *apply* per step, so batching helps it. OUR route already compresses each
+   step's reduction into a **cheap 33-bit CLASSICAL-constant truncated ripple** — `y += δ = c·e +
+   2c·d`, `compressed.rs:2837` (`hi_delta=33`). A jump-`T` matrix apply must instead do **four
+   *quantum* small×256 multiplies** (the matrix entries `a,b,c,d` are data-dependent, not classical),
+   costing ~2.6× the Toffoli of the `T` K2 steps it replaces (~1.4× even with 2-bit windowing; floor
+   argument: 4 controlled 256-bit adds ≈ 2048 T/batch already > 60% of the T=4 step budget). It also
+   **widens** the GCD pillar (a matrix/accumulator register co-resident with `(u,v)` at the apply
+   peak → measured K3 second-shift went 1221→1222q, `memory/2026-06-11-measured-square-carry-selective-k3.md`).
+   And the peak is **co-pinned by `round84_inplace_solinas_square`** anyway, so even a width-neutral
+   GCD win can't drop the peak alone. Replacing a classical-constant ripple with quantum multiplies
+   is a structurally losing trade — the #1-ranked external lever does not survive contact with the
+   dialog route's already-compressed fold. Don't re-attempt without first changing the fold structure.
+2. **`conditionally-clean ancilla` — NOW THE TOP LEAD (jumpdivsteps #1 is dead). Targets the
+   round84-square pillar, the one jumpdivsteps cannot touch.**
    *(Khattar–Gidney 2407.17966; measurement-adaptive MCX 2605.18169.)* Use borrowed/dirty bits as
    if clean with zero allocation + Laddered Toggle Detection. Audit our borrowed-carry adders and
    round84 x-tail venting against it for a cleaner peak win than the hand-tuned `1309→1285` trade.
+   **Dual-pillar reality (verified 2026-06-12):** peak 1203 is co-held by the dialog-GCD apply fold
+   AND `round84_inplace_solinas_square` (forward+inverse) — both hit 1203, so the peak only drops if
+   BOTH drop together (a square-only or GCD-only win lowers Toffoli at best, not the peak). Because
+   it's value-exact (borrows real-clean bits), a conditionally-clean win has GOOD island density —
+   unlike the truncation levers that fall off the density cliff. Pair it with a GCD-pillar width drop
+   (lever 5b: Luo et al. variable-width) to actually move below 1203. Runner-up GCD-pillar lever:
+   **Luo et al. 2026 location-controlled / bit-length-tracked variable-width arithmetic**
+   (`external-literature:43-46`) — exact-reversible peak-floor on the GCD pillar without jumpdivsteps'
+   quantum-matrix penalty.
 3. **Automated uncompute scheduling** *(Meuli–Soeken–Roetteler SAT/QBF 1904.02121; Unqomp; spooky
    DAG solver 2401.10579)* — could replace hand-tuned venting/hosting/recompute decisions at the
    peak phase. Tooling investment, not a one-off lever.
