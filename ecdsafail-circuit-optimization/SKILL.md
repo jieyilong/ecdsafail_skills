@@ -263,9 +263,18 @@ Expected effect:
 
 Do not assume a lookup-table trick will dominate when the benchmark is mostly point-addition arithmetic.
 
-## TraiMix And Schrottenloher 2026 Checklist
+## TrailMix And Schrottenloher 2026 Checklist
 
-Use this checklist when translating ideas from Trail of Bits TraiMix and Andre Schrottenloher's 2026 paper into ECDSA Fail circuit routes. The important lesson is not a single circuit, but a way to account for live values, transcripts, and peak owners.
+Use this checklist when translating ideas from Trail of Bits TrailMix and Andre Schrottenloher's 2026 paper into ECDSA Fail circuit routes. The important lesson is not a single circuit, but a way to account for live values, transcripts, and peak owners.
+
+### Reference Routing
+
+For detailed Trail of Bits TrailMix implementation findings, read
+`references/trailmix-implementation-analysis.md` when the task involves TrailMix,
+Trail of Bits, jump-GCD, base-3/base-5 transcript compression, Proos-Zalka divstep,
+whole-register ghosting, venting, or sub-1175-qubit EC point-addition routes. Keep
+this `SKILL.md` section as the short operating checklist; use the reference for
+source-backed route tables, exact implementation mechanisms, and source-file maps.
 
 ### Verified provenance (read directly from the sources)
 
