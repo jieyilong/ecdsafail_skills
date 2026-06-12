@@ -57,19 +57,26 @@ Use an **engineering harness** to harden the best research outputs:
 
 The handoff artifact between the two harnesses should include: source commit/frontier baseline, hypothesis, changed files/env vars, measured q/Toffoli/score, cheap-gate or full-run result, failure class if any, and the exact next step.
 
-## Circuit-Level Diagnosis And Repair Loop
+## Diagnose, Repair, Then Hunt
 
-When a low-qubit or low-Toffoli route fails triage, do not immediately discard it or keep hunting blindly. Treat the route as a circuit-under-debugging problem and run a bounded diagnosis/improvement loop before spending more GPU time. This is especially important for aggressive sub-frontier qubit routes where candidate density can be zero because the circuit structure rejects the reachable input distribution in theory.
+When a low-qubit or low-Toffoli route fails triage, do not immediately discard it or keep hunting blindly. Treat the route as a circuit-under-debugging problem and run a bounded diagnosis/repair loop before spending more GPU time. This is especially important for aggressive sub-frontier qubit routes where candidate density can be zero because the circuit structure rejects the reachable input distribution in theory.
 
-Use this loop when a route shows zero or very low candidate density, repeated high dirty fingerprints, persistent `pha`/`anc`, or a suspiciously uniform failure pattern:
+Core rule:
 
-1. **Freeze the exact route.** Record the CFG, peak qubits, CCX/Toffoli estimate, peak-owner trace, state-file identity, validator binary/source hash if relevant, and the smallest scan/validation evidence that demonstrates the failure.
-2. **Localize the failing mechanism.** Prefer circuit-aware diagnostics over more nonce search: classical prefilter reason histograms, per-section validator counters, first-failing operation/section traces, convergence-step distributions, carry/borrow width histograms, compare-decision disagreement counts, phase/ancilla cleanup receipts, or local-vs-remote validator cross-checks.
-3. **Explain the failure in circuit terms.** Name the invariant that is being violated: under-converged GCD transcript, truncated body carry losing information, width envelope too tight, stale compare bit, dirty scratch reused across a live control, incorrect measurement/phase discharge, operand alias crossing a dependency boundary, or a peak-owner assumption that was false.
-4. **Patch the smallest responsible mechanism.** Restore one carry bit/window, widen one compare or active-width envelope, add a local giveback, delay one scratch release, restore one cleanup, change one chunk boundary, or move one alias lifetime. Keep the patch as close as possible to the diagnosed mechanism.
-5. **Measure the cost of the repair.** Recompute qubits, CCX/estimated Toffoli, score, and peak-owner movement. A repair is useful only if it preserves the target qubit regime or spends Toffoli/qubits in a consciously acceptable way.
-6. **Re-run the diagnostic before hunting.** The first success criterion is theoretical viability: the diagnosed hard failure should disappear or become a rare tail, failure fingerprints should diversify, and nearby safer variants should improve smoothly. Only then run a short equal-size island triage pilot.
-7. **Iterate with a budget.** Try up to a fixed number of diagnosis/repair iterations, often `X = 10`, or stop sooner if several consecutive repairs do not improve the same core signal. Record failed repairs and why they failed so the next agent does not rediscover them.
+```text
+The GPU should confirm a viable circuit theory, not substitute for one.
+```
+
+Use this loop when a route shows zero or very low candidate density, repeated high dirty fingerprints, persistent `pha`/`anc`, a suspiciously uniform failure pattern, or a hard residual floor that may be nonce-independent.
+
+1. **Freeze the exact route.** Record the source commit, CFG, peak qubits, CCX/Toffoli estimate, score if relevant, peak-owner trace, state-file identity, validator binary/source hash if relevant, scan range, candidate density, and the smallest scan/validation evidence that demonstrates the failure.
+2. **Diagnose the failing mechanism.** Prefer circuit-aware diagnostics over more nonce search: classical prefilter reason histograms, per-section validator counters, first-failing operation/section traces, failing-shot overlap tests, convergence-step distributions, carry/borrow width histograms, compare-decision disagreement counts, phase/ancilla cleanup receipts, local-vs-remote validator cross-checks, and peak-owner traces.
+3. **Explain the failure in circuit terms.** Name the invariant that is being violated: under-converged GCD transcript, truncated body carry losing information, width envelope too tight, stale compare bit, dirty scratch reused across a live control, incorrect measurement/phase discharge, full raw transcript decode co-residing with too much state, operand alias crossing a dependency boundary, or a peak-owner assumption that was false.
+4. **Patch the smallest responsible mechanism.** Restore one carry bit/window, widen one compare or active-width envelope, add a local giveback, delay one scratch release, restore one cleanup, change one chunk boundary, move one alias lifetime, add a per-step decode frame, or recompute/clear a narrow frame instead of holding a wide raw block. Keep the patch as close as possible to the diagnosed mechanism.
+5. **Measure the cost of the repair.** Recompute peak qubits, CCX/estimated Toffoli, score if score matters, and peak-owner movement. A repair is useful only if it preserves the target qubit regime or spends Toffoli/qubits in a consciously acceptable way.
+6. **Re-run diagnostics before hunting.** The first success criterion is theoretical viability: the diagnosed hard failure should disappear or become a rare tail, candidate density should become nonzero/plausible, failure fingerprints should diversify, `pha`/`anc` should not persist, and nearby safer variants should improve smoothly.
+7. **Only then run a short triage scan.** Use a 5-10M equal-size pilot before any large hunt. Validate candidates in fast and full modes. Continue only if candidate density and the `cls / pha / anc` distribution look huntable.
+8. **Iterate with a budget.** Try up to a fixed number of diagnosis/repair iterations, often `X = 10`, or stop sooner if several consecutive repairs do not improve the same core signal. Record failed repairs and why they failed so the next agent does not rediscover them.
 
 Judgment rules for the loop:
 
@@ -78,6 +85,16 @@ Judgment rules for the loop:
 - If relaxing a knob makes the theoretical diagnostic healthy, use that relaxation to identify the mechanism, then look for a cheaper targeted repair.
 - If every repair moves the route out of the target qubit regime, mark the route structurally incompatible with that target and switch bases.
 - If a route has no theoretical path to candidate production, GPU scanning is not evidence gathering; it is just burning frontier.
+
+Hunt-readiness checklist:
+
+- the route's qubits/Toffoli are acceptable for the current objective
+- the peak-owner trace matches the intended optimization
+- candidate density is not starved
+- validation has low or improving residuals
+- dirty fingerprints vary across candidates
+- no fixed failing-shot floor is detected
+- local and remote validators are reproducible
 
 ### Example: GCD Prefilter Autopsy Before More Hunting
 
@@ -97,6 +114,20 @@ Interpretation:
 - Mostly `ComparatorMismatch` under strict mode only: the prefilter may not be the blocker, but full validation must localize whether the truncated branch remains semantically correct.
 
 Case study: the `q=1171, active360, CCX=1,438,594` K1/base-3 sidecar route had zero candidates because sampled Fiat-Shamir factors had effectively `0%` pass rate. Raising active iterations removed only the convergence part; early `BodyTrimMismatch` and `WidthOverflow` still rejected every factor. Disabling the aggressive body/width envelope made the same samples mostly pass. The conclusion was structural: the low-qubit envelope discarded required GCD body/width information too early, so large-scale island hunting could not succeed until that mechanism was repaired.
+
+### Example: K5 Apply Decode Repair
+
+When the 1203q K5 transcript-compression route is apply-peak bound, inspect whether the compressed block is still full-decoded into a raw block during apply. If a 12-bit compressed K5 block co-resides with a 15-bit raw block plus codec/apply scratch, the route may have a direct qubit repair opportunity.
+
+Repair pattern:
+
+1. Keep the K5 clean transcript block compressed at rest.
+2. Decode only the current step's `(b0, b0_and_b1, s2)` into a tiny frame.
+3. Run the apply operation controlled by that frame.
+4. Recompute the same frame and clear it.
+5. Restore the compressed block before moving to the next step.
+
+This attacks the measured peak owner directly. It may spend extra codec Toffolis, but it avoids holding the whole raw transcript block live across `apply_double_y` / `apply_reverse_halve_y`. Use this kind of per-step decode frame whenever the diagnosis shows that "compressed representation exists, but full materialization still binds the peak."
 
 ## The Qubit<->Toffoli Exchange Rate (trailmix metric model)
 
