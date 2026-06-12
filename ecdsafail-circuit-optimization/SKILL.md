@@ -765,40 +765,58 @@ Optimization lesson:
 - Bake CFG defaults before final benchmark, then validate with the trusted path.
 - Preserve the distinction between scanner-side relaxed prefilters and official correctness.
 
-### Recent 1285q -> 1211q Frontier (verified exact-knob ladder)
+### Recent 1285q -> 1203q Frontier (verified exact-knob ladder)
 
 This is the most actionable current ladder. **Current public #1 = `833642fe` (commit `6953d1b`),
-score 1,697,398,113 = 1211 q x 1,401,650 T.**
+score 1,697,398,113 = 1203 q x 1,410,971 T.** This is the headline: **the 1211 qubit floor BROKE to
+1203** -- the first sub-1211 circuit, and the single most important current fact.
 
-**The `WIDTH_SLOPE` walk DEAD-ENDED -- the most important current lesson.** The leaders walked
-`DIALOG_GCD_WIDTH_SLOPE_X1000` 1015->1016->1017, but each notch **craters island density ~25x**
-(measured: slope1016 base ~0.5/Mnonce; slope1017 ~0.02; slope1018 = 0 GCD-clean in 10M). Past 1017
-the frontier is effectively unfindable at ~100k nonce/s. So the leaders **reverted slope 1017->1015**
-(looser = far higher density) and bought the Toffoli back a different way. **Walking slope past the
-live frontier is a trap: emitted drops ~-530/notch but density drops ~25x/notch -- the island-hunt
-cost explodes far faster than the score gain.**
+**The 1211 floor was breakable -- and the lever is jump-GCD + transcript compression, exactly the
+trailmix tactic this skill documents.** Prior analysis (incl. ours) wrongly concluded sub-1211 needed
+an apply-fold carry-pool rewrite and that knob routes were a dead end (a `cls=2` structural floor on
+stacked carry-truncs). The leaders broke it a different way -- by compressing the dialog transcript,
+not the carry pool. The 1203 stack vs the prior 1211 `186d9d7`:
+- `DIALOG_GCD_K2=1` -- **jump-GCD** (Stein-style: strip up to 2 trailing zeros per GCD step, recording
+  a `shift2` bit; the apply mirrors with a conditional 2nd double/halve). Fewer steps.
+- `DIALOG_GCD_K5_CLEAN_BLOCK=1` (+`ROUND763_COMPRESS_LEVER`/`_DEDUP`, `K2_PAIR_COMPRESS`) -- **radix
+  packing of the dialog transcript sidecar**: the `round763` 6->5 base packer + a GROUP_SIZE=3 K2
+  step group, "5 + 3 = 8" compressed bits per block. This frees the qubits the sidecar held at the
+  apply peak.
+- supporting: `SQUARE_ROW_MAX_SEG` 184->176, `DIALOG_GCD_FOLD_CARRY_TRUNC_W` 18->17, slope reverted
+  1017->**1015**, re-hunted nonce `9600076011007`.
 
-**The current SOTA `6953d1b` (slope1015) is a multi-lever retune, not a slope step.** vs the prior
-`186d9d7`: `DIALOG_GCD_WIDTH_SLOPE_X1000` 1017->**1015**, `SQUARE_ROW_MAX_SEG` 184->**176**,
-`DIALOG_GCD_FOLD_CARRY_TRUNC_W` 18->**17**, new knob **`DIALOG_GCD_K5_CLEAN_BLOCK=1`**, a
-`round763` compressor-inverse code change, and a re-hunted nonce. Net avg-executed Toffoli
-1,403,512 -> **1,401,650** (-1,862).
+This is the **trailmix jump=2 GCD + M=5 base-3 sidecar compression** that the "Transcript Compression
+And Jump Symbols" / "Dialog Sidecar Compression" sections predicted would drop the apply_bv peak
+~22 qubits. **Lesson: when stuck on a qubit frontier, mine the documented research levers (trailmix,
+Schrottenloher) -- they are the literal playbook, not background.**
 
-**Key insight -- emitted UP, executed DOWN.** This retune *raised* emitted CCX (1,481,696 ->
-**1,489,336**, +7,640) while *lowering* avg-executed (frac 0.94724 -> **0.94114**). The score is
-`round(avg_executed) x qubits`, so the win came entirely from a lower executed *fraction* (more
-conditional-replay / clean-block ops that fire on only a sub-set of shots), not fewer emitted gates.
-**Stop optimizing emitted CCX in isolation at this frontier; the lever is the executed fraction.**
-`DIALOG_GCD_K5_CLEAN_BLOCK` and the conditional-replay family (`*_CONDITIONAL_REPLAY`, all baked) are
-the model; look for more clean-block / measured-uncompute opportunities that convert always-executed
-Toffolis into fire-on-a-fraction ones.
+**Qubits are the prize, not Toffoli.** The trade the leaders accepted: avg-executed Toffoli *rose*
+1,403,512 -> **1,410,971** (+7,459), but qubits 1211 -> 1203 still won (1203 x 1,410,971 <
+1211 x 1,403,512, a -2.26M score step -- ~3x any single Toffoli notch). Do not grind the Toffoli
+axis when a qubit drop is in reach; -1 qubit ~= -1.4M score, vs ~-0.6M for a hard-won Toffoli notch.
 
-Promoted ladder: `03a1550` (slope1015, 1,701,048,104) -> `f804ee0` (slope1016, 1,700,420,806) ->
-`186d9d7` (slope1017, 1,699,653,032) -> `6953d1b` (slope1015 + K5_CLEAN_BLOCK retune, 1,697,398,113).
-To beat it: apply a *findable* cut on the looser slope1015 base (`DIALOG_GCD_COMPARE_BITS` is gentle
-on density; a deeper compare notch on this base lowers emitted ~-960 and stays huntable), then
-collect islands and submit the lowest avg-executed one -- the avg-T swings with the nonce, so banked
-margin comes from both the cut and a lucky conditional-replay draw.
+**The `WIDTH_SLOPE` walk dead-ended (still true, secondary).** 1015->1016->1017 each cratered island
+density ~25x (slope1016 ~0.5/Mnonce, 1017 ~0.02, 1018 = 0 in 10M) -- unfindable past 1017. The 1203
+SOTA *reverted* slope to 1015 (looser = findable ~0.6/Mnonce). Do not walk slope past the live
+frontier; density dies far faster than the score gain.
+
+**New peak binder at 1203:** `dialog_gcd_compressed_block_apply_double_y` / `reverse_halve_y` (the
+round84 square is now pushed *under* it -- `SQUARE_ROW_MAX_SEG` no longer drops the peak). Pushing
+below 1203 means freeing more at that apply-fold/double-halve phase: deeper transcript packing, a
+higher jump (K=3), or compressing the next co-resident -- the code hints headroom remains
+(K2 "stores shift2 uncompressed ... does not touch the round763 packer yet").
+
+**OPERATIONAL TRAP (cost us a wrong call):** after `ecdsafail sync`, `ecdsafail run` served a **stale
+`ops.bin`** and reported the OLD qubit count (1211, not 1203) -- the cache trap. **Always verify peak
+qubits with a forced `TRACE_PEAK=1 ./target/release/build_circuit` in a clean dir, never trust the
+cached `ecdsafail run` qubit line.**
+
+Promoted ladder: `cac150e`/`03a1550` (1211) -> ... -> `f804ee0` (slope1016) -> `186d9d7` (slope1017)
+-> `6953d1b` (**1203**, jump-GCD + K5 transcript compression, 1,697,398,113).
+To beat it: (a) the **findable Toffoli cut** -- `DIALOG_GCD_COMPARE_BITS=43` on the 1203 base is
+~0.6/Mnonce and lowers emitted ~-960 -> beats by ~1M while keeping 1203 q; collect islands, submit
+lowest avg-T. (b) the **bigger prize** -- push below 1203 via deeper compression / K=3 jump
+(structural, harder).
 
 (Our own promoted `d83d19c`, 1221 q / 1,743,174,081, is no longer the frontier; competitors
 pushed below it via the qubit drops below. A 1216q branch at 1,740,350,144 is also NOT
@@ -838,10 +856,12 @@ Exact promoted sequence (id : qubits : knob introduced):
   the GCD-convergence/width prefilter can screen, rather than a broad phase-wall increase.
 - `186d9d7` : 1211 (T-cut) : `DIALOG_GCD_WIDTH_SLOPE_X1000` 1016->1017 + re-hunted nonce
   `6100000089014596`. **End of the slope-walk** (1018+ unfindable, ~0.02/Mn).
-- `6953d1b` : 1211 (T-cut, **#1**) : slope reverted 1017->**1015** + `DIALOG_GCD_K5_CLEAN_BLOCK=1` +
-  `SQUARE_ROW_MAX_SEG` 184->176 + `DIALOG_GCD_FOLD_CARRY_TRUNC_W` 18->17 + round763 code change +
-  nonce `9600076011007`. avg-T 1,401,650. Emitted *rose* (1,481,696->1,489,336) but executed
-  *fraction* fell (0.94724->0.94114) -- the score win is all in the executed fraction.
+- `6953d1b` : **1203** (q-drop, breaks the 1211 floor, **#1**) : `DIALOG_GCD_K2=1` (jump-GCD) +
+  `DIALOG_GCD_K5_CLEAN_BLOCK=1` (round763 6->5 transcript packing + GROUP_SIZE=3, "5+3=8" bits/block)
+  + `K2_PAIR_COMPRESS=1` + `SQUARE_ROW_MAX_SEG` 184->176 + `DIALOG_GCD_FOLD_CARRY_TRUNC_W` 18->17 +
+  slope 1017->1015 + round763 compressor-inverse code change + nonce `9600076011007`.
+  avg-T 1,410,971 (Toffoli *rose* but the -8 qubits won). The trailmix jump-GCD + base-3 sidecar
+  compression lever, realized.
   `6100000089014596`. Same lever as `f804ee0`, one more notch -- the slope-walk continues (see the
   measured per-notch emit table above; 1018+ is open).
 
@@ -1081,9 +1101,15 @@ or compare-bit tightening as island-gated (needs a fresh `DIALOG_TAIL_NONCE`).
   hit that wall; the current SOTA `6953d1b` **reverted to 1015** and took the Toffoli back via
   `K5_CLEAN_BLOCK` etc. **Do NOT walk slope past the live frontier -- density dies far faster than
   the score gain.** Prefer `COMPARE_BITS` (gentle on density) for a findable cut.
-- `DIALOG_GCD_K5_CLEAN_BLOCK` (=1 in SOTA `6953d1b`) -- K5 clean-block lever; part of the multi-knob
-  slope1015 retune that lowered avg-executed by raising emitted but cutting the executed fraction
-  (the average-executed game). Pairs with the `round763` compressor-inverse code path.
+- `DIALOG_GCD_K2` (=1 in SOTA `6953d1b`) -- **jump-GCD**: strip up to 2 trailing zeros per GCD step
+  (records a `shift2` bit; apply mirrors with a conditional 2nd double/halve). Fewer steps; the
+  enabler for the transcript-compression qubit drop. Required by `K5_CLEAN_BLOCK`.
+- `DIALOG_GCD_K5_CLEAN_BLOCK` (=1 in SOTA `6953d1b`) -- **the lever that broke 1211->1203**: radix
+  packs the dialog transcript sidecar (`round763` 6->5 base packing + GROUP_SIZE=3 K2 group, "5+3=8"
+  compressed bits/block), freeing the qubits the sidecar held at the apply-fold peak. This is the
+  trailmix M=5 base-3 sidecar-compression lever. Pairs with `ROUND763_COMPRESS_LEVER`/`_DEDUP`,
+  `K2_PAIR_COMPRESS`, and the `round763` compressor-inverse code path. Code hints more headroom
+  ("does not touch the round763 packer yet") -> deeper packing may push below 1203.
 - `DIALOG_GCD_HOST_GATED` / `_BRANCH_BITS_HOST_COMPARATOR` / `_COMPOSITE_SCRATCH` -- host
   gated/comparator/Euclidean scratch on idle future-log + inactive high u/v lanes.
 - `DIALOG_GCD_K2_PAIR_COMPRESS` -- encode 2 K2 steps in 5 sidecar bits (was 3 steps/8 bits).
