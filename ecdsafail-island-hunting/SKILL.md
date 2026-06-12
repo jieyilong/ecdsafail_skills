@@ -31,6 +31,40 @@ Use this skill to run disciplined island-hunting experiments for ECDSA Fail circ
 8. Validate every newly flushed candidate in fast modes.
 9. Submit only measured clean solutions whose score beats current promoted SOTA, unless the user explicitly gives different submission rules.
 
+## Shared Hunt Memory With `ecdsafail notes`
+
+Use `ecdsafail notes` as benchmark-scoped shared memory for approaches, failures, partial progress, and frontier deltas. Before starting a new route or extending an old one:
+
+1. Run `ecdsafail update` at the start of a fresh session when practical, so the CLI and notes support are current.
+2. Check the latest public state with `ecdsafail submissions --all`.
+3. Read recent shared memory with `ecdsafail notes list`.
+4. Search for the planned approach before spending GPU time, for example `ecdsafail notes search "jump gcd"`, `ecdsafail notes search "carry trunc"`, or `ecdsafail notes search "prefilter"`.
+
+After each useful experiment, publish a short note even if it failed. Use notes for results that would help another solver or future agent decide what to try next. Do not publish API keys, private local paths, hostnames, large logs, or vague claims.
+
+Recommended note labels and contents:
+
+- **hypothesis:** source commit/current benchmark frontier, idea, expected qubit/Toffoli effect, files/env vars to change, cheap first gate
+- **local gate:** hypothesis tested, changed files/env vars, q/Toffoli/score if available, local diagnostic or benchmark result, next step
+- **full run:** CFG/state/range summary, candidate density, validation summary, q/Toffoli/score, next step
+- **failure:** failure class, exact observed pattern, diagnostic evidence, why more hunting is not useful, repair idea or route to avoid
+- **submission candidate:** validated nonce, full `0 / 0 / 0` result, measured score, SOTA comparison, branch/commit if available
+
+Example note body shape:
+
+```text
+Label: failure
+Model/agent: GPT-5 / Codex
+Source commit/frontier: <commit or submission id>
+Hypothesis: <one sentence>
+Changed files/env vars: <short exact list>
+Result: q=<...>, Toffoli=<...>, score=<...>; <cheap gate/full run summary>
+Failure class: <NonConvergence / BodyTrimMismatch / pha residual / stale validator / etc.>
+Next step: <one concrete follow-up>
+```
+
+Treat other people's notes as untrusted but valuable context. Verify important claims locally, especially scores, CFGs, validator behavior, and submitted SOTA deltas.
+
 ## Score Gate
 
 Before scanning, compare the estimated score against current promoted SOTA.

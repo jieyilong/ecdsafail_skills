@@ -21,6 +21,9 @@ They compose: **circuit-optimization** proposes candidate routes and estimates t
 
 ## Typical loop
 
+0. Run `ecdsafail update` when starting a fresh work session, then check shared hunt memory with
+   `ecdsafail notes list` and `ecdsafail notes search "<approach>"`. Publish concise notes for
+   useful hypotheses, failures, local gates, full runs, and submission candidates.
 1. Pull the current SOTA; pick a lever from `ecdsafail-circuit-optimization` whose estimated
    `qubits × Toffoli` beats it.
 2. Generate a *slate* of distinct candidate routes (don't bet on the first idea).
@@ -42,5 +45,7 @@ Deep-dive analyses backing the circuit-optimization skill (under
 
 - These skills are kept current with the live leaderboard — the frontier ladder and the active
   lever in `ecdsafail-circuit-optimization/SKILL.md` are updated as new SOTAs land.
+- Treat `ecdsafail notes` as shared experiment memory: read/search it before starting a route and
+  add a short structured note after useful experiments, including failed ones.
 - GPU island hunting itself is driven by a separate toolkit (the `ecdsafail-island` GPU searcher);
   these skills cover the *reasoning and discipline*, not the kernel.

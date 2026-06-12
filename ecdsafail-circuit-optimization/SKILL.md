@@ -34,6 +34,29 @@ Track every candidate route with:
 - expected correctness risk
 - candidate density and best `cls / pha / anc` after triage
 
+## Research / Engineering Harness Split
+
+For longer ECDSA Fail optimization pushes, separate exploratory research from engineering hardening.
+This keeps agents from either brainstorming forever or over-polishing a weak route.
+
+Use a **research harness** to create and cheap-test hypotheses:
+
+- generate diverse structural routes from the skill catalogue and SOTA notes
+- measure q/CCX/estimated Toffoli/score quickly
+- run tiny theoretical diagnostics or local gates
+- keep promising and failed route records with enough detail to reproduce
+- converge toward a short list of paths worth engineering
+
+Use an **engineering harness** to harden the best research outputs:
+
+- turn promising knobs into clean, reviewable patches
+- improve diagnostics/tooling where the research loop got stuck
+- run validator/local-vs-remote checks and controlled triage
+- preserve exact CFGs, commits, state files, benchmark output, and failure classes
+- publish concise shared notes so future agents can continue without rereading local logs
+
+The handoff artifact between the two harnesses should include: source commit/frontier baseline, hypothesis, changed files/env vars, measured q/Toffoli/score, cheap-gate or full-run result, failure class if any, and the exact next step.
+
 ## Circuit-Level Diagnosis And Repair Loop
 
 When a low-qubit or low-Toffoli route fails triage, do not immediately discard it or keep hunting blindly. Treat the route as a circuit-under-debugging problem and run a bounded diagnosis/improvement loop before spending more GPU time. This is especially important for aggressive sub-frontier qubit routes where candidate density can be zero because the circuit structure rejects the reachable input distribution in theory.
