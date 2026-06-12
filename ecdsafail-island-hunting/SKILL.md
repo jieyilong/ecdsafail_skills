@@ -382,27 +382,60 @@ If a GPU becomes idle and the route still beats SOTA, start the next obvious una
 
 Watch for suspicious nodes. For example, a GPU scanning tens of millions of nonces with zero candidates while other nodes show normal density may indicate a stale state file, wrong binary, logging issue, or pathological range. Inspect before extending that node repeatedly.
 
+## Heartbeat Automation
+
+When a new island hunt begins, automatically create or update a thread heartbeat instead of relying on memory. Use a **25-minute heartbeat** by default unless the user asks for a different interval. Do this even if the user did not explicitly ask for recurring progress reports; long-running nonce scans should always have a live progress monitor.
+
+The heartbeat prompt should be self-contained. Include:
+
+- active route name, source/worktree, CFG, measured qubits, Toffoli/CCX, and score context
+- state file path and trusted validator/build paths
+- GPU node inventory and SSH commands
+- current assigned ranges, highest frontier, and already completed windows
+- known candidate totals, density, and best validated `cls / pha / anc` near misses
+- submission policy: submit to ecdsafail only if measured score beats SOTA, unless the user explicitly says otherwise
+- branch policy for clean-but-worse low-qubit results, if requested
+- a reminder not to commit temp configs, scan logs, helper binaries, `ops.bin`, GPU states, or generated artifacts
+
+Before creating a duplicate heartbeat, inspect existing automations if the environment exposes an automation tool or local automation records. Prefer updating the current route's heartbeat when one exists. If the route changes, update the heartbeat promptly so it does not keep reporting stale ranges or an old CFG.
+
 ## Reporting Format
 
-For heartbeat-style progress reports, include:
+Use this compact shape for heartbeat-style progress reports. Prefer exact measured values; if a value is estimated, mark it with `~`. If no scans are active, say so plainly instead of inventing an active window.
 
-- latest promoted SOTA and active estimated score
-- active/idle GPU count
-- aggregate nonces/s and per-GPU rates when estimable
-- completed/scanned nonces
-- estimated in-flight nonces
-- remaining assigned window
-- highest assigned frontier
-- total GCD-clean candidates
-- candidate density
-- ETA for assigned ranges
-- expected time to next GCD-clean candidate
-- validator cross-check status
-- validation summary and compact near-miss table
-- any new ranges started
-- any suspicious node or route-triage decision
+```text
+# Overall Stats
+active trusted GPUs: <active>/<trusted reachable>
+unreachable: <node list or none>
+quarantined: <node list and reason, or none>
+aggregate observed rate: ~<nonce/s> nonce/s
+highest assigned frontier: <nonce>
+visible active-window progress: ~<scanned> scanned, ~<remaining> remaining
+current active-window candidates: <count>
+current-window density: ~<candidates/Mnonce> candidates/Mnonce
+expected next candidate: ~<time> at current density/rate
+latest promoted SOTA: <submission id>, q=<q>, Toffoli=<t>, score=<score>
+active route: q=<q>, Toffoli/CCX=<t>, score=<score>, triage=<GREEN/YELLOW/RED>
 
-Keep reports concise. Surface the best near misses and anomalies rather than dumping every dirty candidate.
+# Per GPU stats
+<node> (<GPU model>) <range> <scanned>/<assigned> <candidates> candidates <rate>/s ETA <eta>
+...
+
+# Best near misses (nonce cls/pha/anc)
+<nonce>   <cls> / <pha> / <anc>
+...
+```
+
+Reporting rules:
+
+- Keep reports concise; surface best near misses, anomalies, and route decisions instead of dumping every dirty candidate.
+- Report active/idle GPU count, unreachable nodes, quarantined nodes, and any stale-state suspicion.
+- Report aggregate and per-GPU rates when estimable. If a direct GPU command flushes output only at the end, use the last completed range's observed rate.
+- Include completed/scanned nonces, estimated in-flight nonces, remaining assigned window, highest assigned frontier, total GCD-clean candidates, density, ETA, and expected time to next candidate.
+- Include validator cross-check status when remote validation is used.
+- Include a compact near-miss table sorted by usefulness: clean `pha=0, anc=0` first, then low severity, then lower phase/anc.
+- If a GPU is idle and policy allows extension, report the new range/session. If policy says not to extend, report that decision.
+- If no scans are currently active, set active GPUs to `0/N`, mark ranges as completed, and use historical/completed-window density and rate for the expected-next-candidate estimate.
 
 ## Clean Solution Handling
 
@@ -412,8 +445,8 @@ If any full validation returns `0 / 0 / 0`:
 2. Run the normal benchmark/check.
 3. Pull latest SOTA again.
 4. Compute measured score from benchmark output.
-5. Submit only if measured score beats current promoted SOTA, unless the user explicitly instructs otherwise.
-6. Push the validated circuit to the requested challenge repo branch if requested.
+5. Submit to the ecdsafail site only if measured score beats current promoted SOTA, unless the user explicitly instructs otherwise.
+6. If the user wants clean-but-worse low-qubit results preserved, create a new branch in the requested challenge repo and push the validated circuit even when the score is higher than SOTA.
 
 Do not commit temporary scan configs, logs, helper binaries, remote scripts, `ops.bin`, or generated artifacts unless they are explicitly part of the validated challenge solution.
 
