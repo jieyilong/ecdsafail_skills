@@ -55,10 +55,10 @@ beats SOTA. This slate is the input to the bake-off.
 When you are exploring **multiple** such structural changes that all pass the score gate, do **not**
 just pick one and burn a frontier-scale search on it. Most of them will never land a clean island,
 and you find that out fastest by a cheap comparative pilot. Run a small, **equal-size** triage on
-each and rank them by how likely they are to land an island. Then hunt the most promising route
+each and judge which route has the healthiest overall evidence. Then hunt the most promising route
 first; only fall back to the next-ranked route if the leader is exhausted or fails its stop rules.
 
-Two signals predict island findability, and they multiply:
+Start from the two primary island-findability signals:
 
 1. **GCD-clean candidate density** — higher density means more shots on goal. A route producing
    2x the candidates per nonce reaches any given island count in half the nonces.
@@ -69,6 +69,34 @@ Two signals predict island findability, and they multiply:
    **falls off steeply (roughly geometrically) as its residual grows.** So a route whose candidates
    cluster at `(1, 2, 0)` is exponentially more likely to yield an island than one clustering at
    `(4, 5, 1)`, even at the same density.
+
+Do not collapse route quality into a rigid formula. Use density and residual distributions as the
+main evidence, then apply engineering judgment across supporting signals:
+
+- **Score margin vs SOTA:** a route barely below SOTA has little runway if measured Toffoli drifts
+  upward or a new SOTA appears.
+- **Fast/full validation agreement:** stable agreement and componentwise fast<=full behavior build
+  confidence; surprising disagreement points to tooling or structural uncertainty.
+- **Fingerprint diversity:** varied dirty fingerprints suggest nonce-dependent behavior; one
+  repeated fingerprint suggests a structural failure.
+- **Failure localization:** late, small, varying failures are more huntable than early failures in
+  GCD/apply reconstruction, carry cleanup, phase discharge, or core algebra.
+- **Residual type:** persistent `pha` or `anc` is usually more concerning than classical-only
+  (`cls`) residuals of the same size.
+- **Distribution shape:** prefer routes with a visible tail toward zero over routes clustered tightly
+  around high severity.
+- **Nearby-route sensitivity:** if restoring one carry bit, compare bit, or cleanup step improves
+  quality at modest score cost, the route has a tunable path.
+- **Per-node and per-range health:** candidate production should be roughly consistent across
+  ranges and GPUs; anomalies may indicate stale state, wrong binaries, or logging problems.
+- **Validator reproducibility:** local and remote validators must match sampled candidates before
+  trusting distributed validation.
+- **Peak-owner plausibility:** the structural change should plausibly affect the measured peak
+  owner; savings in non-peak phases may not translate into a real score improvement.
+- **Nonce-range robustness:** similar behavior across separated ranges is stronger than one lucky
+  small band.
+- **Structural provenance:** prefer routes derived from a known-clean base by one understandable
+  change over piles of interacting aggressive changes.
 
 ### Bake-off protocol
 
@@ -83,29 +111,14 @@ For each candidate structural change:
 4. Build the **residual histogram**: bucket candidates by `severity = max(cls, pha, anc)` (sev = 1,
    2, 3, ...). Note separately any `pha > 0` or `anc > 0`, which are structural/harder signals.
 
-### Ranking metric
+### Comparative judgment
 
-The single best predictor is the **estimated island rate per nonce**, which you read off the low
-end of the histogram:
+Use the pilot evidence to make a qualitative route judgment, not a pretend-precise score. Prefer
+routes where multiple independent signals agree: healthy density, low and diverse residuals, stable
+validation, plausible peak-owner impact, and no suspicious node or CFG behavior. Stop or demote a
+route when strong structural-failure evidence appears, even if one metric looks good.
 
-```text
-island_rate(route) ~= GCD_clean_density * P(candidate is clean | GCD-clean)
-```
-
-Estimate `P(clean | GCD-clean)` from the near-miss tail. In practice rank by this proxy
-(higher = hunt first):
-
-```text
-landability = GCD_clean_density * (fraction of GCD-clean candidates with severity <= 2)
-```
-
-This rewards both axes the user cares about: dense candidates AND candidates that sit close to
-`0 / 0 / 0`. If the histogram is clean enough to see a geometric fall-off (e.g. counts at
-sev = 1, 2, 3 in a roughly constant ratio `r`), extrapolate the tail down to sev = 0 to estimate
-the island density directly — that is the most principled rank key. The `severity <= 2` fraction
-is the no-fit fallback.
-
-Tie-breakers and adjustments, in order:
+Useful comparison cues:
 
 - Prefer the route with the **lower mean/median severity** — a route whose mass is at `(1, *, 0)`
   beats one at `(3, *, 0)` even if the `<=2` fractions are close.
@@ -114,26 +127,31 @@ Tie-breakers and adjustments, in order:
   that no nonce will fix (see Stop Rules). A route at `(1, 0, 0)` ranks well above `(1, 0, 1)`.
 - Penalize routes whose near-misses all share **one identical fingerprint** (no diversity) — that
   is a structural near-miss, not a distribution you can search through.
+- Prefer routes whose promising candidates appear across multiple nonce ranges and nodes.
+- Prefer routes whose nearby safer variants improve smoothly rather than flipping between clean-ish
+  and uniformly broken.
+- Prefer routes whose estimated score has enough SOTA margin to survive final measurement drift.
 
 ### Worked example
 
-| route | density (c/Mn) | sev<=2 frac | typical triple | landability | decision |
-|-------|---------------:|------------:|----------------|------------:|----------|
-| A | 0.8 | 0.45 | `(1, 2, 0)` | 0.36 | hunt first |
-| B | 1.6 | 0.10 | `(4, 5, 1)` | 0.16 | hunt second |
-| C | 0.3 | 0.50 | `(2, 0, 0)` | 0.15 | hold |
-| D | 1.2 | 0.05 | `9024 / 141 / 0` | 0.06 | drop (structural) |
+| route | density (c/Mn) | typical validation pattern | supporting signals | decision |
+|-------|---------------:|----------------------------|--------------------|----------|
+| A | 0.8 | many `(1, 2, 0)` / `(2, 1, 0)` candidates | diverse fingerprints, range-stable, good score margin | hunt first |
+| B | 1.6 | mostly `(4, 5, 1)` with persistent `pha/anc` | higher density, but poorer residual type | hold or hunt second |
+| C | 0.3 | a few `(2, 0, 0)` candidates | low density, but clean residual type | hold for fallback |
+| D | 1.2 | repeated `9024 / 141 / 0` | uniform high fingerprint | drop as structural |
 
-Route B has the highest raw density but its candidates sit far from clean, so A — fewer but much
-closer candidates — is the better first hunt. D is dropped outright on the uniform high fingerprint
-regardless of density.
+Route B has the highest raw density, but its candidates sit far from clean and carry persistent
+phase/ancilla dirt. Route A has fewer shots on goal but healthier near misses and more independent
+supporting signals, so it is the better first hunt. D is dropped outright on the uniform high
+fingerprint regardless of density.
 
 ### Cost discipline
 
 The bake-off is a **comparison**, not a hunt. Keep each pilot to the 5-10M band and stop as soon as
-the ranking is clear — if one route is an order of magnitude better on landability after a few
-million nonces, commit GPUs to it rather than finishing equal pilots on the obvious losers. Re-run a
-fresh bake-off whenever the base circuit changes (a new SOTA base reseeds every route's inputs).
+the ranking is clear — if one route has much healthier overall evidence after a few million nonces,
+commit GPUs to it rather than finishing equal pilots on the obvious losers. Re-run a fresh bake-off
+whenever the base circuit changes (a new SOTA base reseeds every route's inputs).
 
 ## Short Triage Scan
 
@@ -288,24 +306,34 @@ Do not commit temporary scan configs, logs, helper binaries, remote scripts, `op
 
 ## Route Comparison Heuristic
 
-When choosing among multiple candidate routes, the quantitative method is the **Route Bake-Off**
-ranking above (rank by `landability = GCD_clean_density * fraction with severity <= 2`, tie-broken by
-mean severity and `pha`/`anc` penalties). The qualitative checklist below is the same idea in
-prose — use it to sanity-check the ranking and to judge a single route in isolation.
+When choosing among multiple candidate routes, use the **Route Bake-Off** above to collect equal-size
+pilot evidence, then make a qualitative engineering judgment. Do not summarize route quality into a
+single rigid formula. Prefer routes with several independent healthy signals; stop routes with strong
+structural-failure evidence even if one metric looks good.
 
 Prefer routes that have:
 
 - lower estimated score than SOTA
+- enough score margin to survive final measurement drift or a small SOTA movement
 - healthy GCD-clean density
 - low single-digit near misses
 - diverse dirty fingerprints
 - stable fast/full and local/remote validation
+- mostly classical residuals rather than persistent phase or ancilla dirt
+- failures that localize late or vary by nonce instead of breaking early core algebra
+- consistent behavior across nodes and separated nonce ranges
+- nearby safer variants that improve smoothly
+- a structural change that plausibly affects the measured peak owner
 
 Avoid routes that have:
 
 - score at or above SOTA
+- score margin so small that final measurement drift would likely lose
 - starved candidate density
 - repeated high dirty triples
 - no severity `<= 10` after dozens of candidates
 - stale validator or CFG uncertainty
 - suspicious per-node behavior that cannot be explained
+- persistent `pha`/`anc` residuals across otherwise promising candidates
+- uniform failure localization in an early GCD/apply, carry-cleanup, or phase-discharge section
+- qubit savings in a non-peak phase only
