@@ -276,6 +276,12 @@ whole-register ghosting, venting, or sub-1175-qubit EC point-addition routes. Ke
 this `SKILL.md` section as the short operating checklist; use the reference for
 source-backed route tables, exact implementation mechanisms, and source-file maps.
 
+For detailed Andre Schrottenloher paper findings, read
+`references/andre-schrottenloher-2026-analysis.md` when the task involves arXiv
+2606.02235, the 1192/1208 qubit accounting, dialog-transcript in-place
+multiplication, EEA/Bezout splitting, pseudo-Mersenne approximate arithmetic,
+or reproducing the Qarton reference implementation.
+
 ### Verified provenance (read directly from the sources)
 
 - **Schrottenloher 2026** = arXiv **2606.02235v1**, "*Optimized Point Addition Circuits for
