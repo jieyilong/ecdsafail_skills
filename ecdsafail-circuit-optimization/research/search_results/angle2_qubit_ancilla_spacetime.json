@@ -1,0 +1,182 @@
+[
+  {
+    "title": "Time/Space Trade-Offs for Reversible Computation",
+    "authors": ["Charles H. Bennett"],
+    "year": 1989,
+    "url": "https://epubs.siam.org/doi/10.1137/0218053",
+    "pdf_url": "https://mathweb.ucsd.edu/~sbuss/CourseWeb/Math268_2013W/Bennett_Tradeoffs.pdf",
+    "abstract": "Using a pebbling argument, shows that ordinary multitape Turing machines using time T and space S can be simulated by reversible ones using time O(T^(1+eps)) and space O(S log T), or in linear time and space O(S T^eps). Introduces a recursive, hierarchical scheme of doing and undoing various-sized portions of a computation -- the 'pebbling' algorithm viewed as a pebble game on a 1D chain of nodes.",
+    "relevance_note": "Foundational reversible pebbling: trade recomputation time for fewer ancilla. The recursive do/undo strategy is the basis of every modern ancilla-recycling scheme; the O(S log T) vs O(S T^eps) curve is the canonical space-time knob for uncomputation."
+  },
+  {
+    "title": "A note on Bennett's time-space tradeoff for reversible computation",
+    "authors": ["Robert Y. Levine", "Alan T. Sherman"],
+    "year": 1990,
+    "url": "https://epubs.siam.org/doi/10.1137/0219046",
+    "pdf_url": "https://scispace.com/papers/a-note-on-bennett-s-time-space-tradeoff-for-reversible-28blm8o08w",
+    "abstract": "Refines and makes precise the time-space tradeoff of Bennett's reversible pebbling simulation, giving an exact analysis of the number of pebbles (registers) versus the number of computation/uncomputation steps for the chain pebble game.",
+    "relevance_note": "Gives the exact pebble-count vs step-count formula for Bennett's chain game: with k+1 pebbles you can pebble 2^k nodes in 3^k steps. This is the precise lever for choosing how many ancilla registers to spend vs how much recomputation to pay."
+  },
+  {
+    "title": "Reversible Pebbling Game for Quantum Memory Management",
+    "authors": ["Giulia Meuli", "Mathias Soeken", "Martin Roetteler", "Nikolaj Bjorner", "Giovanni De Micheli"],
+    "year": 2019,
+    "url": "https://arxiv.org/abs/1904.02121",
+    "pdf_url": "https://arxiv.org/pdf/1904.02121",
+    "abstract": "Quantum memory management is becoming a pressing problem. The order in which intermediate results are computed and uncomputed -- governed by the reversible pebble game -- greatly affects both the number of qubits used and the gate count. Formulates pebbling as a SAT/QBF problem to find pebbling strategies that minimize qubits subject to a circuit-size budget.",
+    "relevance_note": "Reversible pebbling: solver-driven scheduling of compute/uncompute to minimize ancilla qubits at the cost of recomputation. Directly applicable to choosing the uncompute order of intermediate registers in modular-arithmetic / EC point-addition pipelines."
+  },
+  {
+    "title": "The Spooky Pebble Game",
+    "authors": ["Craig Gidney"],
+    "year": 2019,
+    "url": "https://algassert.com/post/1905",
+    "pdf_url": "https://algassert.com/post/1905",
+    "abstract": "Introduces the 'spooky pebble game', an extension of the reversible pebble game that allows Hadamard-basis measurements during uncomputation. Measuring leaves temporary phase errors ('ghosts') that are fixed up later by classically-controlled phase corrections. This lets quantum space be reclaimed before an uncomputation begins instead of after it ends, dramatically reducing qubit counts (e.g. ~log L pebbles in ~L log L steps).",
+    "relevance_note": "Measurement-based uncomputation frees ancilla early at the cost of classically-controlled phase fixups ('ghosts'). Replaces many ancilla qubits with cheaper classical control bits -- the core space-saving idea behind spooky pebbling. Coined the term."
+  },
+  {
+    "title": "Verifying Measurement Based Uncomputation",
+    "authors": ["Craig Gidney"],
+    "year": 2019,
+    "url": "https://algassert.com/post/1903",
+    "pdf_url": "https://algassert.com/post/1903",
+    "abstract": "Explains and verifies the measurement-based uncomputation primitive: instead of running an uncompute circuit, measure the ancilla in the X basis and apply a classically-controlled phase fixup conditioned on the outcome. Shows the algebra by which the measurement removes the qubit while pushing a correctable phase onto the controls.",
+    "relevance_note": "The atomic measurement-based-uncompute move: X-basis measure to deallocate an ancilla with zero gates, paying only a classically-controlled Z fixup. The building block for the temporary logical-AND and for spooky pebbling."
+  },
+  {
+    "title": "Halving the cost of quantum addition",
+    "authors": ["Craig Gidney"],
+    "year": 2018,
+    "url": "https://arxiv.org/abs/1709.06648",
+    "pdf_url": "https://arxiv.org/pdf/1709.06648",
+    "abstract": "Reduces the number of T gates for an n-bit adder from 8n+O(1) to 4n+O(1) using a 'temporary logical-AND' construction: four T gates store the logical-AND of two qubits into an ancilla, and zero T gates later erase it via measurement-based uncomputation. Applies to integer/modular arithmetic, QFT, Shor's algorithm, and Grover oracles.",
+    "relevance_note": "Measurement-based uncompute of the AND ancilla: erase a borrowed ancilla with zero T gates by measuring and applying a classically-controlled CZ fixup. The temporary logical-AND is the workhorse for cheap, garbage-free ancilla in EC/modular arithmetic circuits."
+  },
+  {
+    "title": "Factoring with n+2 clean qubits and n-1 dirty qubits",
+    "authors": ["Craig Gidney"],
+    "year": 2017,
+    "url": "https://arxiv.org/abs/1706.07884",
+    "pdf_url": "https://arxiv.org/pdf/1706.07884",
+    "abstract": "Presents reversible circuits for modular multiplication, modular exponentiation, and Shor's factoring that use n+2 clean qubits plus n-1 borrowed dirty qubits (qubits in an unknown state borrowed from elsewhere and returned untouched). Uses dirty-ancilla constant adders and controlled modular arithmetic.",
+    "relevance_note": "Borrowed/dirty-ancilla construction: hosts scratch on n-1 qubits owned by other registers, restoring them exactly, so net clean-qubit footprint is only n+2. Register-borrowing instead of allocation -- a direct space lever for arithmetic blocks."
+  },
+  {
+    "title": "Factoring using 2n+2 qubits with Toffoli based modular multiplication",
+    "authors": ["Thomas Haener", "Martin Roetteler", "Krysta M. Svore"],
+    "year": 2016,
+    "url": "https://arxiv.org/abs/1611.07995",
+    "pdf_url": "https://arxiv.org/pdf/1611.07995",
+    "abstract": "Implements Shor's algorithm factoring n-bit integers using only 2n+2 qubits with a purely Toffoli-based modular multiplication circuit (depth O(n^3), gate count O(n^3 log n)). Introduces a new in-place constant-adder built from only dirty ancilla qubits with size O(n log n) and depth O(n).",
+    "relevance_note": "Space-optimized modular arithmetic at 2n+2 qubits via an in-place constant adder that uses only dirty (borrowed) ancilla. Shows how to avoid clean-ancilla allocation in the inner adder, the single biggest qubit consumer in modular pipelines."
+  },
+  {
+    "title": "Rise of conditionally clean ancillae for efficient quantum circuit constructions",
+    "authors": ["Tanuj Khattar", "Craig Gidney"],
+    "year": 2024,
+    "url": "https://arxiv.org/abs/2407.17966",
+    "pdf_url": "https://arxiv.org/pdf/2407.17966",
+    "abstract": "Introduces 'conditionally clean' ancillae, a resource bridging clean and dirty ancillae: like dirty ancillae they start/end in an unknown state and can be borrowed from existing system qubits (no allocation overhead), but like clean ancillae they can be treated as |0> within specific computations, avoiding toggle-detection overhead. Introduces 'Laddered Toggle Detection' to avoid exponential overhead, and shows one part of a circuit can borrow dirty bits from another part of itself.",
+    "relevance_note": "Conditionally-clean ancilla: borrow bits from existing registers and use them as if clean, eliminating both allocation cost and the usual dirty-ancilla toggle-detection blowup. Enables linear/log-depth multi-controlled gates with zero extra qubits -- a fresh space lever for control-heavy EC circuits."
+  },
+  {
+    "title": "Tight Bounds on the Spooky Pebble Game: Recycling Qubits with Measurements",
+    "authors": ["Niels Kornerup", "Jonathan Sadun", "David Soloveichik"],
+    "year": 2025,
+    "url": "https://arxiv.org/abs/2110.08973",
+    "pdf_url": "https://arxiv.org/pdf/2110.08973",
+    "abstract": "The reversible pebble game models qubit reuse in quantum algorithms but cannot exploit the power of irreversible intermediate measurements. The spooky pebble game models interleaved measurements and adaptive phase corrections, reducing qubit count beyond reversible approaches. Proves asymptotically tight time-qubit trade-offs for the spooky pebble game on a line for any pebble bound, giving a tight time-qubit tradeoff for simulating arbitrary classical sequential computation.",
+    "relevance_note": "Tight space-time bounds for measurement-based uncomputation on a line: quantifies exactly how many qubits measurement+phase-fixup saves vs reversible pebbling for a given recomputation budget. The theoretical backbone for spooky-pebbling-based qubit recycling."
+  },
+  {
+    "title": "Trade-offs between classical and quantum space using spooky pebbling",
+    "authors": ["Arend-Jan Quist", "Alfons Laarman"],
+    "year": 2024,
+    "url": "https://arxiv.org/abs/2401.10579",
+    "pdf_url": "https://arxiv.org/pdf/2401.10579",
+    "abstract": "Applies the spooky pebble game to general circuits (not just lines) for the first time. Proves an upper bound on quantum space in the spooky pebble game, proves solving the game is PSPACE-complete, and presents a SAT-solver-plus-heuristic solver that computes optimal classical-space / quantum-space / time trade-offs empirically.",
+    "relevance_note": "A practical solver that schedules measurement-based uncomputation (spooks) on arbitrary DAGs to trade classical bits for qubits. Directly usable to find qubit-minimal uncompute orderings for EC point-addition dependency graphs."
+  },
+  {
+    "title": "Optimizing Quantum Space Using Spooky Pebble Games",
+    "authors": ["Arend-Jan Quist", "Alfons Laarman"],
+    "year": 2023,
+    "url": "https://dl.acm.org/doi/10.1007/978-3-031-38100-3_10",
+    "pdf_url": "https://scholarlypublications.universiteitleiden.nl/access/item:3673407/download",
+    "abstract": "Reversible Computation 2023 paper introducing a constraint-solver-based approach to find spooky-pebble-game strategies that minimize quantum space (pebbles) by spending classical space (spooks), with empirical evaluation on benchmark circuits.",
+    "relevance_note": "Companion conference version: concretely demonstrates qubit reductions from converting reversible uncomputes into measurement-based 'spook' moves backed by classical memory. Shows the practical pebble-count savings on real circuits."
+  },
+  {
+    "title": "Parallel Spooky Pebbling Makes Regev Factoring More Practical",
+    "authors": ["Arend-Jan Quist", "Alfons Laarman", "et al."],
+    "year": 2025,
+    "url": "https://arxiv.org/abs/2510.08432",
+    "pdf_url": "https://arxiv.org/pdf/2510.08432",
+    "abstract": "Develops parallel spooky pebbling strategies and applies them to reduce the qubit/space cost of Regev's factoring algorithm, exploiting measurement-based uncomputation across parallel branches to cut quantum space while keeping depth manageable.",
+    "relevance_note": "Extends measurement-based uncomputation to the parallel setting, letting several recomputation branches reclaim qubits concurrently via spooks -- a depth-aware space lever relevant when uncompute scheduling must respect parallelism in EC/Shor pipelines."
+  },
+  {
+    "title": "Unqomp: Synthesizing Uncomputation in Quantum Circuits",
+    "authors": ["Anouk Paradis", "Benjamin Bichsel", "Samuel Steffen", "Martin Vechev"],
+    "year": 2021,
+    "url": "https://dl.acm.org/doi/10.1145/3453483.3454040",
+    "pdf_url": "https://files.sri.inf.ethz.ch/website/papers/pldi21-unqomp.pdf",
+    "abstract": "First procedure to automatically synthesize uncomputation in a given quantum circuit, freeing temporary ancilla values to |0> so they can be safely reused. Integrates into Qiskit-style languages, letting programmers allocate temporaries like in classical computation, with Unqomp guaranteeing correct, efficient uncomputation.",
+    "relevance_note": "Automatic uncomputation: builds a qubit-dependency graph and inserts uncompute gates to free ancilla as early as safely possible, reducing peak qubit count without manual scheduling. Directly relevant to garbage-free ancilla reuse in arithmetic circuits."
+  },
+  {
+    "title": "Reducing the Number of Qubits in Quantum Computations (Scalable Memory Recycling for Large Quantum Programs)",
+    "authors": ["Anouk Paradis", "Benjamin Bichsel", "Martin Vechev"],
+    "year": 2025,
+    "url": "https://arxiv.org/abs/2503.00822",
+    "pdf_url": "https://arxiv.org/pdf/2503.00822",
+    "abstract": "Presents a scalable approach to recycle qubit memory across large quantum programs by automatically scheduling uncomputation and reuse of ancilla registers, extending the Unqomp line of work to handle realistic, modular programs while minimizing peak qubit usage.",
+    "relevance_note": "Scales automatic uncomputation/memory-recycling to whole programs: schedules when freed registers can host later temporaries, lowering peak qubit count. Useful for register sharing across the many sub-blocks of an EC point-addition circuit."
+  },
+  {
+    "title": "Catalytic Embeddings of Quantum Circuits",
+    "authors": ["Matthew Amy", "Matthew Crawford", "Andrew N. Glaudell", "Melissa L. Macasieb", "Samuel S. Mendelson", "Neil J. Ross"],
+    "year": 2023,
+    "url": "https://arxiv.org/abs/2305.07720",
+    "pdf_url": "https://arxiv.org/pdf/2305.07720",
+    "abstract": "Introduces catalytic embeddings for circuit synthesis: rather than repeatedly approximating gates, approximations are relegated to preparing a fixed number of reusable resource states ('catalysts'). Because catalysts are prepared once and returned unchanged, catalytic embeddings always yield shorter circuits in the limit of increasing gate count and target precision.",
+    "relevance_note": "Catalytic embedding: a fixed pool of reusable catalyst qubits replaces per-operation gate approximation, amortizing ancilla cost across many uses and returning the catalysts untouched -- a space-time lever for rotation-heavy subroutines."
+  },
+  {
+    "title": "Quantum Catalytic Space",
+    "authors": ["Harry Buhrman", "Marten Folkertsma", "Ian Mertz", "Florian Speelman", "Sergii Strelchuk", "Sathyawageeswar Subramanian", "Quinten Tupker"],
+    "year": 2025,
+    "url": "https://arxiv.org/abs/2506.16324",
+    "pdf_url": "https://arxiv.org/pdf/2506.16324",
+    "abstract": "Defines catalytic computing in the quantum setting and gives initial results. Shows that reusing borrowed full ('catalytic') memory that must be returned to its original state is a powerful computational resource, enabling subroutines with little or no net space overhead.",
+    "relevance_note": "Catalytic computation theory: borrow a full, arbitrarily-initialized register, use it as workspace, and restore it exactly -- net-zero ancilla footprint. Generalizes dirty-ancilla borrowing and motivates register-sharing tricks that host garbage in already-occupied qubits."
+  },
+  {
+    "title": "Active volume: An architecture for efficient fault-tolerant quantum computers with limited non-local connections",
+    "authors": ["Daniel Litinski", "Naomi Nickerson"],
+    "year": 2022,
+    "url": "https://arxiv.org/abs/2211.15465",
+    "pdf_url": "https://arxiv.org/pdf/2211.15465",
+    "abstract": "Introduces an architecture where the cost of a computation is the number of qubits times the number of non-Clifford gates, replaced by a per-operation 'active volume'. With O(log N) non-local connections per logical qubit, cost scales with logical operations rather than qubit count; for thousands of logical qubits active volume can be orders of magnitude below circuit volume, and the machine runs with spacetime cost ~2x the active volume.",
+    "relevance_note": "Active-volume reframes the space-time tradeoff: idle qubits cost nothing, so the metric becomes summed per-operation volume. Changes which uncomputation/ancilla strategies are optimal -- favoring constructions that minimize active (non-Clifford) volume over raw qubit count."
+  },
+  {
+    "title": "On Exact Space-Depth Trade-Offs in Multi-Controlled Toffoli Decomposition",
+    "authors": ["et al."],
+    "year": 2025,
+    "url": "https://arxiv.org/abs/2502.01433",
+    "pdf_url": "https://arxiv.org/pdf/2502.01433",
+    "abstract": "Studies exact trade-offs between ancilla count and circuit depth when decomposing multi-controlled Toffoli gates, integrating Selinger/Jones/Soeken measurement-based-update designs (one ancilla, T-count 4, T-depth 1) and ancilla-free logical-AND variants. Characterizes when replacing Toffolis with ANDs plus measurement-based uncomputation reduces depth at the price of ancilla, or vice versa.",
+    "relevance_note": "Maps the exact ancilla-vs-depth frontier for multi-controlled Toffoli/AND decompositions, including measurement-based uncompute variants that trade an ancilla qubit for lower T-depth. Practical guidance for the control-heavy gates in EC point-addition."
+  },
+  {
+    "title": "Improved T counts and active volume estimates for high-level arithmetic subroutines",
+    "authors": ["et al."],
+    "year": 2025,
+    "url": "https://arxiv.org/abs/2504.19626",
+    "pdf_url": "https://arxiv.org/pdf/2504.19626",
+    "abstract": "Provides improved T-count and active-volume estimates for high-level arithmetic subroutines (adders, multipliers, modular reduction), analyzing how ancilla-borrowing and uncomputation choices affect both T-count and active volume under fault-tolerant cost models.",
+    "relevance_note": "Connects ancilla/uncompute choices to active-volume cost for the exact arithmetic primitives used in EC/Shor circuits, helping pick space-saving constructions that also minimize the active-volume-dominated runtime cost."
+  }
+]

@@ -1,0 +1,98 @@
+[
+  {
+    "title": "Constructing Large Controlled Nots",
+    "url": "https://algassert.com/circuits/2015/06/05/Constructing-Large-Controlled-Nots.html",
+    "year": "2015",
+    "abstract": "Reduces a multi-controlled NOT (C^n X) into a linear number of Toffoli gates using ancilla bits, with constant factors that depend on whether the borrowed wires are dirty (borrowed, restored) or burnable (clean/zeroed).",
+    "pdf_url": "",
+    "relevance_note": "Decompose a C^n X down a ladder of borrowed ancilla into O(n) Toffolis instead of textbook O(n^2). Mechanisms: (1) single-ancilla split: 'toggle the ancilla bit ON when half of the controls are ON, then use a single control on the ancilla to play the role of that half', turning C^n into two C^(n/2). (2) Linear construction with n-2 borrowed bits accumulates control intersections down a chain of Toffolis. Costs: ~4n gates with n borrowed (dirty) bits, ~n gates with n burnable (clean) bits, ~16n gates with a single borrowed bit. Key lever for point-add: any big multi-control (e.g. is-register-zero, conditional select) becomes linear-Toffoli with ancilla you already have lying around."
+  },
+  {
+    "title": "Constructing Large Increment Gates",
+    "url": "https://algassert.com/circuits/2015/06/12/Constructing-Large-Increment-Gates.html",
+    "year": "2015",
+    "abstract": "Builds an n-bit increment (+1) gate from O(n) Toffoli-or-smaller gates using a single borrowed (dirty) ancilla bit, via a complement-and-subtract construction.",
+    "pdf_url": "",
+    "relevance_note": "n-bit increment in O(n) Toffolis with ONE borrowed dirty ancilla instead of O(n^2). Mechanism: surround an increment with NOTs to turn it into a decrement ('increment the complemented value, then take the complement again ... turning it into a decrement'); use a borrowed register and two subtractions with toggled garbage bits that cancel, netting +1. Relevant because EC point-add is full of conditional +/-1 and counter updates; this gives the cheap linear increment primitive with negligible ancilla."
+  },
+  {
+    "title": "Turning Gradients into Additions into QFTs",
+    "url": "https://algassert.com/post/1620",
+    "year": "2016",
+    "abstract": "Shows that adding into a pre-prepared phase-gradient register applies precise phase rotations, so QFT-style precise Z-gates can be replaced by ordinary additions, and the expensive precise gate need only be approximated once.",
+    "pdf_url": "",
+    "relevance_note": "Replace many high-precision phase gates with additions into a phase-gradient register. Mechanism: 'when you shift samples in the time domain, you phase values in the frequency domain' and 'a phase gradient is unaffected when you add a into it ... except that a itself gets phased by a gradient.' Reduces more-precise-than-T phase gates from O(n lg n) to O(n) (prepare the gradient once, then reuse via cheap adders). Lever for any rotation/phasing inside arithmetic."
+  },
+  {
+    "title": "Efficient Controlled Phase Gradients",
+    "url": "https://algassert.com/post/1708",
+    "year": "2017",
+    "abstract": "A 'reverse control' trick to make a phase gradient controllable without extra workspace qubits, by controlling pre/post operations that invert one gradient so it sums with another.",
+    "pdf_url": "",
+    "relevance_note": "Make a phase-gradient controllable with no extra workspace: apply a square-rooted reversed gradient controlled by a toggle, undo, then apply a forward gradient, with Z-rotation fixups on the control. 'When the control is satisfied, the first phase gradient is inverted so it adds together with the other gradient into the operation we want.' Keeps O(n) gates / O(n lg n) depth, zero ancilla -- useful for controlled rotations in modular arithmetic."
+  },
+  {
+    "title": "Proxy Phasing and Computed Phasing",
+    "url": "https://algassert.com/post/1719",
+    "year": "2017",
+    "abstract": "Apply an arbitrary phasing function by computing membership/value into an ancilla, applying a Z (or phase gradient) to it, then uncomputing -- so a phase costs only the compute+uncompute of its function.",
+    "pdf_url": "",
+    "relevance_note": "Compute-phase-uncompute: 'to phase a specific set of states, make a circuit that temporarily computes membership in that set and applies a Z gate to that computation's output'; 'any computable phasing function can be applied with the cost of merely computing and uncomputing that function.' For rotating n qubits by an angle, computing Hamming weight + phase gradient costs ~4n + m*lg(n) instead of m*n individually synthesized rotations. Cuts T-count for structured phasings."
+  },
+  {
+    "title": "Verifying Measurement Based Uncomputation",
+    "url": "https://algassert.com/post/1903",
+    "year": "2019",
+    "abstract": "Explains measurement-based uncomputation (MBUC): uncompute an AND/Toffoli result by X-basis measurement plus a classically-controlled CZ fixup, using only stabilizer ops, and a way to verify it with a fast Toffoli/stabilizer simulator.",
+    "pdf_url": "",
+    "relevance_note": "Uncompute a logical-AND with 0 T gates: measure the AND-ancilla in the X basis (Hadamard + measure) and apply a classically-controlled CZ to fix the probabilistic phase flip. 'For an MBUC to be correct it is necessary and sufficient that it perform phasing operations that correct the probabilistic phase flips introduced by the X basis measurements.' This is the verification companion to the temporary-AND trick -- the uncompute half of every AND in an adder becomes free."
+  },
+  {
+    "title": "Spooky Pebble Games and Irreversible Uncomputation",
+    "url": "https://algassert.com/post/1905",
+    "year": "2019",
+    "abstract": "Extends reversible pebble games with measurement-based uncomputation: a pebble can be removed at any time, leaving a 50/50 'ghost' if dependencies are missing, deferring cleanup to reclaim space early.",
+    "pdf_url": "",
+    "relevance_note": "Scheduling framework for measurement-uncomputation space/time tradeoffs. 'You can remove a pebble at any time; if a dependency is missing, there is a 50/50 chance the node will contain a ghost', and ghosts can be cleaned later. On a line this drops space from Omega(log n) to constant (S=3) and time from Theta(n^1.58) to Theta(n log n) via 'sweep and clean'. Lever: reclaim ancilla BEFORE the uncompute, letting deep point-add subroutines run in far fewer qubits."
+  },
+  {
+    "title": "Producing an N+1 Qubit CCZ State with an N Qubit Adder",
+    "url": "https://algassert.com/post/1906",
+    "year": "2019",
+    "abstract": "Shows an n-qubit adder hides an (n+1)-qubit CCZ, proving an adder must consume at least N-1 CCZ magic states (a tight lower bound), and giving a recipe to extract a large CCZ state from an adder.",
+    "pdf_url": "",
+    "relevance_note": "Adder <-> CCZ equivalence and magic-state lower bound. 'An N-qubit controlled increment decomposes into an uncontrolled N+1 increment and a bit flip; an N+1 increment decomposes into a triangle of C..CNOT gates; conjugate the largest C..CNOT by Hadamards and you have your N+1 qubit CCZ.' Establishes that an N-bit adder consumes >= N-1 three-qubit CCZ states -- a hard floor when budgeting Toffoli/CCZ for the additions in point-addition."
+  },
+  {
+    "title": "Trouble Adding Constants into Qubit Registers",
+    "url": "https://algassert.com/post/1701",
+    "year": "2017",
+    "abstract": "Notes that adding a compile-time constant is harder than register+register addition (no source register to use as workspace), and shows how to borrow workspace from the target register itself.",
+    "pdf_url": "",
+    "relevance_note": "Constant-addition workspace trick: 'when adding a compile-time constant you don't have a source register to use as workspace.' Borrow an ancilla FROM the target register -- adding an even constant doesn't change the low bit's parity, so use that bit as workspace; for odd constants do a fixup increment first. Register-add is Theta(n) but best-known constant-add is O(n lg n). Relevant for adding curve constants (a, b, field prime) into registers without dedicated ancilla."
+  },
+  {
+    "title": "Simple Algorithm for Multiplicative Inverses mod 2^n",
+    "url": "https://algassert.com/post/1709",
+    "year": "2017",
+    "abstract": "Computes K^-1 mod 2^n by reversing a multiplication circuit bit-by-bit; works in-place because high bits never carry into low bits under a power-of-2 modulus.",
+    "pdf_url": "",
+    "relevance_note": "Invert multiplication-by-constant for free reversibly: 'the reverse of multiplying by K is multiplying by K^-1', and since 'high bits don't carry into low bits' mod 2^n, do conditional subtractions low-to-high in place with no workspace. Useful for Montgomery/2-adic inverse steps in modular arithmetic. Caveat: doesn't extend to non-power-of-2 moduli (circular dependency on the inverse)."
+  },
+  {
+    "title": "Breaking Down the Quantum Swap",
+    "url": "https://algassert.com/post/1717",
+    "year": "2017",
+    "abstract": "Decomposes a qubit SWAP into three CNOTs (XOR-swap) and generalizes to swapping arbitrary anticommuting observables, so data can be relocated without physically moving qubits.",
+    "pdf_url": "",
+    "relevance_note": "SWAP = 3 CNOTs (XOR swap), and more generally any pair of anticommuting observables can store/move a qubit. 'Quantum mechanics is linear, so if it works for the basis states it works for every state.' Lets you relabel/relocate registers (e.g. fold a conditional swap into surrounding gates) instead of paying for physical moves -- cheap structural rewiring in point-add data routing."
+  },
+  {
+    "title": "Thinking of Operations as Controls",
+    "url": "https://algassert.com/post/1706",
+    "year": "2017",
+    "abstract": "Argues operations and controls are interchangeable (only convention distinguishes them); reframing targets as X-axis controls yields more compact circuits and clarifies which qubit to treat as control vs target.",
+    "pdf_url": "",
+    "relevance_note": "Control/target duality: 'X-axis controls condition operations on the control qubit being in the state H|1>'. Swapping which wire is control vs target can eliminate target designations and merge gates, shrinking circuits (demonstrated on Grover). A structural lever for re-expressing controlled arithmetic so controls fuse and fewer explicit operations remain."
+  }
+]

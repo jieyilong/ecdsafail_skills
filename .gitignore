@@ -1,0 +1,17 @@
+# ecdsafail_skills — ignore re-fetchable downloaded research artifacts.
+#
+# The literature INDEX is kept in git (research/index.json, research/candidates.json,
+# research/search_plan.json, research/search_results/, research/README.md). The actual
+# PDFs/HTML are NOT committed — they are re-downloadable from the URLs in index.json.
+# See <skill>/research/README.md for the download.py one-liner.
+
+# Downloaded papers directory under any skill's research/ folder
+**/research/papers/
+
+# Belt-and-suspenders: any stray downloaded docs anywhere under a research/ folder
+**/research/**/*.pdf
+**/research/**/*.html
+**/research/**/_download.log
+
+# macOS cruft
+.DS_Store

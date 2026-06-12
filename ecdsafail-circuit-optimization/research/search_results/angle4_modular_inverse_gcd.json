@@ -1,0 +1,142 @@
+[
+  {
+    "title": "The Montgomery Inverse and Its Applications",
+    "authors": "Burton S. Kaliski Jr.",
+    "year": 1995,
+    "url": "https://ieeexplore.ieee.org/document/403725",
+    "pdf_url": "https://www.semanticscholar.org/paper/954b579a139a939514af51afda9fd90922b28615",
+    "venue": "IEEE Transactions on Computers 44(8), 1064-1065",
+    "abstract": "Introduces the Montgomery modular inverse: a right-shifting binary extended-Euclid algorithm that computes a^{-1}*2^k mod p (the 'almost inverse', Montgomery form). Splits into Phase I (binary EEA producing (r, k) with r = a^{-1}*2^k) and Phase II (k correction shifts). Uses only shift/add/subtract on (u,v,r,s) tuples, no division.",
+    "relevance_note": "THE canonical (u,v,r,s) binary inverse that every quantum modular-inversion circuit (Roetteler, Haener, Luo) descends from. Phase I runs at most ~2n iterations, each a divstep-like branch on parity/comparison. In reversible form the four registers (u,v,r,s) plus the per-iteration branch bits are the dominant qubit cost — the whole optimization game (register sharing, branch-bit recording, length registers) is about shrinking exactly this."
+  },
+  {
+    "title": "Constant time modular inversion",
+    "authors": "Joppe W. Bos",
+    "year": 2014,
+    "url": "https://link.springer.com/article/10.1007/s13389-014-0084-8",
+    "pdf_url": "https://www.semanticscholar.org/paper/8460492acb80645456864f07b99c03d8b767f65a",
+    "venue": "Journal of Cryptographic Engineering 4(4), 275-281",
+    "abstract": "Modifies Kaliski's Montgomery-inverse algorithm so the (u,v,r,s) loop runs in constant time (fixed iteration count 2n, branchless conditional updates) to defeat simple power analysis, computing both classical and Montgomery inverse with identical control flow regardless of input.",
+    "relevance_note": "Constant-time = input-independent control flow = exactly the property a reversible quantum circuit REQUIRES (the gate sequence cannot depend on superposed data). Bos's branchless reformulation of Kaliski (fixed 2n iterations, masked conditional swaps/adds) is the direct template for how to lay out Kaliski reversibly: pad to worst-case iteration count, replace each data-dependent branch with a controlled (Toffoli-masked) update gated on a recorded branch qubit."
+  },
+  {
+    "title": "Short-Iteration / Compact and Efficient Constant-Time GCD and Modular Inversion with Short-Iteration",
+    "authors": "Yaoan Jin, Atsuko Miyaji",
+    "year": 2023,
+    "url": "https://globals.ieice.org/en_transactions/information/10.1587/transinf.2022ICP0009/_p",
+    "pdf_url": "https://link.springer.com/chapter/10.1007/978-3-031-25319-5_5",
+    "venue": "SAC 2022 (LNCS 13742) / IEICE Trans. Information E106-D(9), 1397-1406",
+    "abstract": "Proposes short-iteration constant-time GCD (CT-GCD) and constant-time modular inversion algorithms that reduce the number of divstep/Kaliski iterations versus Bos, Bernstein-Yang, and the improved BY, with experimental speedups. Tightens the worst-case iteration bound that constant-time padding must reach.",
+    "relevance_note": "Iteration count is the loop-unroll depth of any reversible inverse circuit, and Toffoli cost scales linearly with it. Lowering the proven worst-case bound (e.g. fewer than 2n, or fewer than the 741/724 safegcd bound for 256-bit) directly cuts the number of unrolled rounds — and thus branch-bit ancillas — in a reversible Kaliski/divstep circuit. Useful as the 'how few rounds can we get away with' reference."
+  },
+  {
+    "title": "Fast constant-time gcd computation and modular inversion (safegcd)",
+    "authors": "Daniel J. Bernstein, Bo-Yin Yang",
+    "year": 2019,
+    "url": "https://eprint.iacr.org/2019/266",
+    "pdf_url": "https://gcd.cr.yp.to/safegcd-20190413.pdf",
+    "venue": "IACR TCHES 2019(3) / ePrint 2019/266",
+    "abstract": "Introduces 'divstep': a single branchless transition on a (delta, f, g) state that subsumes the parity and comparison branches of binary GCD into arithmetic on delta. n divsteps compute gcd and Bezout coefficients in constant time. Proves divstep-count bounds (e.g. 741 divsteps suffice for 256-bit). Also gives the polynomial-input variant. Applications: Curve25519 inversion, NTRU keygen.",
+    "relevance_note": "The single most important primitive for reversible inversion. divstep is constant-time AND branchless: the entire control decision is folded into the sign of delta and the low bit of g, so each step is a fixed small reversible transformation (a 2x2 transition matrix on (f,g) plus a delta update). This eliminates the data-dependent branching that forces r,s bookkeeping in Kaliski. The proven divstep bound gives the exact unroll depth; the 2x2 matrix structure is what enables jumpdivstep batching (see secp256k1)."
+  },
+  {
+    "title": "More on Fast Constant-Time GCD Computation and Modular Inversion (safegcd2) + jumpdivsteps / secp256k1 implementation notes",
+    "authors": "Daniel J. Bernstein, Bo-Yin Yang (safegcd2); Peter Dettman & Pieter Wuille (secp256k1 batching); sipa/gmaxwell safegcd-bounds",
+    "year": 2024,
+    "url": "https://gcd.cr.yp.to/safegcd2.pdf",
+    "pdf_url": "https://github.com/bitcoin-core/secp256k1/blob/master/doc/safegcd_implementation.md",
+    "venue": "Workshop 2024 + Bitcoin Core secp256k1 docs + safegcd-bounds repos",
+    "abstract": "Refines divstep bounds and presents the batched 'jumpdivsteps' technique: take the low k bits of f and g, run k divsteps on just those bottom bits while recording which branches were taken, accumulate a single (k+2)-bit 2x2 transition matrix, then apply that ONE matrix to the full-width f,g. secp256k1 does 62 divsteps per batch, updating full operands only ~12 times for 256-bit. safegcd-bounds (sipa/gmaxwell) proves 724 divsteps suffice (vs 741 claimed).",
+    "relevance_note": "jumpdivsteps is the key lever for reversible cost: instead of n full-width controlled updates (each O(n) Toffoli), batch T divsteps into one small 2x2 matrix computed on k bottom bits (cheap, narrow), then do ~n/T full-width matrix-mults. This decouples the expensive wide arithmetic count from the iteration count, and the small transition matrix is the only per-batch state to record reversibly. Directly relevant to shrinking the (u,v,r,s)/Toffoli budget in EC point addition."
+  },
+  {
+    "title": "Shor's discrete logarithm quantum algorithm for elliptic curves",
+    "authors": "John Proos, Christof Zalka",
+    "year": 2003,
+    "url": "https://arxiv.org/abs/quant-ph/0301141",
+    "pdf_url": "https://arxiv.org/pdf/quant-ph/0301141",
+    "venue": "Quantum Information & Computation 3(4), 317-344",
+    "abstract": "First detailed implementation of Shor's discrete-log algorithm for elliptic curve groups over prime fields. Estimates ~1000 qubits to break 160-bit ECC vs ~2000 for equivalent 1024-bit RSA. Modular inversion (via extended GCD) is identified as the dominant cost of the affine group law, and the paper introduces the register-sharing idea to keep the inverse circuit space-efficient.",
+    "relevance_note": "Origin of the 'inversion dominates point-addition space' framing and the register-sharing trick that later works refine. Their extended-GCD inverse reuses register space across the (u,v,r,s) evolution rather than allocating fresh registers per iteration; the modern descendants (Luo 2026, length registers + location-controlled arithmetic) are explicit reversible realizations of this idea. Note Proos-Zalka accepted some fidelity loss; recent work makes it exactly reversible."
+  },
+  {
+    "title": "Quantum resource estimates for computing elliptic curve discrete logarithms",
+    "authors": "Martin Roetteler, Michael Naehrig, Krysta M. Svore, Kristin Lauter",
+    "year": 2017,
+    "url": "https://arxiv.org/abs/1706.06752",
+    "pdf_url": "https://arxiv.org/pdf/1706.06752",
+    "venue": "ASIACRYPT 2017 (LNCS 10625) / ePrint 2017/598",
+    "abstract": "Concrete Toffoli-network resource estimates for Shor-ECDLP via LIQUi|> simulation. Gives reversible modular addition, multiplication, and inversion, and full controlled EC point addition. Result: <= 9n + 2*ceil(log2 n) + 10 qubits and <= 448 n^3 log2(n) + 4090 n^3 Toffoli gates for an n-bit prime curve.",
+    "relevance_note": "The reference 9n-layout. Implements a reversible Kaliski-style binary extended-GCD modular inverse; its register layout (separate u,v,r,s plus ancillas, and an iteration counter) is the baseline qubit budget that every later 'space-efficient' paper measures against. The 9n term is dominated by the inversion's multiple full-width registers — the thing the binary-GCD/divstep batching tricks aim to compress."
+  },
+  {
+    "title": "Improved Quantum Circuits for Elliptic Curve Discrete Logarithms",
+    "authors": "Thomas Haener, Samuel Jaques, Michael Naehrig, Martin Roetteler, Mathias Soeken",
+    "year": 2020,
+    "url": "https://arxiv.org/abs/2001.09580",
+    "pdf_url": "https://arxiv.org/pdf/2001.09580",
+    "venue": "PQCrypto 2020 (LNCS 12100, 425-444) / ePrint 2020/077",
+    "abstract": "Improves the EC scalar-multiplication circuit by reformulating the binary Euclidean (Kaliski) modular-inversion algorithm, applying windowing to integer/modular arithmetic, and more adaptive uncompute placement. Trades off qubits vs depth vs T-count; full Q# implementation with automated resource estimation. Lower depth and fewer T gates than Roetteler 2017 for affine point addition.",
+    "relevance_note": "Directly reformulates the binary-GCD inverse for reversibility: shows how to restructure the Kaliski loop so uncomputation of the per-iteration branch/comparison bits is cheaper, and how windowing the inner arithmetic cuts T-count. This is the concrete 'how to lay out a reversible binary EEA well' reference, and the 256-bit qubit number here (2124) is the baseline that Luo 2026 (1333) and Schrottenloher 2026 (1098) beat."
+  },
+  {
+    "title": "Space-Efficient Quantum Algorithm for Elliptic Curve Discrete Logarithms with Resource Estimation",
+    "authors": "Han Luo, Ziyi Yang, Ziruo Wang, Yuexin Su, Tongyang Li",
+    "year": 2026,
+    "url": "https://arxiv.org/abs/2604.02311",
+    "pdf_url": "https://arxiv.org/pdf/2604.02311",
+    "venue": "arXiv 2604.02311 (Apr 2026)",
+    "abstract": "Fully reversible, exactly-correct realization of the Proos-Zalka low-space modular inversion. Refines register sharing using 'length registers together with location-controlled arithmetic' to store the shrinking (u,v) operands compactly and optimizes the stepwise EEA update rules. Modular inversion in 3n + 4*floor(log2 n) + O(1) qubits and 204 n^2 log2(n) + O(n^2) Toffoli; full ECDLP in 5n + 4*floor(log2 n) + O(1) qubits. 1333 logical qubits for 256-bit vs 2124 (Haener et al).",
+    "relevance_note": "State-of-the-art reversible binary-EEA inversion. Key technique: instead of keeping full-width r,s registers, it tracks the bit-LENGTH of the shrinking u,v values in small length registers and uses 'location-controlled arithmetic' (operate only on the active prefix), which is how it drops from ~9n to ~3n. Makes Proos-Zalka EXACTLY reversible (no fidelity loss). This is the must-read for the lowest-qubit reversible binary GCD inverse."
+  },
+  {
+    "title": "Reducing the Number of Qubits in Quantum Discrete Logarithms on Elliptic Curves",
+    "authors": "Clemence Chevignard, Pierre-Alain Fouque, Andre Schrottenloher",
+    "year": 2026,
+    "url": "https://eprint.iacr.org/2026/280",
+    "pdf_url": "https://eprint.iacr.org/2026/280.pdf",
+    "venue": "EUROCRYPT 2026 / ePrint 2026/280",
+    "abstract": "Space-optimized Shor-ECDLP reaching 3.12n space complexity, breaking 256-bit ECC with 1098 logical qubits (vs 2124 prior), below the ~2043 qubits for 3072-bit RSA. Central idea: AVOID modular inversion entirely in the inner loop where possible, and compress an inversion-result to a single bit using a Legendre symbol computation rather than materializing the full inverse register.",
+    "relevance_note": "A different lever: rather than building a cheaper reversible inverse, it side-steps inversion by replacing it with a Legendre/quadratic-residue test that yields just one bit, eliminating the large inverse-result register. The Legendre symbol itself is computed via a GCD-like (reciprocity/divstep) reversible procedure. The likely source of Schrottenloher's reference [14] (the Dialog representation) for the constant-time EEA used inside. Key competitor SOTA at 1098 qubits."
+  },
+  {
+    "title": "Verifiable Quantum Advantage via Optimized DQI Circuits (the 'Dialog representation' paper)",
+    "authors": "Tanuj Khattar, Noah Shutty, Craig Gidney, Adam Zalcman, Noureldin Yosri, Dmitri Maslov, Ryan Babbush, Stephen P. Jordan",
+    "year": 2025,
+    "url": "https://arxiv.org/abs/2510.10967",
+    "pdf_url": "https://arxiv.org/pdf/2510.10967",
+    "venue": "arXiv 2510.10967 (Oct 2025)",
+    "abstract": "Builds end-to-end reversible quantum circuits for Reed-Solomon syndrome decoding via the Extended Euclidean Algorithm, for Decoded Quantum Interferometry on the Optimal Polynomial Intersection problem. Introduces the 'Dialog' representation: a decomposition of a pair of inputs (numbers or polynomials) into a sequence of small invertible matrix multiplications that records the execution trace of a constant-time/division-free EEA, giving a complete recipe to recover the original inputs from the output. Provides implicit Bezout-coefficient access at low qubit overhead.",
+    "relevance_note": "ALMOST CERTAINLY Schrottenloher's [14] 'dialog representation' reference. The Dialog = the recorded sequence of small (2x2) divstep/EEA transition matrices (the 'branch bits' / transition history), NOT the full r,s coefficient registers. By storing only this compact execution trace you reconstruct Bezout coefficients implicitly on demand instead of carrying wide r,s registers throughout — capturing the low gate cost of division-free EEA (safegcd/jumpdivsteps) WITHOUT its usual qubit blow-up. This is the cleanest articulation of 'record branch bits to avoid r,s registers' for reversible modular inversion. Polynomial-EEA variant matches Schrottenloher's polynomial-GCD context."
+  },
+  {
+    "title": "Concrete quantum cryptanalysis of binary elliptic curves",
+    "authors": "Gustavo Banegas, Daniel J. Bernstein, Iggy van Hoof, Tanja Lange",
+    "year": 2021,
+    "url": "https://eprint.iacr.org/2020/1296",
+    "pdf_url": "https://eprint.iacr.org/2020/1296.pdf",
+    "venue": "IACR TCHES 2021(1), 451-472",
+    "abstract": "Reversible circuits for Shor-ECDLP over binary fields GF(2^n), minimizing logical qubit count across the full subroutine stack. Compares modular-inversion strategies including Fermat's-little-theorem exponentiation division (FLT_DIV) versus extended-GCD inversion in characteristic 2, with concrete qubit/Toffoli counts.",
+    "relevance_note": "Binary-field analogue: in GF(2^n) the division-free GCD/divstep is even cleaner (no carries, comparisons become degree comparisons / polynomial divsteps). Useful contrast on the FLT-exponentiation-vs-GCD tradeoff: FLT_DIV avoids GCD branch bookkeeping entirely at the cost of ~n squarings+mults, sometimes winning on qubits in reversible settings. Directly informs the 'Montgomery/standard vs Fermat division' decision for reversible inversion."
+  },
+  {
+    "title": "New Space-Efficient Quantum Algorithm for Binary Elliptic Curves using the Optimized Division Algorithm",
+    "authors": "Hyeonhak Kim, Seokhie Hong",
+    "year": 2023,
+    "url": "https://arxiv.org/abs/2303.06570",
+    "pdf_url": "https://arxiv.org/pdf/2303.06570",
+    "venue": "arXiv 2303.06570 / Quantum Information Processing (2023)",
+    "abstract": "Optimizes the reversible division (inversion + multiply) step for binary-curve Shor-ECDLP using an optimized GF(2^n) division/extended-GCD algorithm, reducing qubit usage versus Banegas et al. while preserving reversibility of the polynomial-GCD loop.",
+    "relevance_note": "Concrete optimization of the reversible polynomial-EEA division for binary curves: shows how to lay out the polynomial divstep loop with reduced ancilla by reusing space across the shrinking-degree operands (binary-field analogue of Luo's length-register trick). Good cross-check on how branch-bit / transition recording is realized for polynomial GCD specifically."
+  },
+  {
+    "title": "The Jacobi Factoring Circuit: Quantum Factoring with Near-Linear Gates and Sublinear Space and Depth",
+    "authors": "Gregory D. Kahanamoku-Meyer, Seyoon Ragavan, Vinod Vaikuntanathan, Katherine Van Kirk (et al.)",
+    "year": 2024,
+    "url": "https://arxiv.org/abs/2412.12558",
+    "pdf_url": "https://arxiv.org/pdf/2412.12558",
+    "venue": "arXiv 2412.12558 (Dec 2024)",
+    "abstract": "Quantum factoring circuit with near-linear gate count and sublinear space/depth, built around a reversible Jacobi-symbol computation. The Jacobi symbol is evaluated via a binary-GCD-style reciprocity recursion (the same shift/swap/reciprocity-flip structure as Stein's binary GCD), implemented as a constant-time reversible circuit.",
+    "relevance_note": "Demonstrates a fully reversible binary-GCD-flavored circuit in the wild: the Jacobi-symbol recursion IS a binary GCD where you additionally track the symbol sign through quadratic-reciprocity flips. The accumulator/sign-tracking and shift-swap layout are directly transferable to a reversible Kaliski/divstep inverse, and tie to Schrottenloher's Legendre-symbol-to-one-bit compression. Strong evidence that GCD/Jacobi reciprocity circuits can hit near-linear gates and sublinear space."
+  }
+]

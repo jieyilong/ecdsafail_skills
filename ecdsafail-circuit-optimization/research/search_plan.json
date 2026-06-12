@@ -1,0 +1,37 @@
+{
+  "topic": "Quantum circuit optimization 2000-2026: qubit + Toffoli reduction, EC point addition",
+  "angles": [
+    {
+      "id": "angle0_foundational_arith",
+      "desc": "Foundational reversible/quantum arithmetic 2000-2015: adders (Cuccaro, Draper-Kutin QCLA, Takahashi-Tani-Kunihiro, Gidney), modular add/mult, ancilla-efficient in-place, carry-save (Gossett)"
+    },
+    {
+      "id": "angle1_toffoli_tcount_synthesis",
+      "desc": "Modern Toffoli/T-count reduction & synthesis 2015-2026: ZX-calculus simplification, T-count optimization, Toffoli/Tofolli decomposition, measurement-assisted uncompute, template/peephole (Maslov), AutoT/phase-gadget"
+    },
+    {
+      "id": "angle2_qubit_ancilla_spacetime",
+      "desc": "Qubit/ancilla minimization & space-time tradeoffs: reversible pebbling, Bennett, spooky/measurement-based uncomputation, borrowed/dirty ancilla, in-place, garbage minimization"
+    },
+    {
+      "id": "angle3_ecdlp_point_add",
+      "desc": "Elliptic-curve point addition & Shor ECDLP resource estimates 2017-2026: Roetteler-Naehrig-Svore-Lauter, Haener et al, Banegas-Bernstein-vanHoof-Lange, Schrottenloher 2026, Gidney ECC, projective-coordinate (Huang), windowed point mult"
+    },
+    {
+      "id": "angle4_modular_inverse_gcd",
+      "desc": "Reversible modular inversion / binary GCD: Kaliski Montgomery inverse, Roetteler inversion 1706.06752, Bernstein-Yang safegcd, dialog/transcript representations, Jacobi symbol circuits, Stein/jump GCD"
+    },
+    {
+      "id": "angle5_ft_cost_distillation",
+      "desc": "Fault-tolerant cost models: surface-code spacetime volume, magic-state distillation (Litinski), Gidney-Ekera megaqubitdays, T-factory, qubit-count vs T-depth metrics, active-volume"
+    },
+    {
+      "id": "gidney_papers",
+      "desc": "Craig Gidney arXiv/paper catalog 2017-2026: temporary-AND/halving addition, windowed quantum arithmetic, quantum Karatsuba, conditionally-clean ancillae, factoring 2048-bit (8h/under-a-week), magic state cultivation, AutoCCZ/CCZ factories, lattice surgery, yoked surface codes, DQI/Dialog circuits, secp256k1/ECC estimate"
+    },
+    {
+      "id": "gidney_blog",
+      "desc": "Craig Gidney algassert.com blog + talks + Stim/GitHub: practical reversible-circuit tricks (constructing large controlled-NOTs, using gates instead of ancilla bits, spooky pebble games, cleaner/windowed quantum arithmetic, measurement-based uncomputation, approximate permutations)"
+    }
+  ]
+}

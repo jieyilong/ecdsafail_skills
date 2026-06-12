@@ -1043,3 +1043,107 @@ or compare-bit tightening as island-gated (needs a fresh `DIALOG_TAIL_NONCE`).
 - `DIALOG_TAIL_NONCE` -- the 96-op identity-tail Fiat-Shamir island selector; re-hunt on EVERY
   op-stream change. Consumed at build time; first `set_default_env` wins (bake the default in `mod.rs`).
 - `DIALOG_REROLL` / `DIALOG_POST_SUB_REROLL` -- older pre-tail-nonce 2-D island reroll knobs.
+
+## External Literature (2000–2026): Techniques Beyond the Current Route
+
+Survey of the broader quantum-circuit-optimization literature (foundational reversible
+arithmetic, T/Toffoli synthesis, ancilla/pebbling, the modular-inversion frontier, FT cost
+models). Built by `/expert-autoresearch`: 6 angles, 80 indexed papers, 15 PDFs. The existing
+TrailMix/Schrottenloher sections above stay the primary route guide; this brings in
+*external* techniques and the 2026 frontier.
+
+### Reference Routing
+
+Read `references/external-literature-2000-2026.md` when the task involves: borrowing a
+technique from outside our route, the inversion-algorithm frontier (safegcd/divstep,
+jumpdivsteps, Legendre/Jacobi inversion elimination, compact `3n` inversion), Toffoli/T
+primitives (4-T Toffoli variants, temporary-AND), the ancilla/pebbling toolkit
+(conditionally-clean ancilla, measured/spooky uncompute, automated uncompute scheduling),
+generic synthesis (ZX/T-par/AlphaTensor-Quantum), FT cost-model justification, or correctness
+auditing. Full annotated index + abstracts + local PDFs: `research/index.json`,
+`research/papers/`; raw per-angle hits: `research/search_results/`.
+
+### Top external levers to try (ranked by expected fit)
+
+1. **`jumpdivsteps` — the unexplored generalization of our `ACTIVE_ITERATIONS`/`K2` win.**
+   *(Bernstein–Yang safegcd, eprint 2019/266.)* Batch `T` binary-GCD `divstep`s computed on the
+   low `k` bits into one `(k+2)`-bit 2×2 transition matrix, then apply that matrix to the
+   full-width operands ~`n/T` times. Our route pays a full-width apply per recorded step
+   (`ACTIVE_ITERATIONS` × 256-wide); `K2` is the degenerate "strip ≤2 zeros/step" case. A true
+   jump-`T` records one matrix per `T` steps → far fewer full-width applies, trading transcript
+   width for full-width-op count. Watch the same failure mode as our measured K3 loss: the matrix
+   decode/apply must be cheaper than the steps it replaces.
+2. **`conditionally-clean ancilla` — the principled version of our dirty/vented `ROUND84` tricks.**
+   *(Khattar–Gidney 2407.17966; measurement-adaptive MCX 2605.18169.)* Use borrowed/dirty bits as
+   if clean with zero allocation + Laddered Toggle Detection. Audit our borrowed-carry adders and
+   round84 x-tail venting against it for a cleaner peak win than the hand-tuned `1309→1285` trade.
+3. **Automated uncompute scheduling** *(Meuli–Soeken–Roetteler SAT/QBF 1904.02121; Unqomp; spooky
+   DAG solver 2401.10579)* — could replace hand-tuned venting/hosting/recompute decisions at the
+   peak phase. Tooling investment, not a one-off lever.
+4. **4-T Toffoli variants** *(Jones 1212.5069; Maslov relative-phase 1508.03273)* for MCTs inside
+   paired compute/uncompute blocks (the spurious phase cancels); temporary-AND *(Gidney 1709.06648)*
+   must back every paired AND. Apply to the apply-phase modular arithmetic.
+5. **Legendre/Jacobi inversion ELIMINATION (qubit frontier, but a moonshot here)** *(Chevignard–
+   Fouque–Schrottenloher 2026 eprint 2026/280 → 1098 q ≈ 3.12n; Jacobi Factoring Circuit
+   2412.12558)*. Projective coords + compress the inverse to one Legendre/Jacobi bit, dropping the
+   inverse result register. Orthogonal to dialog-GCD; the scored *affine* PA needs the actual
+   coordinates, so it doesn't drop in — but it's where the qubit floor is going (cf. Huang
+   2502.12441 *withdrawn*: naive projective fails; the symbol trick is what fixes it).
+
+### Honest low-yield note
+
+Generic peephole/ZX/T-par synthesis *(ZX 1903.10477, T-par 1303.2042, Quartz/VOQC)* gives 10–50%
+on **un-optimized** circuits; our route is hand-optimized from tight primitives (we measured **0
+peephole cancellations**), so expect little — leverage is structural (inversion algorithm, ancilla
+hosting), not local rewriting. A one-shot ZX/T-par pass on the field-arithmetic blocks in isolation
+is the only cheap thing worth a try.
+
+### Correctness audit (zero-cost)
+
+*Papa 2025 (2506.03318)* catalogs four ancilla-uncomputation bugs in published point-add circuits,
+all fixable at zero gate cost — a missed uncompute is a free `anc/cls/pha` fix; an *over-eager*
+truncation that fails uncompute on some inputs is exactly the island-search failure mode. Audit any
+new truncation against these before scanning.
+
+### Cost-model footnote
+
+`Toffoli × qubits` is a sound proxy for surface-code spacetime volume *(Gidney–Ekerå 1905.09749;
+Fowler–Gidney 1812.01238)* under 2D-local codes where idle storage ∝ qubits. Caveat: under
+active-volume *(Litinski–Nickerson 2211.15465)* or magic-state cultivation *(2409.17595)*, idle
+qubits become ~free and the objective shifts toward Toffoli/op-count alone. For our sequential
+circuit depth ≈ count, so the distinction is moot here.
+
+### Craig Gidney — Techniques Catalog
+
+Gidney (Google Quantum AI) is the most relevant single author for this benchmark — temporary-AND,
+windowed arithmetic, conditionally-clean ancillae, the DQI "Dialog" (the EEA-split our `dialog-GCD`
+descends from), and the secp256k1 frontier (2603.28846) are all his. Many of his sharpest *practical*
+tricks live only on his blog **algassert.com**, not in papers.
+
+**Read `references/gidney-techniques.md`** for the full catalog (paper + blog, mapped to our levers).
+Top Gidney levers to try here, ranked by fit:
+
+1. **Windowed arithmetic on the in-circuit Bézout multiplies** *(1905.07682)*. Replace `2^w`
+   controlled multiply-adds with one **QROM lookup** over a w-bit window. The apply phase is ~90% of
+   our Toffoli; our fixed-base `k·G` comb is already this idea for scalar mult — the open question is
+   whether the Bézout-reconstruction multiplies admit a windowed/table form. Biggest potential cut.
+2. **Conditionally-clean ancillae** *(Khattar–Gidney 2407.17966)*. Borrow dirty bits as clean with
+   **zero allocation, no toggle-detection** — the principled version of our `ROUND84_XTAIL`
+   dirty/vent peak win; likely cleaner than the hand-tuned `1309→1285` trade.
+3. **Constant-workspace classical-quantum adder** *(2507.23079)*. In-place add-a-constant at
+   **3n–4n Toffoli, O(1) clean ancilla, free control** → for the Solinas/pseudo-Mersenne constant folds.
+4. **Spooky pebble scheduling** *(blog 2019)*. Free an ancilla *early* leaving a 50/50 "ghost" to
+   clean later → reclaim qubits before uncompute (line graph → S=3). The theory behind our
+   measured-cleanup / transcript-hosting; a DAG pebble solver could schedule venting automatically.
+5. **The "adder hides a CCZ" floor** *(blog)*. An n-bit adder must consume **≥ n−1 CCZ/Toffoli** —
+   a hard lower bound; use it to sanity-check any proposed adder-Toffoli cut.
+6. **cswap/relabel identities** *(blog: control-target duality, SWAP=3·CNOT, relabel-don't-move)* —
+   the toolkit for the tobitvector/apply **cswap** Toffoli chunk (cf. our cswap-floor analysis).
+7. **DQI "Dialog" `2510.10967`** — read for the in-place EEA construction and whether it batches
+   `T` divsteps into one transition matrix (the **jumpdivstep** generalization of our `K2`/
+   `ACTIVE_ITERATIONS` win — see `references/external-literature-2000-2026.md` §1).
+
+**Cost-model note from Gidney's FT line:** magic-state *cultivation* (2409.17595) drops the
+per-Toffoli cost toward a CNOT, which shifts the spacetime balance toward idle-qubit/peak cost — i.e.
+under modern fault-tolerance the **qubit (peak) factor matters relatively more**, so peak-reduction
+work (conditionally-clean ancillae, spooky-pebble hosting) is as valuable as Toffoli-cutting.

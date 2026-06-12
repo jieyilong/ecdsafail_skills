@@ -1,0 +1,167 @@
+[
+  {
+    "title": "Quantum resource estimates for computing elliptic curve discrete logarithms",
+    "authors": ["Martin Roetteler", "Michael Naehrig", "Krysta M. Svore", "Kristin Lauter"],
+    "year": 2017,
+    "venue": "ASIACRYPT 2017",
+    "url": "https://arxiv.org/abs/1706.06752",
+    "pdf_url": "https://arxiv.org/pdf/1706.06752",
+    "eprint_id": "arXiv:1706.06752",
+    "abstract": "Precise quantum resource estimates for Shor's algorithm to compute elliptic curve discrete logarithms over prime fields. Simulates Toffoli-gate networks for affine Weierstrass point addition (controlled point addition is the inner loop of Shor-ECDLP). Establishes that ECC needs far fewer qubits than RSA factoring at comparable classical security.",
+    "relevance_note": "FOUNDATIONAL BASELINE. For an n-bit prime curve: 9n + 2*ceil(log2(n)) + 10 logical qubits; full ECDLP Toffoli count ~ (448 log2(n) + 4090) * n^3. Concrete secp256k1 (n=256): 2330 logical qubits, ~1.26e11 (126 billion) Toffoli gates. Every later paper is measured against these numbers. Modular inversion (extended Euclid / Kaliski) is the dominant cost. All circuits are reversible Toffoli networks."
+  },
+  {
+    "title": "Improved quantum circuits for elliptic curve discrete logarithms",
+    "authors": ["Thomas Häner", "Samuel Jaques", "Michael Naehrig", "Martin Roetteler", "Mathias Soeken"],
+    "year": 2020,
+    "venue": "PQCrypto 2020",
+    "url": "https://arxiv.org/abs/2001.09580",
+    "pdf_url": "https://arxiv.org/pdf/2001.09580",
+    "eprint_id": "arXiv:2001.09580 / IACR eprint 2020/077",
+    "abstract": "Improved quantum circuits for EC scalar multiplication in Shor's algorithm: optimized low-level reversible integer and modular arithmetic, windowed scalar multiplication, an improved (Montgomery-style) modular inversion, and an affine Weierstrass point-addition circuit with reduced depth and T-count. Q# implementation with resource estimates and explicit cost trade-offs.",
+    "relevance_note": "KEY OPTIMIZATION PAPER. Windowed point addition (lookup-table comb) cuts the number of point-addition steps and Toffoli count substantially vs double-and-add. Reports ~2124 logical qubits for n=256 (the figure later beaten by Luo/Chevignard/Schrottenloher). Introduces the qubit/Toffoli/T-depth trade-off knobs (window size, in-place vs out-of-place division) that downstream space-optimized designs tune."
+  },
+  {
+    "title": "Optimized Point Addition Circuits for Elliptic Curve Discrete Logarithms",
+    "authors": ["André Schrottenloher"],
+    "year": 2026,
+    "venue": "IACR ePrint / arXiv",
+    "url": "https://arxiv.org/abs/2606.02235",
+    "pdf_url": "https://arxiv.org/pdf/2606.02235",
+    "eprint_id": "arXiv:2606.02235 / IACR eprint 2026/1128",
+    "abstract": "Presents fully-disclosed optimized point-addition quantum logical circuits over prime fields, achieving results comparable to the (undisclosed) Babbush et al. / Google Quantum AI circuits. Gives explicit gate counts for secp256k1 and a generic prime-field variant valid for any prime field.",
+    "relevance_note": "DIRECT SOTA-RELEVANT, 2026. Independently rediscovers the Google ECDLP point-add optimization (which Google released only via a zero-knowledge proof). For secp256k1: ~1.5% MORE qubits but 6.5-10% FEWER Toffoli gates than Babbush et al. Provides a closed-form generic prime-field point-addition gate-count formula — directly usable as a circuit template for the ECDSA-Fail benchmark."
+  },
+  {
+    "title": "Reducing the Number of Qubits in Quantum Discrete Logarithms on Elliptic Curves",
+    "authors": ["Clémence Chevignard", "Pierre-Alain Fouque", "André Schrottenloher"],
+    "year": 2026,
+    "venue": "EUROCRYPT 2026",
+    "url": "https://eprint.iacr.org/2026/280",
+    "pdf_url": "https://eprint.iacr.org/2026/280.pdf",
+    "eprint_id": "IACR eprint 2026/280",
+    "abstract": "Space-optimized Shor-ECDLP achieving space complexity 3.12n for an n-bit curve. Key trick: output compression via a single-bit hash function based on the Legendre symbol — computing the Legendre symbol of projective coordinates instead of doing explicit modular inversion, which removes the most expensive (qubit-hungry) subroutine from the critical register.",
+    "relevance_note": "STRONGEST QUBIT-MINIMIZER, 2026. 256-bit ECDLP in 1098 logical qubits (down from 2124 of Häner et al.) — ~3.12n space. The Legendre-symbol output compression eliminates explicit modular inversion in the projective representation; major lever for qubit-count-limited benchmarks like ECDSA-Fail. EUROCRYPT 2026."
+  },
+  {
+    "title": "Space-Efficient Quantum Algorithm for Elliptic Curve Discrete Logarithms with Resource Estimation",
+    "authors": ["Han Luo", "Ziyi Yang", "Ziruo Wang", "Yuexin Su", "Tongyang Li"],
+    "year": 2026,
+    "venue": "arXiv",
+    "url": "https://arxiv.org/abs/2604.02311",
+    "pdf_url": "https://arxiv.org/pdf/2604.02311",
+    "eprint_id": "arXiv:2604.02311",
+    "abstract": "Optimized quantum circuit for ECDLP minimizing logical qubits. Core contribution is a space-efficient reversible modular inversion algorithm using length registers and location-controlled arithmetic to compactly store intermediate variables of the extended-Euclid/Kaliski inversion.",
+    "relevance_note": "QUBIT-MINIMIZER via modular inversion. Modular inversion circuit: 3n + 4*floor(log2 n) + O(1) qubits, 204 n^2 log2(n) + O(n^2) Toffoli. Full ECDLP: 5n + 4*floor(log2 n) + O(1) qubits, O(n^3) Toffoli. Concrete n=256: 1333 logical qubits (vs 2124 in Häner et al.). The compact-inversion register layout is a directly portable space-saving technique."
+  },
+  {
+    "title": "Securing Elliptic Curve Cryptocurrencies against Quantum Vulnerabilities: Resource Estimates and Mitigations",
+    "authors": ["Ryan Babbush", "Adam Zalcman", "Craig Gidney", "Michael Broughton", "Tanuj Khattar", "Hartmut Neven", "Thiago Bergamaschi", "Justin Drake", "Dan Boneh"],
+    "year": 2026,
+    "venue": "Google Quantum AI / arXiv",
+    "url": "https://arxiv.org/abs/2603.28846",
+    "pdf_url": "https://arxiv.org/pdf/2603.28846",
+    "eprint_id": "arXiv:2603.28846 / IACR eprint 2026/625",
+    "abstract": "New resource estimates for breaking 256-bit ECDLP over secp256k1. Shor's algorithm runs with either <=1200 logical qubits and <=90M Toffoli, or <=1450 logical qubits and <=70M Toffoli. On superconducting hardware (1e-3 error, planar connectivity) executes in minutes with <500k physical qubits. Logical point-addition circuits are NOT disclosed; validated via a zero-knowledge proof for responsible disclosure.",
+    "relevance_note": "CURRENT GOOGLE SOTA, 2026. The ~20x reduction over Litinski's 2023 physical-qubit figure that set the modern bar. Two operating points: (1200 qubits, 90M Toffoli) and (1450 qubits, 70M Toffoli) — the qubit/Toffoli Pareto frontier. Circuits withheld but Schrottenloher 2026 (2606.02235) reconstructs comparable ones. The benchmark target to beat."
+  },
+  {
+    "title": "How to compute a 256-bit elliptic curve private key with only 50 million Toffoli gates",
+    "authors": ["Daniel Litinski"],
+    "year": 2023,
+    "venue": "arXiv (PsiQuantum)",
+    "url": "https://arxiv.org/abs/2306.08585",
+    "pdf_url": "https://arxiv.org/pdf/2306.08585",
+    "eprint_id": "arXiv:2306.08585",
+    "abstract": "Resource estimate for Shor-ECDLP as a case study for the active-volume (silicon-photonics-inspired) fault-tolerant architecture. Non-local connections cut cost-per-key by 300-700x; architecture-independent algorithmic modifications reduce Toffoli count per key by up to 5x by reusing stored state across multiple keys and spreading the modular-division cost over parallel algorithm instances.",
+    "relevance_note": "DISTILLATION-AWARE TOFFOLI MINIMIZER. ~50M Toffoli for one 256-bit key (down from the ~5x-larger naive count) via state reuse and amortizing modular division across parallel instances. At 10% threshold / 10-us cycle: one key every ~10 min on 6000 modules x 1152 physical qubits each. Establishes that algorithmic Toffoli reduction (not just hardware) drives cost; the 'amortize the inversion' idea is a portable lever."
+  },
+  {
+    "title": "How to factor 2048 bit RSA integers with less than a million noisy qubits",
+    "authors": ["Craig Gidney"],
+    "year": 2025,
+    "venue": "Google Quantum AI / arXiv",
+    "url": "https://arxiv.org/abs/2505.15917",
+    "pdf_url": "https://arxiv.org/pdf/2505.15917",
+    "eprint_id": "arXiv:2505.15917",
+    "abstract": "Argues a fault-tolerant quantum computer with <1M physical qubits can factor RSA-2048 in <1 week — a ~20x qubit reduction over Gidney-Ekera 2019 (~20M qubits). Gains come from approximate residue arithmetic (Chevignard-Fouque-Schrottenloher 2024), yoked surface codes for idle logical qubits (Gidney-Newman-Brooks-Jones 2023), and magic-state cultivation reducing distillation footprint (Gidney-Shutty-Jones 2024).",
+    "relevance_note": "RSA not ECC, but the enabling techniques transfer directly: approximate/residue arithmetic to shrink registers, yoked surface codes for cheap idle storage, and magic-state cultivation to slash distillation overhead. These are the same space- and distillation-aware levers used in the 2026 ECDLP estimates; useful for cost-modeling the ECDSA-Fail circuit."
+  },
+  {
+    "title": "Concrete quantum cryptanalysis of binary elliptic curves",
+    "authors": ["Gustavo Banegas", "Daniel J. Bernstein", "Iggy van Hoof", "Tanja Lange"],
+    "year": 2020,
+    "venue": "IACR TCHES 2021(1)",
+    "url": "https://eprint.iacr.org/2020/1296",
+    "pdf_url": "https://eprint.iacr.org/2020/1296.pdf",
+    "eprint_id": "IACR eprint 2020/1296",
+    "abstract": "Optimizes the full reversible-circuit stack for Shor-ECDLP on binary (GF(2^n)) elliptic curves, with the primary optimization target being the number of logical qubits. Covers fixed-base-point scalar multiplication and all subroutines.",
+    "relevance_note": "BINARY-CURVE QUBIT MINIMIZER. Reduces qubits to 7n + ceil(log2 n) + 9 and Toffoli to 48 n^3 + 8 n^(log2(3)+1) + 352 n^2 log2(n) + 512 n^2 + O(n^(log2 3)) for double-and-add scalar multiplication. The 7n+O(log n) space layout for GF(2^n) arithmetic and Karatsuba-style (n^log2 3) multiplication are reusable design patterns even when the benchmark is a prime curve."
+  },
+  {
+    "title": "Quantum resource estimates for computing binary elliptic curve discrete logarithms",
+    "authors": ["Michael Garn", "Angus Kan"],
+    "year": 2025,
+    "venue": "arXiv",
+    "url": "https://arxiv.org/abs/2503.02984",
+    "pdf_url": "https://arxiv.org/pdf/2503.02984",
+    "eprint_id": "arXiv:2503.02984",
+    "abstract": "Estimates logical and physical resources for binary ECDLP via Shor's algorithm, handling all exceptional cases of the point-addition law, and compares execution across quantum hardware architectures (photonic ~2-20x faster than baseline).",
+    "relevance_note": "Binary-curve resource estimate that explicitly handles exceptional point-addition cases (point at infinity / equal points) — a correctness concern that affects qubit/ancilla budgeting in any reversible point-add circuit. Architecture comparison (photonic vs superconducting) informs which cost metric to optimize."
+  },
+  {
+    "title": "Resource analysis of Shor's elliptic curve algorithm with an improved quantum adder on a two-dimensional lattice",
+    "authors": ["Quan Gu", "Han Ye", "Junjie Chen", "Xiongfeng Ma"],
+    "year": 2025,
+    "venue": "arXiv",
+    "url": "https://arxiv.org/abs/2510.23212",
+    "pdf_url": "https://arxiv.org/pdf/2510.23212",
+    "eprint_id": "arXiv:2510.23212",
+    "abstract": "Proposes a carry-lookahead quantum adder whose Toffoli depth matches state-of-the-art while keeping O(n) ancillas, combined with windowed scalar multiplication, Montgomery representation, and quantum lookup tables plus dynamic-circuit techniques, targeting P-256 cryptanalysis.",
+    "relevance_note": "P-256 estimate at ~4300 logical qubits using a carry-lookahead adder (SOTA Toffoli depth with only O(n) ancillas) + windowed mult + Montgomery rep + quantum tables. The low-ancilla carry-lookahead adder and Montgomery-representation arithmetic are concrete subroutine swaps for reducing depth without blowing up the qubit budget."
+  },
+  {
+    "title": "Choosing Coordinate Forms for Solving ECDLP Using Shor's Algorithm",
+    "authors": ["Yan Huang", "et al."],
+    "year": 2025,
+    "venue": "arXiv (withdrawn 2025-07-22)",
+    "url": "https://arxiv.org/abs/2502.12441",
+    "pdf_url": "https://arxiv.org/pdf/2502.12441",
+    "eprint_id": "arXiv:2502.12441 (withdrawn)",
+    "abstract": "Investigates whether projective coordinates beat affine for Shor-ECDLP. Builds reversible out-of-place point-addition circuits in projective coordinates for Weierstrass and Edwards curves, then uses Bennett's trick to make them in-place, and analyzes the quantum resources. Concludes projective coordinates do NOT give the same advantage as affine because projective representations are non-unique without modular division.",
+    "relevance_note": "AFFINE-vs-PROJECTIVE TRADE-OFF (cautionary). Key finding: naive projective coordinates do not help because non-uniqueness of (X:Y:Z) reintroduces modular division to canonicalize, defeating the point of avoiding inversion. Withdrawn, but its negative result is exactly what Chevignard-Fouque-Schrottenloher 2026 sidestep with the Legendre-symbol hash — important context for any projective-coordinate route in the benchmark."
+  },
+  {
+    "title": "Validation of Quantum Elliptic Curve Point Addition Circuits",
+    "authors": ["Francis P. Papa"],
+    "year": 2025,
+    "venue": "arXiv",
+    "url": "https://arxiv.org/abs/2506.03318",
+    "pdf_url": "https://arxiv.org/pdf/2506.03318",
+    "eprint_id": "arXiv:2506.03318",
+    "abstract": "Identifies and corrects inconsistencies in state-of-the-art quantum point-addition circuits, ensuring ancilla qubits are restored to their original states (to avoid decoherence/garbage). Surfaces four specific issues and provides fixes without increasing gate cost.",
+    "relevance_note": "CORRECTNESS / ANCILLA-CLEANUP. Catalogs four concrete bugs in published point-add circuits where ancillas were not properly uncomputed — directly relevant to the ECDSA-Fail validity (cls/pha/anc) checks. Fixes cost zero extra gates, so adopting them is a free correctness win when reusing a literature point-add design."
+  },
+  {
+    "title": "Quantum Circuit Designs of Point Doubling for Binary Elliptic Curves",
+    "authors": ["Harashta Tatimma Larasati", "Howon Kim"],
+    "year": 2023,
+    "venue": "arXiv",
+    "url": "https://arxiv.org/abs/2306.07530",
+    "pdf_url": "https://arxiv.org/pdf/2306.07530",
+    "eprint_id": "arXiv:2306.07530",
+    "abstract": "Designs the previously-overlooked point-doubling subroutine of Shor-ECDLP on binary curves and analyzes its integration with point addition for complete double-and-add scalar multiplication.",
+    "relevance_note": "Fills the point-doubling gap (most papers only cost the addition step). Relevant for any double-and-add scalar-multiplication route where doubling ancilla/Toffoli cost must be budgeted separately from generic addition; useful for completing a binary-curve cost model."
+  },
+  {
+    "title": "Automatic synthesis of quantum circuits for point addition on ordinary binary elliptic curves",
+    "authors": ["Parshuram Budhathoki", "Rainer Steinwandt"],
+    "year": 2014,
+    "venue": "arXiv / Quantum Information Processing",
+    "url": "https://arxiv.org/abs/1401.2437",
+    "pdf_url": "https://arxiv.org/pdf/1401.2437",
+    "eprint_id": "arXiv:1401.2437",
+    "abstract": "Software tool that auto-generates point-addition circuits for binary elliptic curves, achieving less than 39% of the T-gate count of the best previous construction without increasing qubits or T-depth, and optimizing CNOT depth via graph colorings.",
+    "relevance_note": "EARLY AUTOMATED CIRCUIT SYNTHESIS. >60% T-gate reduction at equal qubit/T-depth, plus CNOT-depth minimization via graph coloring — an automated-search precedent for the island-hunting / synthesis approach. The graph-coloring CNOT-scheduling idea is reusable for depth optimization of any reversible arithmetic block."
+  }
+]

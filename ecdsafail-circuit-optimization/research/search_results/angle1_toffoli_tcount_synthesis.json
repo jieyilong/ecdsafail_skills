@@ -1,0 +1,152 @@
+[
+  {
+    "title": "Reducing T-count with the ZX-calculus",
+    "authors": ["Aleks Kissinger", "John van de Wetering"],
+    "year": 2019,
+    "url": "https://arxiv.org/abs/1903.10477",
+    "pdf_url": "https://arxiv.org/pdf/1903.10477",
+    "arxiv_id": "1903.10477",
+    "abstract": "Represents a Clifford+T circuit as a ZX-diagram, simplifies it with the graph-theoretic ZX rewrite rules, and introduces 'phase teleportation' to let non-Clifford phases combine and cancel non-locally without changing circuit structure. Matches or beats prior T-count reducers on most benchmarks, with up to ~50% reduction in the ancilla-free case.",
+    "relevance_note": "Phase teleportation / phase-gadget fusion: merges and cancels T-phases scattered across the circuit, cutting T-count up to ~50% with no extra qubits. Core technique behind PyZX. Directly applicable to reducing T in the modular-arithmetic blocks of ECC point addition."
+  },
+  {
+    "title": "Graph-theoretic Simplification of Quantum Circuits with the ZX-calculus",
+    "authors": ["Ross Duncan", "Aleks Kissinger", "Simon Perdrix", "John van de Wetering"],
+    "year": 2019,
+    "url": "https://arxiv.org/abs/1902.03178",
+    "pdf_url": "https://arxiv.org/pdf/1902.03178",
+    "arxiv_id": "1902.03178",
+    "abstract": "Develops the local-complementation and pivoting rewrite strategy that removes interior Clifford spiders from a ZX graph (graph-like normal form), giving a deterministic simplification routine that reduces the number of nodes (and 2-qubit gates) while preserving semantics.",
+    "relevance_note": "Local-complementation + pivoting to eliminate interior Clifford spiders: the foundational ZX simplification that downstream T-count reducers build on. Reduces spider/edge count and CNOT count; the substrate for phase-teleportation T-count cuts."
+  },
+  {
+    "title": "Polynomial-Time T-Depth Optimization of Clifford+T Circuits Via Matroid Partitioning (T-par)",
+    "authors": ["Matthew Amy", "Dmitri Maslov", "Michele Mosca"],
+    "year": 2013,
+    "url": "https://arxiv.org/abs/1303.2042",
+    "pdf_url": "https://arxiv.org/pdf/1303.2042",
+    "arxiv_id": "1303.2042",
+    "abstract": "Models the Clifford+T circuit as a phase polynomial over parity terms and uses matroid partitioning to schedule T/T-dagger rotations in parallel layers, minimizing T-depth (and exposing T-count cancellations) in polynomial time. Basis of the 'T-par' optimizer.",
+    "relevance_note": "Phase-polynomial + matroid partitioning ('T-par'): groups Rz(pi/4) rotations on identical parities so they cancel/merge, reducing both T-count and T-depth. Strong on arithmetic circuits like adders used in ECC."
+  },
+  {
+    "title": "T-count optimization and Reed-Muller codes",
+    "authors": ["Matthew Amy", "Michele Mosca"],
+    "year": 2016,
+    "url": "https://arxiv.org/abs/1601.07363",
+    "pdf_url": "https://arxiv.org/pdf/1601.07363",
+    "arxiv_id": "1601.07363",
+    "abstract": "Shows the T-count minimization of a phase polynomial is equivalent to minimum-distance decoding of a punctured Reed-Muller code, giving optimal and heuristic (RM-based) algorithms that provably reduce T-count below earlier methods on many circuits.",
+    "relevance_note": "Reed-Muller / coding-theoretic T-count minimization: reformulates T-count as RM(1,m) decoding, enabling provably better T-count for the phase-polynomial blocks (e.g. multiple-control gates, modular arithmetic)."
+  },
+  {
+    "title": "Novel constructions for the fault-tolerant Toffoli gate",
+    "authors": ["Cody Jones"],
+    "year": 2013,
+    "url": "https://arxiv.org/abs/1212.5069",
+    "pdf_url": "https://arxiv.org/pdf/1212.5069",
+    "arxiv_id": "1212.5069",
+    "abstract": "Gives a Toffoli realized with Clifford operations plus only four T gates (vs the conventional seven) using measurement and classical feedforward; adding n controls costs 4n T gates instead of 8n. Also provides an error-detecting variant.",
+    "relevance_note": "Measurement-assisted Toffoli with 4 T instead of 7 (and 4n vs 8n for multi-controlled). Roughly halves the T-cost of every Toffoli; central lever for ECC point-addition circuits dominated by Toffoli/AND structure."
+  },
+  {
+    "title": "Halving the cost of quantum addition (measurement-based / temporary AND gates)",
+    "authors": ["Craig Gidney"],
+    "year": 2017,
+    "url": "https://arxiv.org/abs/1709.06648",
+    "pdf_url": "https://arxiv.org/pdf/1709.06648",
+    "arxiv_id": "1709.06648",
+    "abstract": "Introduces the measurement-uncomputed 'temporary logical-AND' gadget: an AND can be computed with 4 T gates and uncomputed with 0 T gates (Clifford + measurement + feedforward), and ripple-carry addition reuses a single ancilla, halving Toffoli/T cost relative to standard adders.",
+    "relevance_note": "Gidney AND-gate: compute-AND = 4 T, uncompute-AND = 0 T via measurement. Halves the T-count of adders/comparators. The standard building block for cheap reversible modular arithmetic in ECC circuits."
+  },
+  {
+    "title": "On the advantages of using relative phase Toffolis with an application to multiple control Toffoli optimization",
+    "authors": ["Dmitri Maslov"],
+    "year": 2015,
+    "url": "https://arxiv.org/abs/1508.03273",
+    "pdf_url": "https://arxiv.org/pdf/1508.03273",
+    "arxiv_id": "1508.03273",
+    "abstract": "Shows that relative-phase (up-to-phase) Toffoli gates cost as few as 4 T gates and that multiple-control Toffoli gates can be built from relative-phase pieces whose spurious phases cancel between the compute and uncompute halves, cutting T-count and ancilla.",
+    "relevance_note": "Relative-phase Toffoli: 4 T instead of 7 when a spurious controlled phase is later uncomputed. Composing MCT gates from relative-phase Toffolis (compute/uncompute cancel) sharply lowers T-count and removes ancilla."
+  },
+  {
+    "title": "Elementary gates for quantum computation",
+    "authors": ["Adriano Barenco", "Charles H. Bennett", "Richard Cleve", "David P. DiVincenzo", "Norman Margolus", "Peter Shor", "Tycho Sleator", "John A. Smolin", "Harald Weinfurter"],
+    "year": 1995,
+    "url": "https://arxiv.org/abs/quant-ph/9503016",
+    "pdf_url": "https://arxiv.org/pdf/quant-ph/9503016",
+    "arxiv_id": "quant-ph/9503016",
+    "abstract": "Foundational gate-count paper: upper/lower bounds for building 2- and 3-bit gates, asymptotic counts for n-bit Deutsch-Toffoli gates, and the canonical recursive decomposition of multi-controlled-U / multi-controlled-Toffoli into elementary gates (with and without ancilla).",
+    "relevance_note": "Original multi-controlled-Toffoli decomposition (linear-with-ancilla and quadratic-without). Baseline against which all later MCT/T reductions (Maslov, Jones, He et al.) are measured; defines the ancilla/gate trade-offs."
+  },
+  {
+    "title": "Techniques for the Synthesis of Reversible Toffoli Networks (template/peephole matching)",
+    "authors": ["Dmitri Maslov", "Gerhard W. Dueck", "D. Michael Miller"],
+    "year": 2007,
+    "url": "https://arxiv.org/abs/quant-ph/0607166",
+    "pdf_url": "https://arxiv.org/pdf/quant-ph/0607166",
+    "arxiv_id": "quant-ph/0607166",
+    "abstract": "Presents template (peephole) simplification of reversible Toffoli networks: a library of size-classified templates whose matched subsequences are replaced by shorter equivalents, plus a fast template-application algorithm and new templates of sizes 7 and 9.",
+    "relevance_note": "Template / peephole matching: replaces locally matching gate runs with shorter equivalents and removes adjacent cancelling gates, reducing Toffoli/gate count in reversible logic. The classical complement to ZX-level optimization."
+  },
+  {
+    "title": "Quantum Circuit Optimization with AlphaTensor (AlphaTensor-Quantum)",
+    "authors": ["Francisco J. R. Ruiz", "Tuomas Laakkonen", "Johannes Bausch", "Matej Balog", "et al. (Google DeepMind)"],
+    "year": 2024,
+    "url": "https://arxiv.org/abs/2402.14396",
+    "pdf_url": "https://arxiv.org/pdf/2402.14396",
+    "arxiv_id": "2402.14396",
+    "abstract": "Casts T-count minimization as symmetric tensor (rank) decomposition and solves it with a deep-RL agent (extension of AlphaTensor), incorporating gadget-based domain knowledge. Outperforms prior T-count optimizers on arithmetic benchmarks and rediscovers Karatsuba-like finite-field multiplication.",
+    "relevance_note": "RL + tensor-rank decomposition for T-count: finds gadgetized low-T circuits, beating heuristic optimizers on Shor-relevant arithmetic (finite-field multiplication). Directly targets the kind of modular-multiplication blocks in ECC point addition."
+  },
+  {
+    "title": "Reusability Report: Optimizing T-count in General Quantum Circuits with AlphaTensor-Quantum",
+    "authors": ["(reproducibility/reusability study authors)"],
+    "year": 2025,
+    "url": "https://arxiv.org/abs/2511.09951",
+    "pdf_url": "https://arxiv.org/pdf/2511.09951",
+    "arxiv_id": "2511.09951",
+    "abstract": "Independent reusability evaluation of AlphaTensor-Quantum: reproduces and probes the deep-RL T-count optimizer on general (non-arithmetic) circuits, characterizing where the gadget-based tensor-decomposition approach helps and where it underperforms classical ZX/phase-polynomial methods.",
+    "relevance_note": "Critical follow-up on AlphaTensor-Quantum: clarifies the practical T-count gains/limits of the RL approach vs ZX and T-par on general circuits, useful for deciding whether RL is worth deploying on ECC arithmetic."
+  },
+  {
+    "title": "Quartz: Superoptimization of Quantum Circuits",
+    "authors": ["Mingkuan Xu", "Zikun Li", "Oded Padon", "et al."],
+    "year": 2022,
+    "url": "https://arxiv.org/abs/2204.09033",
+    "pdf_url": "https://arxiv.org/pdf/2204.09033",
+    "arxiv_id": "2204.09033",
+    "abstract": "Automatically generates candidate circuit-rewrite rules for an arbitrary gate set, verifies them with an automated theorem prover, then applies them via cost-based backtracking search. Discovers optimizations beyond hand-written rule sets across multiple gate sets.",
+    "relevance_note": "Automated rewrite-rule generation + verified superoptimization: discovers gate-count/T-count-reducing transformations a human might miss, generalizing template matching to any gate set. Tooling for finding new ECC-circuit simplifications."
+  },
+  {
+    "title": "A Verified Optimizer for Quantum Circuits (VOQC)",
+    "authors": ["Kesha Hietala", "Robert Rand", "Shih-Han Hung", "Xiaodi Wu", "Michael Hicks"],
+    "year": 2019,
+    "url": "https://arxiv.org/abs/1912.02250",
+    "pdf_url": "https://arxiv.org/pdf/1912.02250",
+    "arxiv_id": "1912.02250",
+    "abstract": "A formally verified (Coq) quantum circuit optimizer implementing gate cancellation, rotation merging, and not-propagation passes proven to preserve semantics; competitive with Qiskit/t|ket> while guaranteeing correctness.",
+    "relevance_note": "Formally verified rotation-merging and gate-cancellation passes: machine-checked T/gate reduction, so optimizations applied to ECC arithmetic are provably correct (no silent miscompilation of the circuit)."
+  },
+  {
+    "title": "Reinforcement Learning Based Quantum Circuit Optimization via ZX-Calculus",
+    "authors": ["Jordi Riu", "Jan Nogue", "Gerard Vilaplana", "Artur Garcia-Saez", "Marta P. Estarellas"],
+    "year": 2023,
+    "url": "https://arxiv.org/abs/2312.11597",
+    "pdf_url": "https://arxiv.org/pdf/2312.11597",
+    "arxiv_id": "2312.11597",
+    "abstract": "Trains an RL agent to choose and order ZX-calculus rewrite rules (local complementation, pivoting, phase gadgetization) to minimize gate/T-count, outperforming fixed-heuristic ZX simplification routines such as PyZX's full_reduce on benchmark circuits.",
+    "relevance_note": "RL-guided ZX rewriting: learns the rewrite-ordering policy that fixed PyZX heuristics miss, squeezing extra 2-qubit-gate and T-count reduction out of the ZX representation. Applicable on top of phase teleportation."
+  },
+  {
+    "title": "Adaptive Clifford+T Decomposition of Large Toffoli Gates with One Clean Ancilla",
+    "authors": ["(2026 authors)"],
+    "year": 2026,
+    "url": "https://arxiv.org/abs/2605.18169",
+    "pdf_url": "https://arxiv.org/pdf/2605.18169",
+    "arxiv_id": "2605.18169",
+    "abstract": "Gives measurement-adaptive Clifford+T constructions for multi-controlled Toffoli (MCX) gates using only one clean ancilla, lowering T-count and T-depth versus standard ancilla-heavy decompositions by exploiting mid-circuit measurement and feedforward.",
+    "relevance_note": "Measurement-adaptive multi-controlled Toffoli with a single clean ancilla: reduces both T-count and ancilla for large MCX gates - relevant when ECC circuits need wide controlled operations under tight qubit budgets."
+  }
+]

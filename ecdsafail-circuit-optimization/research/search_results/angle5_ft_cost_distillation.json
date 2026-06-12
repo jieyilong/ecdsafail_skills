@@ -1,0 +1,110 @@
+[
+  {
+    "title": "How to factor 2048 bit RSA integers in 8 hours using 20 million noisy qubits",
+    "authors": ["Craig Gidney", "Martin Ekerå"],
+    "year": 2019,
+    "url": "https://arxiv.org/abs/1905.09749",
+    "pdf_url": "https://arxiv.org/pdf/1905.09749",
+    "abstract": "Combines Shor 1994, Griffiths-Niu 1996, Zalka 2006, Fowler 2012, Ekerå-Håstad 2017, Ekerå 2017/2018, Gidney-Fowler 2019 and Gidney 2019 to factor 2048-bit RSA with ~20 million noisy physical qubits in ~8 hours, at physical error rate ~1e-3 and surface-code cycle time 1us. Spacetime volume is ~100x less than comparable earlier estimates. Uses windowed/coset-representation modular exponentiation, oblivious carry runways, and a CCZ magic-state factory.",
+    "relevance_note": "Canonical surface-code SPACETIME-VOLUME cost model: the objective is physical-qubits x wall-clock-time, reported in 'megaqubitdays'. Justifies minimizing Toffoli/CCZ count because each Toffoli consumes a magic state whose factory dominates both qubit footprint and time. Establishes that the real FT cost is logical-volume (qubits x cycles) not raw gate count, and that distillation factories set the conversion rate from Toffoli-count to spacetime."
+  },
+  {
+    "title": "How to factor 2048 bit RSA integers with less than a million noisy qubits",
+    "authors": ["Craig Gidney"],
+    "year": 2025,
+    "url": "https://arxiv.org/abs/2505.15917",
+    "pdf_url": "https://arxiv.org/pdf/2505.15917",
+    "abstract": "Reduces the qubit cost of factoring 2048-bit RSA ~20x versus Gidney-Ekerå 2019: <1 million noisy qubits in <1 week at p~1e-3. Savings come from (1) approximate residue arithmetic, (2) storing idle logical qubits with yoked surface codes, and (3) allocating far less space to distillation by using magic state cultivation instead of full distillation factories.",
+    "relevance_note": "Latest SOTA FT cost model for Shor-class arithmetic. Crucially shows the spacetime objective is dominated by (a) idle-qubit storage cost (yoked codes shrink it) and (b) magic-state production cost (cultivation shrinks it), so reducing Toffoli/T count and idle logical-qubit-time both directly cut megaqubitdays. Directly relevant to whether qubit x Toffoli is the right proxy: it shows qubit-count and Toffoli-volume trade against each other under a fixed spacetime budget."
+  },
+  {
+    "title": "A Game of Surface Codes: Large-Scale Quantum Computing with Lattice Surgery",
+    "authors": ["Daniel Litinski"],
+    "year": 2018,
+    "url": "https://arxiv.org/abs/1808.02892",
+    "pdf_url": "https://arxiv.org/pdf/1808.02892",
+    "abstract": "Presents lattice-surgery surface-code schemes for small/intermediate/large scale, expressed as a tile-based 'game'. Encodes logical qubits as patches with low space cost and lays out explicit space-time trade-offs from slow/few-qubit to fast/many-qubit computations. Quantifies the cost of T/Toffoli gates and Clifford operations in terms of tiles (qubit patches) x time steps (code cycles).",
+    "relevance_note": "Foundational tile-based cost model: a computation's cost is measured in TILES x CODE-CYCLES (logical spacetime volume). Shows a logical non-Clifford (T/Toffoli) gate costs a fixed number of tile-cycles to consume a magic state, and that the bottleneck is often the rate of magic-state consumption. Gives the precise vocabulary for converting 'qubit count' and 'Toffoli count' into a single spacetime-volume objective."
+  },
+  {
+    "title": "Magic State Distillation: Not as Costly as You Think",
+    "authors": ["Daniel Litinski"],
+    "year": 2019,
+    "url": "https://arxiv.org/abs/1905.06903",
+    "pdf_url": "https://arxiv.org/pdf/1905.06903",
+    "abstract": "Rewrites distillation circuits to separate error-detecting from non-error-detecting qubits, allowing most distillation qubits to be encoded at low code distance. This sharply reduces the space-time cost and qubit count of distillation; in extreme cases distilling a magic state can cost less than performing a logical Clifford on full-distance qubits. Provides explicit qubit/time costs for a range of 15-to-1 and higher-yield factories.",
+    "relevance_note": "Quantifies the per-magic-state spacetime cost (in qubit-cycles / tile-cycles) of distillation factories, the conversion factor that turns a Toffoli/T count into surface-code volume. Argues distillation is NOT the dominant cost, weakening the case for treating raw T-count as the sole objective and reinforcing that idle logical-qubit storage and routing volume matter too."
+  },
+  {
+    "title": "Active volume: An architecture for efficient fault-tolerant quantum computers with limited non-local connections",
+    "authors": ["Daniel Litinski", "Naomi Nickerson"],
+    "year": 2022,
+    "url": "https://arxiv.org/abs/2211.15465",
+    "pdf_url": "https://arxiv.org/pdf/2211.15465",
+    "abstract": "Introduces an architecture where, given O(log N) non-local connections per logical qubit, the cost scales with the number of logical operations (their 'active volume') rather than with circuit volume (qubits x time). Each logical operation has an associated active volume and total cost is the sum of active volumes. For computations with thousands of logical qubits, active volume can be orders of magnitude below the naive circuit volume.",
+    "relevance_note": "Proposes ACTIVE VOLUME as an alternative cost metric to spacetime/circuit volume: cost = sum of per-operation active volumes, decoupled from idle-qubit count. Reduces cost most when a computation is reaction-limited (latency of magic-state consumption dominates). Directly challenges 'qubit x time' as the objective: under active-volume hardware, idle qubits are nearly free and the objective becomes total operation count (i.e. Toffoli/logical-op count) rather than qubit x Toffoli."
+  },
+  {
+    "title": "Surface codes: Towards practical large-scale quantum computation",
+    "authors": ["Austin G. Fowler", "Matteo Mariantoni", "John M. Martinis", "Andrew N. Cleland"],
+    "year": 2012,
+    "url": "https://arxiv.org/abs/1208.0928",
+    "pdf_url": "https://arxiv.org/pdf/1208.0928",
+    "abstract": "The standard tutorial/reference on surface-code quantum computing: defines stabilizers on a 2D array, logical qubit construction, code distance d, and the relationship between physical error rate, distance, and logical error rate (p_L ~ (p/p_th)^(d/2)). Estimates the size and speed of a surface-code quantum computer and the physical-qubit overhead per logical qubit (~2d^2 physical qubits) and per code cycle.",
+    "relevance_note": "Defines the base conversion from logical to physical resources: a logical qubit costs ~2d^2 physical qubits and one logical time-step costs ~d code cycles, so logical spacetime volume x ~d^3 = physical qubit-seconds. This is the foundational reason qubit-count and time both enter the cost as a product, and why higher Toffoli volume forces larger d or more factories, inflating physical spacetime."
+  },
+  {
+    "title": "Low overhead quantum computation using lattice surgery",
+    "authors": ["Austin G. Fowler", "Craig Gidney"],
+    "year": 2018,
+    "url": "https://arxiv.org/abs/1808.06709",
+    "pdf_url": "https://arxiv.org/pdf/1808.06709",
+    "abstract": "Shows lattice surgery reduces storage overhead by >4x and distillation overhead by ~5x relative to braided defects, enabling algorithms with 10^8 T gates using only 3.7e5 physical qubits at p~1e-3. Argues defects/braids should be deprecated in favor of lattice surgery, and gives explicit physical-qubit and T-gate budget tradeoffs.",
+    "relevance_note": "Quantifies the FT overhead as a function of T-count and physical error rate, giving a concrete 'physical qubits needed for X T gates' law. Demonstrates that the dominant levers on spacetime volume are storage (idle logical qubits) and distillation throughput, both of which scale with T/Toffoli volume; supports T/Toffoli count as a primary cost driver while showing layout/routing also matters."
+  },
+  {
+    "title": "Magic state cultivation: growing T states as cheap as CNOT gates",
+    "authors": ["Craig Gidney", "Noah Shutty", "Cody Jones"],
+    "year": 2024,
+    "url": "https://arxiv.org/abs/2409.17595",
+    "pdf_url": "https://arxiv.org/pdf/2409.17595",
+    "abstract": "Introduces 'magic state cultivation', which grows a single T state inside a surface-code patch using roughly the same number of physical gates as a lattice-surgery CNOT of equivalent reliability. Reaches logical error ~2e-9 at p~1e-3 (and ~4e-11 at p~5e-4) using an order of magnitude fewer qubit-rounds than prior distillation. Suggests further distillation may never be needed in practice.",
+    "relevance_note": "Drastically lowers the per-T spacetime cost (qubit-rounds per magic state) — the conversion factor from Toffoli/T count to surface-code volume. By making a T state ~as cheap as a CNOT, it shifts the FT cost balance away from distillation factories toward logical-qubit storage and routing, reinforcing that idle qubit x time and Toffoli-count are both first-order terms in the objective."
+  },
+  {
+    "title": "Encoding Electronic Spectra in Quantum Circuits with Linear T Complexity",
+    "authors": ["Ryan Babbush", "Craig Gidney", "Dominic W. Berry", "Nathan Wiebe", "Jarrod McClean", "Alexandru Paler", "Austin Fowler", "Hartmut Neven"],
+    "year": 2018,
+    "url": "https://arxiv.org/abs/1805.03662",
+    "pdf_url": "https://arxiv.org/pdf/1805.03662",
+    "abstract": "Constructs qubitization/QROM-based circuits that block-encode correlated-electron Hamiltonians with O(N + log(1/eps)) T-gate complexity. Introduces SELECT/PREPARE oracles and unary-iteration (QROM) techniques whose dominant cost is measured explicitly in Toffoli/T gates rather than arbitrary rotations.",
+    "relevance_note": "Seminal example of using T-COUNT (and Toffoli count) as the primary algorithmic cost metric for FT algorithms, on the grounds that non-Clifford gates are the only ones requiring magic states and thus dominate surface-code spacetime. Motivates 'count the Toffolis/T' as the right first-order objective, and pioneered Toffoli-cheap constructions (unary iteration) that trade ancilla qubits for fewer non-Clifford gates."
+  },
+  {
+    "title": "Even More Efficient Quantum Computations of Chemistry Through Tensor Hypercontraction",
+    "authors": ["Joonho Lee", "Dominic W. Berry", "Craig Gidney", "William J. Huggins", "Jarrod R. McClean", "Nathan Wiebe", "Ryan Babbush"],
+    "year": 2020,
+    "url": "https://arxiv.org/abs/2011.03494",
+    "pdf_url": "https://arxiv.org/pdf/2011.03494",
+    "abstract": "Uses tensor hypercontraction to block-encode quantum-chemistry Hamiltonians with O~(N) Toffoli complexity, the lowest shown for arbitrary-basis chemistry. Phase estimation needs O(lambda/eps) repetitions where lambda is the 1-norm of coefficients. Reports full Toffoli-count and logical-qubit resource estimates for realistic molecules (e.g. FeMoco).",
+    "relevance_note": "Explicitly adopts TOFFOLI COMPLEXITY x repetition count as the end-to-end cost figure of merit for FT algorithms, and reports Toffoli-count alongside logical-qubit count as the headline resource numbers. Strong evidence that 'minimize total Toffoli count (then qubits)' is the community-standard objective for surface-code-era algorithms, the assumption behind a qubit x Toffoli proxy."
+  },
+  {
+    "title": "Efficient magic state factories with a catalyzed |CCZ> to 2|T> transformation",
+    "authors": ["Craig Gidney", "Austin G. Fowler"],
+    "year": 2018,
+    "url": "https://arxiv.org/abs/1812.01238",
+    "pdf_url": "https://arxiv.org/pdf/1812.01238",
+    "abstract": "Presents a |CCZ> magic-state factory with footprint 12d x 6d producing one |CCZ> every ~5.5d surface-code cycles, plus a catalyzed |CCZ>->2|T> transformation that yields T-factories 25% smaller and 2x faster than Fowler et al. Generalizes the catalysis to arbitrary phase angles.",
+    "relevance_note": "Gives the explicit qubit-footprint and cycle-time of a Toffoli/CCZ factory — i.e. exactly how many qubit-cycles one logical Toffoli costs (a 12d x 6d patch x ~5.5d cycles). This is the concrete conversion constant that turns a Toffoli count into surface-code spacetime volume, underpinning the Gidney-Ekerå RSA estimate and any qubit x Toffoli cost proxy."
+  },
+  {
+    "title": "Assessing requirements to scale to practical quantum advantage",
+    "authors": ["Michael E. Beverland", "Prakash Murali", "Matthias Troyer", "Krysta M. Svore", "Torsten Hoefler", "Vadym Kliuchnikov", "Guang Hao Low", "Mathias Soeken", "Aarthi Sundaram", "Alexander Vaschillo"],
+    "year": 2022,
+    "url": "https://arxiv.org/abs/2211.07629",
+    "pdf_url": "https://arxiv.org/pdf/2211.07629",
+    "abstract": "Microsoft's full-stack resource-estimation framework. Abstracts the layers of the FT stack and estimates physical resources for three scaled applications, finding 1e5-1e6 physical qubits are needed for practical advantage. Identifies qubit size, speed, and controllability as the critical hardware parameters and provides closed-form formulas relating logical-qubit count, T/Toffoli count, code distance, and runtime.",
+    "relevance_note": "Provides an explicit, tool-backed cost model: runtime ~ (logical-cycle count) x (cycle time) and physical-qubit count ~ (logical-qubit count + factory count) x 2d^2, with logical-cycle count driven by T/Toffoli depth. Defines the 'logical qubit-cycle' / spacetime accounting that makes qubit-count x logical-depth (a proxy for qubit x Toffoli volume) the natural scalar objective for comparing FT circuits."
+  }
+]

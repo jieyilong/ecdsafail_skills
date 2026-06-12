@@ -1,0 +1,128 @@
+[
+  {
+    "title": "A new quantum ripple-carry addition circuit",
+    "authors": ["Steven A. Cuccaro", "Thomas G. Draper", "Samuel A. Kutin", "David Petrie Moulton"],
+    "year": 2004,
+    "url": "https://arxiv.org/abs/quant-ph/0410184",
+    "pdf_url": "https://arxiv.org/pdf/quant-ph/0410184",
+    "abstract": "Presents a new linear-depth ripple-carry quantum addition circuit. Previous addition circuits required linearly many ancillary qubits; this new adder uses only a single ancillary qubit, with lower depth and fewer gates than previous ripple-carry adders.",
+    "relevance_note": "The canonical 1-ancilla in-place ripple-carry adder (CDKM). Uses the MAJ/UMA (majority / un-majority-and-add) gate pattern to do n-bit addition with a single ancilla qubit and 2n Toffoli gates. Foundational space-optimal adder reused in essentially every Shor/ECDLP modular-arithmetic circuit."
+  },
+  {
+    "title": "A logarithmic-depth quantum carry-lookahead adder",
+    "authors": ["Thomas G. Draper", "Samuel A. Kutin", "Eric M. Rains", "Krysta M. Svore"],
+    "year": 2004,
+    "url": "https://arxiv.org/abs/quant-ph/0406142",
+    "pdf_url": "https://arxiv.org/pdf/quant-ph/0406142",
+    "abstract": "Borrows the classical carry-lookahead idea to build a quantum carry-lookahead (QCLA) adder that adds two n-bit numbers in O(log n) depth using O(n) ancillary qubits. Provides in-place and out-of-place versions, plus mod 2^n and mod 2^n-1 variants.",
+    "relevance_note": "Log-depth carry-lookahead adder (QCLA) trading O(n) ancilla for O(log n) depth instead of O(n). The depth/ancilla trade-off knob versus the CDKM ripple adder; its P/G (propagate/generate) tree structure is the basis for low-T-depth adders and modular reduction."
+  },
+  {
+    "title": "Quantum Addition Circuits and Unbounded Fan-Out",
+    "authors": ["Yasuhiro Takahashi", "Seiichiro Tani", "Noboru Kunihiro"],
+    "year": 2009,
+    "url": "https://arxiv.org/abs/0910.2530",
+    "pdf_url": "https://arxiv.org/pdf/0910.2530",
+    "abstract": "Constructs an O(n)-depth, O(n)-size quantum addition circuit for two n-bit numbers with no ancillary qubits; exact size 7n-6, smaller than any prior ancilla-free adder. Using it, builds O(d(n))-depth O(n)-size adders and explores unbounded fan-out for lower depth.",
+    "relevance_note": "Zero-ancilla ripple adder (Takahashi-Tani-Kunihiro), exact size 7n-6 with no ancilla qubits. The maximally space-frugal adder primitive; the qubit-count baseline for 2n+2 / 2n+3 Shor circuits where every saved ancilla matters."
+  },
+  {
+    "title": "Halving the cost of quantum addition",
+    "authors": ["Craig Gidney"],
+    "year": 2017,
+    "url": "https://arxiv.org/abs/1709.06648",
+    "pdf_url": "https://arxiv.org/pdf/1709.06648",
+    "abstract": "Reduces the number of T gates for an n-bit adder from 8n+O(1) to 4n+O(1) via a 'temporary logical-AND' construction that uses four T gates to store the AND of two qubits into an ancilla and zero T gates to later erase it (measurement-based uncompute).",
+    "relevance_note": "Measurement-based AND uncompute / temporary-logical-AND halves the T cost: a Toffoli-as-AND costs 4 T to compute and 0 T to uncompute (Clifford + classically-controlled fixup after X-basis measurement). The single most reused T-count reduction trick in modern Shor/ECDLP circuits."
+  },
+  {
+    "title": "Quantum Networks for Elementary Arithmetic Operations",
+    "authors": ["Vlatko Vedral", "Adriano Barenco", "Artur Ekert"],
+    "year": 1995,
+    "url": "https://arxiv.org/abs/quant-ph/9511018",
+    "pdf_url": "https://arxiv.org/pdf/quant-ph/9511018",
+    "abstract": "Explicit quantum networks for basic arithmetic from addition through modular exponentiation. Identifies modular exponentiation as the most time- and space-consuming part of Shor's algorithm and analyzes the auxiliary memory required.",
+    "relevance_note": "Original (VBE) reversible arithmetic circuits and the add-then-conditional-subtract modular adder template. The historical baseline (~7n-ish qubits, plain-Toffoli adders) against which all later qubit/Toffoli reductions are measured."
+  },
+  {
+    "title": "Quantum Carry-Save Arithmetic",
+    "authors": ["Phil Gossett"],
+    "year": 1998,
+    "url": "https://arxiv.org/abs/quant-ph/9808061",
+    "pdf_url": "https://arxiv.org/pdf/quant-ph/9808061",
+    "abstract": "Designs arithmetic elements from quantum gates using classical 'carry-save' techniques, enabling bit-parallel evaluation of all arithmetic needed for Shor's algorithm and deferring all carry propagation until the end of the computation, reducing depth.",
+    "relevance_note": "Carry-save / redundant representation to defer carry propagation, cutting addition depth to O(1)-amortized inside multiply-accumulate. The technique behind constant-depth multiplier inner loops; a depth-vs-qubit lever for modular multiplication."
+  },
+  {
+    "title": "Circuit for Shor's algorithm using 2n+3 qubits",
+    "authors": ["Stephane Beauregard"],
+    "year": 2002,
+    "url": "https://arxiv.org/abs/quant-ph/0205095",
+    "pdf_url": "https://arxiv.org/pdf/quant-ph/0205095",
+    "abstract": "Minimizes qubit count for factoring an n-bit integer with Shor's algorithm: a circuit using 2n+3 qubits and O(n^3 lg n) elementary gates in O(n^3) depth, computable classically in polynomial time and fully general.",
+    "relevance_note": "Defines the 2n+3-qubit Shor circuit via Draper Fourier-basis (phase) addition and the add-then-conditional-subtract modular adder, plus one-controlled-qubit-at-a-time semiclassical QFT. The reference design for extreme qubit minimization of the modular-exponentiation core."
+  },
+  {
+    "title": "Factoring using 2n+2 qubits with Toffoli based modular multiplication",
+    "authors": ["Thomas Häner", "Martin Roetteler", "Krysta M. Svore"],
+    "year": 2016,
+    "url": "https://arxiv.org/abs/1611.07995",
+    "pdf_url": "https://arxiv.org/pdf/1611.07995",
+    "abstract": "Implements Shor's algorithm to factor n-bit integers using only 2n+2 qubits with a purely Toffoli-based (no QFT-addition) modular multiplication circuit. Circuit depth O(n^3) and gate count O(n^3 log n), matching the space/time of Takahashi while being Toffoli-based.",
+    "relevance_note": "2n+2-qubit Shor with a fully Toffoli-based (non-Fourier) modular multiplier built on CDKM/Takahashi adders, comparison-based modular reduction, and windowed/controlled adds. The fault-tolerant-friendly counterpart to Beauregard's phase-arithmetic, central to Toffoli-count minimization."
+  },
+  {
+    "title": "Asymptotically Efficient Quantum Karatsuba Multiplication",
+    "authors": ["Craig Gidney"],
+    "year": 2019,
+    "url": "https://arxiv.org/abs/1904.07356",
+    "pdf_url": "https://arxiv.org/pdf/1904.07356",
+    "abstract": "Improves the space complexity of Karatsuba multiplication on a quantum computer from O(n^1.427) to O(n) while keeping O(n^lg3) gate complexity, by ensuring recursive calls add their outputs directly into subsections of the output register, avoiding storage and uncomputation of intermediate results.",
+    "relevance_note": "Subquadratic-gate Karatsuba multiplier at linear ancilla: recursive add-into-output avoids storing/uncomputing partial products. The technique for reducing Toffoli count of large multipliers below the schoolbook O(n^2) while staying space-frugal."
+  },
+  {
+    "title": "Improved reversible and quantum circuits for Karatsuba-based integer multiplication",
+    "authors": ["Alex Parent", "Martin Roetteler", "Michele Mosca"],
+    "year": 2017,
+    "url": "https://arxiv.org/abs/1706.03419",
+    "pdf_url": "https://arxiv.org/pdf/1706.03419",
+    "abstract": "Presents a reversible Karatsuba multiplication circuit reducing space from O(n^1.585) to O(n^1.427) with less than a 2x increase in operation count and minor depth growth, with optimization insights derived from pebble games on complete ternary trees.",
+    "relevance_note": "Reversible Karatsuba multiplier with pebble-game-driven ancilla management (space-time trade via recomputation). The earlier subquadratic multiplier that frames the qubit-vs-Toffoli trade-off Gidney later pushed to O(n) space; relevant to large modular multipliers in ECDLP."
+  },
+  {
+    "title": "Ancilla-Input and Garbage-Output Optimized Design of a Reversible Quantum Integer Multiplier",
+    "authors": ["H V Jayashree", "Himanshu Thapliyal", "Hamid R. Arabnia", "V K Agrawal"],
+    "year": 2016,
+    "url": "https://arxiv.org/abs/1608.01228",
+    "pdf_url": "https://arxiv.org/pdf/1608.01228",
+    "abstract": "Proposes a garbage-free, ancilla-optimized reversible quantum integer multiplier using a novel add-and-rotate methodology that replaces shift-and-add with conditional adds plus rotate-right, producing zero garbage qubits and a 60-90% reduction in ancilla count over prior reversible multipliers.",
+    "relevance_note": "Garbage-free, ancilla-minimized reversible multiplier (add-and-rotate). Representative of the dedicated reversible squaring/multiplier line (Jayashree-Thapliyal-Agrawal): a dedicated squarer reuses the operand on both inputs to roughly halve partial-product Toffolis vs a generic multiplier."
+  },
+  {
+    "title": "Quantum resource estimates for computing elliptic curve discrete logarithms",
+    "authors": ["Martin Roetteler", "Michael Naehrig", "Krysta M. Svore", "Kristin Lauter"],
+    "year": 2017,
+    "url": "https://arxiv.org/abs/1706.06752",
+    "pdf_url": "https://arxiv.org/pdf/1706.06752",
+    "abstract": "Precise quantum resource estimates for Shor's elliptic-curve discrete-log algorithm over prime fields. Simulating Toffoli networks for controlled EC point addition (in LIQUi|>), shows ECDLP over an n-bit prime field needs at most 9n+2*ceil(log2 n)+10 qubits and at most 448 n^3 log2(n) + 4090 n^3 Toffoli gates.",
+    "relevance_note": "The canonical ECDLP/ECC circuit-resource paper and the direct ancestor of the ecdsa.fail point-addition benchmark. Specifies the full reversible modular-arithmetic stack (modular add/sub, Montgomery multiply, modular inverse via extended-GCD) and the 9n-ish qubit / Toffoli accounting that later work shaves."
+  },
+  {
+    "title": "Synthesis and Optimization of Reversible Circuits - A Survey",
+    "authors": ["Mehdi Saeedi", "Igor L. Markov"],
+    "year": 2013,
+    "url": "https://arxiv.org/abs/1110.2574",
+    "pdf_url": "https://arxiv.org/pdf/1110.2574",
+    "abstract": "Surveys reversible logic circuits and their applications. Categorizes work into synthesis, post-synthesis optimization, and technology mapping, reviewing search-based, cycle-based, transformation-based, and BDD-based synthesis (exact and heuristic), and identifies open challenges and misconceptions.",
+    "relevance_note": "Reference survey of reversible-logic synthesis and post-synthesis optimization (gate-count/quantum-cost reduction, template/peephole rewriting, ancilla management). The methodological map for systematically reducing Toffoli/ancilla in arithmetic blocks."
+  },
+  {
+    "title": "Reversible Logic Circuit Synthesis",
+    "authors": ["Vivek V. Shende", "Aditya K. Prasad", "Igor L. Markov", "John P. Hayes"],
+    "year": 2002,
+    "url": "https://arxiv.org/abs/quant-ph/0207001",
+    "pdf_url": "https://arxiv.org/pdf/quant-ph/0207001",
+    "abstract": "Foundational results on reversible circuits built from NOT/CNOT/Toffoli gates. Proves every even permutation is realizable without temporary storage (ancilla) using NOT, CNOT and TOFFOLI, gives optimal synthesis algorithms, and analyzes circuit sizes on three wires.",
+    "relevance_note": "Establishes the NOT/CNOT/Toffoli universality and the ancilla-free realizability of even permutations, with optimal small-circuit synthesis. The theoretical underpinning for Toffoli-count lower bounds and template-based peephole optimization of reversible arithmetic."
+  }
+]
