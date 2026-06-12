@@ -321,6 +321,60 @@ Circuit design implications:
   reconstruction lets you use Gidney (2n-Toffoli) adders there instead of CDKM (3n); this single
   choice is the entire 1192<->1446 / 2^21.19<->2^20.83 split in both Babbush and Schrottenloher.
 
+### How Schrottenloher's 1192 / 1208 Qubit Counts Are Computed
+
+Use this subsection when going "back to the drawing board" on why the paper can sit near 1.2k
+qubits. The paper's Table 1 reports **1192 qubits**, not 1195, for the space-optimized
+secp256k1 point-addition circuit. Table 2 adds the `w=16` window register for the full Shor
+windowed circuit:
+
+```text
+1192 point-add qubits + 16 window qubits = 1208 full-window qubits
+```
+
+Do not compare a challenge route against the wrong table. For ECDSA Fail-style fixed
+point-addition work, Table 1 is the closer structural analogue; for a full Shor resource estimate,
+Table 2 is the right accounting.
+
+The finite-size count is a concrete version of the asymptotic peak:
+
+```text
+peak ~= compressed_EEA_transcript + two n-bit Bezout/modular registers + O(sqrt(n))
+     ~= 2.355n + 2n + O(sqrt(n))
+     ~= 4.355n + O(sqrt(n))
+```
+
+For `n=256`, the arithmetic is:
+
+```text
+EEA iterations ~= 1.413n + c_iter * sqrt(n)
+               ~= 362 + padding
+
+Schrottenloher transcript packing: 3 iterations -> 5 bits
+compressed transcript ~= iterations * 5/3
+                      ~= roughly 667 bits with the paper's concrete padding
+
+Bezout reconstruction registers: r,s = 2n = 512 bits
+
+667 + 512 + small concrete overhead ~= 1192 qubits
+```
+
+Interpretation:
+
+- The **peak owner is Bezout reconstruction**, not GCD construction. GCD construction can use
+  shrinking `u,v` live ranges and freed high bits for the transcript, so it stays below the
+  reconstruction peak.
+- The `4.12n + O(sqrt(n))` number is a lower-space theoretical floor using the information content
+  of the transcript. The implemented circuit chooses a slightly larger `4.355n + O(sqrt(n))`
+  transcript representation because it is much cheaper and simpler to apply.
+- The extra concrete qubits over `4.355 * 256 ~= 1115` are the `O(sqrt(n))` padding, success-bound
+  margins, and small work/selection overheads. Do not expect the leading asymptotic term alone to
+  predict the exact 256-bit table row.
+- When borrowing this idea, first ask: "Can the current route be made to peak at transcript +
+  two registers, or are extra coordinate passengers / carry slices / decoded windows co-resident?"
+  If the latter are present, qubit count will land above the paper even if the EEA transcript is
+  compressed well.
+
 ### Transcript Compression And Jump Symbols
 
 TraiMix's low-qubit EEA-dialog circuits emphasize that the dialog sidecar is compressible
