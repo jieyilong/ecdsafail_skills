@@ -634,8 +634,9 @@ Optimization lesson:
 
 ### Recent 1285q -> 1211q Frontier (verified exact-knob ladder)
 
-This is the most actionable current ladder. **Current public #1 = `03a1550` (mpjunior92),
-score 1,701,048,104 = 1211 q x 1,404,664 T** -- `DIALOG_GCD_APPLY_CLEAN_COMPARE_BITS` 20->19.
+This is the most actionable current ladder. **Current public #1 = `f804ee0` (rubenmarcus),
+score 1,700,420,806 = 1211 q x 1,404,146 T** -- `DIALOG_GCD_WIDTH_SLOPE_X1000` 1015->1016
+on top of `03a1550`, a flat-qubit GCD width-envelope Toffoli trim.
 (Our own promoted `d83d19c`, 1221 q / 1,743,174,081, is no longer the frontier; competitors
 pushed below it via the qubit drops below. A 1216q branch at 1,740,350,144 is also NOT
 competitive with the live 1211q frontier -- always re-pull the leaderboard before assuming.)
@@ -663,7 +664,11 @@ Exact promoted sequence (id : qubits : knob introduced):
 - `d156d08` : **1212** : one more square-row segmentation notch.
 - `cac150e` : **1211** : `DIALOG_GCD_FOLD_PARK_LOW_CARRIES=1` (park lowest fused-fold carry qubits
   across the high-limb tail, recompute before uncompute) + `SQUARE_ROW_MAX_SEG=184`.
-- `03a1550` : 1211 (T-cut, **#1**) : `DIALOG_GCD_APPLY_CLEAN_COMPARE_BITS` 20->19.
+- `03a1550` : 1211 (T-cut) : `DIALOG_GCD_APPLY_CLEAN_COMPARE_BITS` 20->19.
+- `f804ee0` : 1211 (T-cut, **#1**) : `DIALOG_GCD_WIDTH_SLOPE_X1000` 1015->1016. The note frames
+  this as a steeper affine active-width taper for GCD `u,v`; dropped high bits are zero on the
+  searched verifier support. Expected failure mode is classical width-envelope/carry escape, which
+  the GCD-convergence/width prefilter can screen, rather than a broad phase-wall increase.
 
 The dominant late qubit lever is `SQUARE_ROW_MAX_SEG` (each notch ~ -2 peak), unlocked one step at
 a time by freeing/parking a carry slice (`*_FREED_TAIL`, `*_PARK_LOW_CARRIES`, `*_BORROW_CARRIES`,
@@ -678,6 +683,8 @@ Actionable route design:
    - shrink `SQUARE_ROW_MAX_SEG` one notch and compensate with safer carry widths;
    - move one more fold/add scratch interval onto certified clean `inner_scratch`;
    - tighten measured square-row cleanup only if triage stays near-miss.
+   - if qubits are flat and score margin matters, test one-notch `DIALOG_GCD_WIDTH_SLOPE_X1000`
+     steepening, but still re-hunt and triage because the op stream is reseeded.
 3. Measure qubits and average Toffoli before scanning.
 4. If score beats SOTA, run a short density and `cls / pha / anc` triage before committing GPUs.
 
