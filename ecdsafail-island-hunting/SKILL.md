@@ -314,6 +314,28 @@ candidates are `cls=0`; multiply by the analogous `pha=0` rate (weaker if `cls`/
 positively correlated, which they usually are near a true island) to estimate time-to-island.
 A deep but finite tail is a *patience* decision, not a route-kill — report the honest ETA.
 
+**A statistical route can still be a *practical* dead-end.** Statistical ≠ landable in your time
+budget. Estimate the required candidate count `~e^lambda` and compare against what the fleet can
+actually produce. **Verified:** `slope1015+compare43` (1203q) — 346 GCD-clean candidates validated,
+`cls` floor stuck at 3, broad distribution (3→17, mode `~8–10`), **zero shot-overlap** (statistical,
+not structural). But `e^9 ≈ 8000` candidates needed for one `cls=0`; at the achievable harvest rate
+that's impractical, and 960M nonces yielded **zero** `0/0/0` islands. The overlap test cleared it as
+"not structural," but the *depth* killed it. Abandon a statistical route whose `e^lambda` exceeds
+your candidate budget — don't grind it for free.
+
+**The apply-aware filter's calibration sets the `cls` floor — match the lever to the filter.** The
+GPU prefilter is *apply-aware*: it models the apply-side comparator (e.g. `compare_bits=46`). A lever
+that **changes the comparator the filter models** (like `compare46→43`) silently *miscalibrates* the
+filter — GPU-`CLEAN` then means "clean under the wrong comparator," so candidates validate to a high
+`cls` floor (the `compare43` mean `~8–10` above is exactly this). Diagnostic value: when GPU-`CLEAN`
+candidates validate far from `0/0/0`, suspect a filter/circuit comparator mismatch before blaming
+nonce luck. Conversely, a **value-exact, comparator-preserving** lever (apply-side carry-parking /
+square-segmentation that keeps `compare_bits` fixed) leaves the filter calibrated and inherits the
+base config's landability — though even these perturb the modeled apply path slightly, so expect a
+small residual `cls` (observed `cls≈5` on a first `park4+seg160` 1200q candidate, vs `compare43`'s
+`~8–10`). Rule of thumb: pre-GCD changes cost nothing on the filter, comparator changes cost the most,
+value-exact apply tweaks cost a little — pick levers that keep the filter honest.
+
 **Why a floor can exist at all** (since the tail nonce reseeds all 9024 shots): a structural floor
 requires shots whose inputs are *nonce-independent*. Most truncation error is driven by
 nonce-derived inputs (no floor), but some stacked apply-side truncations create a fixed bad set
