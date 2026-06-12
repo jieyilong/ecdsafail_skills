@@ -703,12 +703,38 @@ Optimization lesson:
 
 ### Recent 1285q -> 1211q Frontier (verified exact-knob ladder)
 
-This is the most actionable current ladder. **Current public #1 = `f804ee0` (rubenmarcus),
-score 1,700,420,806 = 1211 q x 1,404,146 T** -- `DIALOG_GCD_WIDTH_SLOPE_X1000` 1015->1016
-on top of `03a1550`, a flat-qubit GCD width-envelope Toffoli trim.
+This is the most actionable current ladder. **Current public #1 = `5d7044c0` (commit `186d9d7`),
+score 1,699,653,032 = 1211 q x 1,403,512 T** -- `DIALOG_GCD_WIDTH_SLOPE_X1000` 1016->1017 + a
+re-hunted `DIALOG_TAIL_NONCE`.
+
+**The 1211q frontier is now a `WIDTH_SLOPE` walk** (the single most important current fact). The
+leaders increment `DIALOG_GCD_WIDTH_SLOPE_X1000` one notch at a time and re-hunt the tail nonce each
+step. It is a **peak-neutral structural Toffoli cut** (qubits stay 1211): a steeper affine
+active-width taper for the GCD `u,v` registers does fewer GCD ops. Measured emitted-CCX per notch on
+the 1211 base (verified, peak=1211 throughout):
+
+```
+slope 1015 -> 1,482,860      1018 -> 1,481,192
+slope 1016 -> 1,482,332      1019 -> 1,480,700
+slope 1017 -> 1,481,696      1020 -> 1,480,108
+```
+
+i.e. **~-500..-640 emitted T per notch (~-580k..-730k score), with lots of headroom above 1017** --
+1018, 1019, 1020 are unclaimed. Each notch reseeds the Fiat-Shamir island, so it needs a fresh
+`DIALOG_TAIL_NONCE`; the GCD-convergence/width prefilter screens the expected failure (classical
+width-envelope/carry escape), so islands are findable. Promoted slope-walk steps:
+`03a1550` (slope1015, 1,701,048,104) -> `f804ee0` (slope1016, 1,700,420,806) ->
+`186d9d7` (slope1017, 1,699,653,032). **To beat the current SOTA, push slope to 1018+ and re-hunt**
+(bigger, more durable than the `DIALOG_GCD_COMPARE_BITS` 46->45/44 trims, which only buy -272/-584
+emitted T per notch and sit on the same island-hunt budget).
+
 (Our own promoted `d83d19c`, 1221 q / 1,743,174,081, is no longer the frontier; competitors
 pushed below it via the qubit drops below. A 1216q branch at 1,740,350,144 is also NOT
-competitive with the live 1211q frontier -- always re-pull the leaderboard before assuming.)
+competitive with the live 1211q frontier -- always re-pull the leaderboard before assuming.
+Knob-only sub-1211 is a dead end: the carry-trunc combos that drop peak to 1210 introduce an
+irreducible classical-mismatch floor -- e.g. `SEG182+FOLD17+DIALOGFOLD17` floors at cls=2 over
+hundreds of GCD-clean candidates. True sub-1211 needs a circuit-code change to the apply-fold
+carry pool, not a knob.)
 
 Exact promoted sequence (id : qubits : knob introduced):
 
@@ -734,10 +760,13 @@ Exact promoted sequence (id : qubits : knob introduced):
 - `cac150e` : **1211** : `DIALOG_GCD_FOLD_PARK_LOW_CARRIES=1` (park lowest fused-fold carry qubits
   across the high-limb tail, recompute before uncompute) + `SQUARE_ROW_MAX_SEG=184`.
 - `03a1550` : 1211 (T-cut) : `DIALOG_GCD_APPLY_CLEAN_COMPARE_BITS` 20->19.
-- `f804ee0` : 1211 (T-cut, **#1**) : `DIALOG_GCD_WIDTH_SLOPE_X1000` 1015->1016. The note frames
+- `f804ee0` : 1211 (T-cut) : `DIALOG_GCD_WIDTH_SLOPE_X1000` 1015->1016. The note frames
   this as a steeper affine active-width taper for GCD `u,v`; dropped high bits are zero on the
   searched verifier support. Expected failure mode is classical width-envelope/carry escape, which
   the GCD-convergence/width prefilter can screen, rather than a broad phase-wall increase.
+- `186d9d7` : 1211 (T-cut, **#1**) : `DIALOG_GCD_WIDTH_SLOPE_X1000` 1016->1017 + re-hunted nonce
+  `6100000089014596`. Same lever as `f804ee0`, one more notch -- the slope-walk continues (see the
+  measured per-notch emit table above; 1018+ is open).
 
 The dominant late qubit lever is `SQUARE_ROW_MAX_SEG` (each notch ~ -2 peak), unlocked one step at
 a time by freeing/parking a carry slice (`*_FREED_TAIL`, `*_PARK_LOW_CARRIES`, `*_BORROW_CARRIES`,
@@ -968,8 +997,12 @@ or compare-bit tightening as island-gated (needs a fresh `DIALOG_TAIL_NONCE`).
   (current #1 lever: 20->19).
 - `DIALOG_GCD_ACTIVE_ITERATIONS` (399->258-260) -- truncated K2 step-blocks per inversion; dropping
   one cuts ~2,861 T AND can free peak scratch. Historically the largest single lever.
-- `DIALOG_GCD_WIDTH_MARGIN` (32->7-12) / `DIALOG_GCD_WIDTH_SLOPE_X1000` (~948-1015) -- GCD active-width
-  envelope (affine fit + cushion); tightening frees peak but raises island rarity.
+- `DIALOG_GCD_WIDTH_MARGIN` (32->7-12) -- GCD active-width cushion; tightening frees peak but raises island rarity.
+- `DIALOG_GCD_WIDTH_SLOPE_X1000` (948 -> 1015 -> 1016 -> 1017 -> **1018+ open**) -- slope of the GCD
+  active-width affine envelope. In the qubit-frontier era it helped free peak; **at the 1211q frontier it
+  is now THE active peak-neutral Toffoli-cut lever**: each +1 notch removes ~500-640 emitted T (~-580k..
+  -730k score), needs a fresh `DIALOG_TAIL_NONCE`, GCD-prefilterable. The current SOTA ladder is a walk
+  up this knob (1015->1016->1017). Walk it further before reaching for `COMPARE_BITS`.
 - `DIALOG_GCD_HOST_GATED` / `_BRANCH_BITS_HOST_COMPARATOR` / `_COMPOSITE_SCRATCH` -- host
   gated/comparator/Euclidean scratch on idle future-log + inactive high u/v lanes.
 - `DIALOG_GCD_K2_PAIR_COMPRESS` -- encode 2 K2 steps in 5 sidecar bits (was 3 steps/8 bits).
