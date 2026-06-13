@@ -216,10 +216,13 @@ re-`TRACE_PEAK`, read the new owning phase, and design the next lever against TH
 - **1192q** (SOTA a39ce501, `cf99209`, 1,683,083,736 = 1192 x 1,411,983) — a PURE peak-neutral
   Toffoli trim: -442 avg-T, **0 qubits**. Shrinking the square's clean-compare window frees no
   qubits because the square no longer binds the peak; it only cuts gates.
-- **Next sub-1192 target is therefore the materialized_special_underflow_fold phase**, NOT
-  the square or the GCD-apply. Do not re-attack a phase that is no longer the binder.
+- then ATTACK that binder with per-step scheduling + a denser codec (next bullet) ->
+- **1185q** (SOTA 3182d2b3, `cf310ec`, 1,681,025,595 = 1185 x 1,418,587; -7 q for +6,604 avg-T
+  = 943 T/q, under break-even). A ROUTE CHANGE, not a notch — binder migrated to
+  `dialog_gcd_apply_chunk_sub_ripple` (ops_idx ~1.82M). **Next sub-1185 target = that GCD-apply
+  chunked sub-ripple phase.**
 
-Two lessons fall out of this leg pair: (1) the QUBIT win only ever comes from shrinking
+Two lessons fall out of the 1193->1192 leg pair: (1) the QUBIT win only ever comes from shrinking
 whoever CURRENTLY binds the peak (here the seg notch on the square); (2) once a phase falls
 OFF-peak, shrinking it further is a pure-Toffoli play — judge it on avg-T alone, expect zero
 qubit movement (here clean-compare 21->19 bought -442 T at 0 q). Don't expect a qubit drop
@@ -230,6 +233,46 @@ move qubits. The cheap workflow to tell which case you are in:
 everything else you tighten is a Toffoli-only play.
 
 Risk: early release can silently create classical/phase errors if a supposedly dead bit is still entangled or reused as a control later.
+
+### Per-Step Scheduling And Denser Codecs (the 1192 -> 1185 route change)
+
+Once the cheap constant-width notches are exhausted, the next qubit regime is unlocked by
+TWO structural ideas, both verified in SOTA 3182d2b3 (`cf310ec`, 1185q):
+
+**1. Per-step scheduling — replace a constant width with a `fn(step)` schedule.** The GCD
+runs ~258 fixed iterations; different steps tolerate different truncation/notch widths, so a
+single constant must be set to the worst-case step. A per-step schedule squeezes each step
+exactly as tight as IT can take, recovering the slack the constant wasted. Concretely:
+- Code: `dialog_gcd_special_fold_carry_trunc_window(step)` REPLACES the constant
+  `fold_carry_trunc_window()` at the `dialog_gcd_materialized_special_underflow_fold` (and
+  `_borrowed_`) sites (`src/point_add/mod.rs` underflow-fold).
+- Knobs (all per-step maps): `DIALOG_GCD_BINDER_NOTCH_STEPS=8,9,10` + `_EXTRA=3` +
+  `_MAP=11:1,12:1,13:1` (notch the BINDING phase at chosen steps — the scheduled form of
+  "attack the current binder"); `DIALOG_GCD_BODY_CARRY_BAND_TRIMS` (one entry per active
+  iteration, e.g. `0,3,3,3,3,3,1,...,1,3,3,3` — wider trim at the ends, tight 1 in the
+  middle); `DIALOG_GCD_SPECIAL_OVERFLOW_CLEAN_STEP_BITS=113:21,131:21,142:22,...`.
+- Parse/validate these in the classical filter (`dialog_gcd_classical_filter.rs` reads
+  `BINDER_NOTCH_STEPS/EXTRA/MAP` ~line 707) so island hunting models the per-step widths.
+
+**2. Denser transcript codec.** `DIALOG_GCD_K5_HEAD11_CODEC=1` + `DIALOG_GCD_APPLY_IMPLICIT_HIGH_ZERO=1`
+pack the K5 transcript tighter (head-11 codec) and exploit known-zero high bits in the apply.
+This is the "denser transcript compressor" long predicted as the only real sub-1193 lever
+(symbol entropy is near-uniform, so the win is structural packing, not VLC). Guarded by
+`dialog_gcd_k5_head11_codec_selftest()` + `dialog_gcd_k5_head11_supports(pattern)` — a codec
+that changes the transcript MUST ship a bijectivity/coverage self-check or it silently drops
+inputs. Paired with deeper carry parking (`DIALOG_GCD_FOLD_PARK_LOW_CARRIES` 1->7, new
+`DIALOG_GCD_SPECIAL_FOLD_PARK_LOW_CARRIES=5` + `_RELEASE_SCRATCH=1`) and `DIALOG_GCD_PERPOS_MAJ2=1`.
+
+Two meta-lessons from this submission:
+- **Off-peak phases get loosened, not just left alone.** This route raised `SQUARE_ROW_MAX_SEG`
+  165->176 and `SQUARE_ROW_WINDOW_CLEAN_COMPARE_BITS` 19->21 — UN-doing earlier qubit notches
+  on the square — because the square is now far off-peak, so loosening it is qubit-free and
+  buys back Toffoli. When the binder moves, revisit what you previously over-tightened.
+- **The competitor bakes its optimizer's full env vector into the source** via a
+  `std::env::set_var(...)` block ("make the submitted circuit independent of the optimizer
+  shell environment"). They run an external optimizer over a large knob vector and materialize
+  the winner — a signal that the frontier is now found by automated multi-knob search over
+  per-step schedules, not hand-picked single notches.
 
 ### Chunking Large Blocks
 
