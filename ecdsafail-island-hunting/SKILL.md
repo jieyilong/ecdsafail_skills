@@ -345,14 +345,34 @@ anyway (the 1210q case). Reseeding does **not** guarantee no floor — run the t
 
 Prefer remote parallel validation for large batches because local CPU validation is slow.
 
+During an active island hunt, **candidate validation is part of every heartbeat**. Do not let the
+GPU scan frontier advance while the GCD-clean candidate backlog grows unchecked. Each heartbeat
+should do real validation work: validate newly flushed candidates, report the validation backlog,
+and say which candidates or shards were validated. If remote validation is blocked, stale, or not
+yet trusted, say so explicitly and keep a small local validation sample moving so the route's
+`cls / pha / anc` distribution stays current.
+
+For large candidate batches, use **distributed validation** across the available Linux GPU-node host
+CPUs whenever possible. Shard the candidate list across prepared nodes, write per-node logs, and
+merge results into the heartbeat's near-miss table. Distributed validation must use the exact active
+CFG/source/binaries for the circuit being hunted; a validator from a neighboring route or older
+SOTA base is stale even if it appears to run successfully.
+
 Before trusting remote validation in a heartbeat or batch:
 
-1. Sample at least two recent GCD-clean candidates.
-2. Validate them locally in fast modes.
-3. Validate the same candidates remotely in fast modes.
-4. Require exact local/remote agreement before using remote results.
+1. Sample at least two recent GCD-clean candidates, preferably including the current best near miss
+   and one ordinary dirty candidate.
+2. Validate them locally with the exact active CFG in every available mode (fast and full when both
+   exist; full only if the prototype has no fast path).
+3. Validate the same candidates remotely with the exact same CFG and binaries.
+4. Require exact local/remote agreement on nonce, verdict, and `cls / pha / anc` before using
+   remote shard results.
 
-After rebuilding or refreshing remote validators, require a fixed acceptance set to match local exactly before trusting the node. Keep remote validator binaries aligned with the active CFG. A stale validator can silently invalidate the experiment.
+After rebuilding or refreshing remote validators, require a fixed acceptance set to match local
+exactly before trusting the node. Keep remote validator binaries aligned with the active CFG. A
+stale validator can silently invalidate the experiment. If any node disagrees with local validation,
+quarantine that node's validator output, do not merge its shard, and report the mismatch with the
+offending nonce and both triples.
 
 ## GPU Scan Operations
 
@@ -393,11 +413,28 @@ The heartbeat prompt should be self-contained. Include:
 - GPU node inventory and SSH commands
 - current assigned ranges, highest frontier, and already completed windows
 - known candidate totals, density, and best validated `cls / pha / anc` near misses
+- a validation mandate: every heartbeat must drain candidate backlog using distributed validation
+  when possible, and must cross-check a small sampled set against local validation before trusting
+  remote validator output
 - submission policy: submit to ecdsafail only if measured score beats SOTA, unless the user explicitly says otherwise
 - branch policy for clean-but-worse low-qubit results, if requested
 - a reminder not to commit temp configs, scan logs, helper binaries, `ops.bin`, GPU states, or generated artifacts
 
 Before creating a duplicate heartbeat, inspect existing automations if the environment exposes an automation tool or local automation records. Prefer updating the current route's heartbeat when one exists. If the route changes, update the heartbeat promptly so it does not keep reporting stale ranges or an old CFG.
+
+Heartbeat work order:
+
+1. Poll scans, parse completed ranges, and extend idle trusted GPUs if policy allows.
+2. Extract newly flushed GCD-clean candidates and update the backlog.
+3. Validate candidates during the heartbeat. Prefer remote distributed validation for nontrivial
+   batches.
+4. Before accepting remote results, cross-check a small sampled set locally against the remote
+   validator output. Use exact `cls / pha / anc` agreement as the trust gate.
+5. Report validation progress, backlog remaining, validator trust status, best near misses, and any
+   clean `0 / 0 / 0` immediately.
+
+Do not treat GPU utilization as the whole heartbeat. A healthy hunt has both scanners and validators
+moving.
 
 ## Reporting Format
 
