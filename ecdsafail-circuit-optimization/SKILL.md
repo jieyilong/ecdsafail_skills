@@ -199,6 +199,22 @@ Gate conditions in code: `!inplace_raw && recompressed_s2.is_none() && replay_sw
 Lesson: when you free a binding-phase scratch, the NEXT peak owner becomes the new target —
 re-trace `TRACE_PEAK` after every hole to find who binds now, then attack THAT phase.
 
+**Peak-owner whack-a-mole — the verified migration chain (1211 -> 1192).** Each qubit win
+is a lever that drops the *current* binder and exposes the *next* one; the technique is to
+re-`TRACE_PEAK`, read the new owning phase, and design the next lever against THAT phase:
+- **1211q** — binder = GCD-apply compressed-block.
+- `DIALOG_GCD_K5_FREE_CLEAN_BLOCK_DURING_SHIFT=1` (the live-range hole above) ->
+- **1193q** (SOTA ad4cf86d) — binder migrated to `round84_inplace_solinas_square_forward`.
+- attack the square: **`SQUARE_ROW_WINDOW_CLEAN_COMPARE_BITS` 21->19** (fewer clean compare
+  bits held live across the square window) + `SQUARE_ROW_MAX_SEG` 166->165, re-hunt island ->
+- **1192q** (SOTA a39ce501, `cf99209`, 1,683,083,736 = 1192 x 1,411,983 — strict win on BOTH
+  axes, -1 q AND -408 avg-T) — binder migrated AGAIN to
+  `dialog_gcd_materialized_special_underflow_fold` (ops_idx ~1.82M, early in the GCD).
+- **Next sub-1192 target is therefore the materialized_special_underflow_fold phase**, NOT
+  the square or the GCD-apply. Do not re-attack a phase that is no longer the binder.
+The cheap workflow: `rm -f ops.bin; TRACE_PEAK=1 build_circuit | grep peak_qubits` prints
+`peak_qubits=<N> at phase='<owner>'` — that phase name IS your next lever's target.
+
 Risk: early release can silently create classical/phase errors if a supposedly dead bit is still entangled or reused as a control later.
 
 ### Chunking Large Blocks
