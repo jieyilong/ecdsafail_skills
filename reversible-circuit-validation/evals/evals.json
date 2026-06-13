@@ -1,0 +1,8 @@
+{
+  "skill_name": "reversible-circuit-validation",
+  "evals": [
+    {"id":0,"name":"ancilla-not-clean-debug","prompt":"My reversible multiplier produces the correct product, but when I drop it into a bigger algorithm the results get corrupted — and I traced it to some ancilla qubits not coming back to |0> at the end. How do I track down where the uncomputation is going wrong?","files":[]},
+    {"id":1,"name":"validate-adder-for-shor","prompt":"I've written a reversible modular adder and it passes my test: I feed in computational-basis states and check the output bits are right. But I'm about to use it inside Shor's algorithm and I'm nervous. How should I actually validate that it's correct?","files":[]},
+    {"id":2,"name":"designed-truncation-vs-bug","prompt":"My circuit deliberately truncates some carry bits to save qubits, so I expect it to give wrong answers on a small fraction of inputs. I'm seeing about 0.3% of random inputs fail. How do I tell whether that's just my intended truncation or an actual bug I introduced?","files":[]}
+  ]
+}
