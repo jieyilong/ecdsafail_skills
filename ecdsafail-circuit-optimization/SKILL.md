@@ -315,6 +315,54 @@ Trail of Bits/trailmix-inspired framing:
 
 Risk: operand aliasing often produces low qubits but can cause uniform high `cls / pha / anc` failures if one dependency was misclassified as dead.
 
+### Transient-vs-Floor: cut the apply-chunk transient, not the persistent floor (verified q1185 → q1175)
+
+Decompose the binder's live set into a **persistent floor** (held across the whole region) and a
+**transient** (the working registers of the *current* step). Get this from an alloc-phase
+composition histogram at the peak (instrument `alloc_qubit`/`free` to tally live qubits by the
+phase that allocated them). On the dialog-GCD route at the 1185q binder
+(`dialog_gcd_apply_chunk_sub_ripple`) it was:
+
+- **1149 persistent** = 637 `raw_pa_pair1_quotient` (u 256 + compressed transcript ~372) + 512
+  `init` (the two output coordinate registers), plus
+- **~36 transient** = the current apply chunk's load (~20) + carry-ripple lane (~15).
+
+The verified **q1175** route (commit `757e6e7`, full-clean `0/0/0`) cut **−10 qubits entirely from
+the transient** (load 20→13, ripple 15→12); the 1149 persistent floor was **untouched**. Lesson:
+the cheapest sub-frontier qubit is usually the *transient working register*, not the hard
+persistent u/transcript floor — attack the transient first.
+
+**Mechanism — source the current-chunk scratch from qubits that already exist, and chunk finer:**
+
+- **Host the apply working space on DIRTY qubits** (`DIALOG_GCD_APPLY_ALL_DIRTY_QOFFSET`,
+  `..._FIRST_DIRTY_QOFFSET`) — reuse non-`|0⟩` qubits as the apply's scratch and clean them after,
+  instead of grabbing fresh clean lanes (the dirty-borrow pattern, scaled up to the apply hot loop).
+- **Borrow already-cleaned future-boundary carries** as scratch
+  (`DIALOG_GCD_BOUNDARY_REPLAY_BORROW_CLEANED`, `DIALOG_GCD_APPLY_BORROW_FUTURE_BOUNDARY_CARRIES`).
+- **Finer apply chunking** (`DIALOG_GCD_APPLY_CHUNKED_F_BLOCKS` 18→25 with an explicit
+  `DIALOG_GCD_APPLY_CHUNKED_F_CUTS` schedule) — smaller chunks ⇒ a smaller per-chunk load/carry lane
+  live at once.
+- **Stream/host fold controls** instead of materializing them (`DIALOG_GCD_FOLD_STREAM_CONTROLS`,
+  `DIALOG_GCD_FOLD_HOST_STREAMED_CONTROL`, `..._HOST_D_CARRY12 / _E_TOP_CARRY / _OVF2_CARRY13`) and
+  **deeper carry parking** (`FOLD_PARK_LOW_CARRIES` 7→17, `SPECIAL_FOLD_PARK_LOW_CARRIES` 5→15).
+
+**Coordinate across ALL co-bound families.** The 1185 peak was a co-bind plateau of ~10 phases
+(round84 square + materialized folds + apply double_y/halve_y + apply ripple), so narrowing one
+family's transient leaves the others pinning 1185. The q1175 route narrowed *every* co-bound
+family together: apply (above) + square (`SQUARE_ROW_MAX_SEG` 158→144) + folds (park/host).
+Budget for several coordinated edits and re-`TRACE_PEAK` after each to see which walls remain.
+
+**Two cautions.** (1) These are **new code primitives, not just knobs** — the q1175 commit is ~816
+inserted lines across `compressed.rs`/`dialog/mod.rs`/`venting.rs`; the dirty-qoffset /
+boundary-borrow / stream-control knobs do not exist on the 1185 base. A structural width cut is
+value-exact-or-broken (validate `0/0/0` on random inputs before any island hunt; the commit name
+"repaired clean island" reflects exactly that fix-then-re-hunt). (2) **The trade is steep:** −10
+qubits cost **+127k avg-Toffoli** (~12,700 T/qubit, ~10× the ~1,200 break-even), so q1175 is a
+clean **qubit-record branch, not a score win** (1175 × 1,545,825 = 1,816,344,375 > the 1185 SOTA's
+1,681,025,595). Gate every transient cut on the exchange rate — finer chunking + hosting/borrow
+recompute is where the Toffoli goes. That the persistent 1149 floor is still standing means real
+qubit headroom remains *if* a cheaper-Toffoli mechanism (or a denser transcript) is found.
+
 ### Compare-Bit Narrowing
 
 Several low-qubit routes reduce the number of clean compare bits kept live.
