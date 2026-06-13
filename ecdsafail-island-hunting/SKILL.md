@@ -392,6 +392,10 @@ anyway (the 1210q case). Reseeding does **not** guarantee no floor — run the t
 ## Remote Validation Hygiene
 
 Prefer remote parallel validation for large batches because local CPU validation is slow.
+**Start distributed validation as early as the first GCD-clean candidates appear — don't wait for
+a large backlog — and validate FULL only (no fast-reject): the near-miss `cls / pha / anc`
+distribution and the per-channel-zero check (loop step 5.2) both need exact counts, which the
+fast path's early-out cannot give.**
 
 During an active island hunt, **candidate validation is part of every heartbeat**. Do not let the
 GPU scan frontier advance while the GCD-clean candidate backlog grows unchecked. Each heartbeat
@@ -452,7 +456,7 @@ Watch for suspicious nodes. For example, a GPU scanning tens of millions of nonc
 
 ## Heartbeat Automation
 
-When a new island hunt begins, automatically create or update a thread heartbeat instead of relying on memory. Use a **25-minute heartbeat** by default unless the user asks for a different interval. Do this even if the user did not explicitly ask for recurring progress reports; long-running nonce scans should always have a live progress monitor.
+When a new island hunt begins, automatically create or update a thread heartbeat instead of relying on memory. Use a **15-minute heartbeat for active distributed hunts** (the preferred cadence; 25 min is acceptable only for a slow background scan) unless the user asks for a different interval. Do this even if the user did not explicitly ask for recurring progress reports; long-running nonce scans should always have a live progress monitor.
 
 The heartbeat prompt should be self-contained. Include:
 
@@ -462,8 +466,8 @@ The heartbeat prompt should be self-contained. Include:
 - current assigned ranges, highest frontier, and already completed windows
 - known candidate totals, density, and best validated `cls / pha / anc` near misses
 - a validation mandate: every heartbeat must drain candidate backlog using distributed validation
-  when possible, and must cross-check a small sampled set against local validation before trusting
-  remote validator output
+  when possible, and must **cross-check 5 sampled GCD-clean candidates** against local validation
+  before trusting remote validator output (exact `cls / pha / anc` agreement is the trust gate)
 - submission policy: submit to ecdsafail only if measured score beats SOTA, unless the user explicitly says otherwise
 - branch policy for clean-but-worse low-qubit results, if requested
 - a reminder not to commit temp configs, scan logs, helper binaries, `ops.bin`, GPU states, or generated artifacts
@@ -476,8 +480,8 @@ Heartbeat work order:
 2. Extract newly flushed GCD-clean candidates and update the backlog.
 3. Validate candidates during the heartbeat. Prefer remote distributed validation for nontrivial
    batches.
-4. Before accepting remote results, cross-check a small sampled set locally against the remote
-   validator output. Use exact `cls / pha / anc` agreement as the trust gate.
+4. Before accepting remote results, cross-check **5 sampled GCD-clean candidates** locally against
+   the remote validator output. Use exact `cls / pha / anc` agreement as the trust gate.
 5. Report validation progress, backlog remaining, validator trust status, best near misses, and any
    clean `0 / 0 / 0` immediately.
 
