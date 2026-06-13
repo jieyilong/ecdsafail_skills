@@ -1,0 +1,26 @@
+{
+  "skill_name": "peak-qubit-reduction",
+  "evals": [
+    {
+      "id": 0,
+      "name": "montgomery-multiplier-ancilla",
+      "prompt": "I've got a reversible modular multiplier (Montgomery-style) in my quantum compiler. It works but it allocates a huge pile of ancilla — peak is around 5n qubits for an n-bit modulus and I need to get it closer to 3n to fit our target device. The big consumers are the partial-product accumulator and a bunch of carry registers from the adders. How should I go about reducing the peak width? Walk me through a concrete plan.",
+      "expected_output": "A plan that (1) tells them to get a live-qubits-vs-time trace and find which phase owns the peak, (2) frames peak as a max-over-time not a sum, (3) proposes concrete moves — uncompute-early/recompute-later holes for carry scratch, live-range shortening for passengers, truncation of provably-zero high carry bits — (4) flags the qubit<->gate/depth exchange-rate tradeoff, and (5) tells them to re-measure and repeat because the binder moves.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "point-add-next-move-below-1185",
+      "prompt": "My reversible point-addition circuit peaks at 1185 qubits and a trace says the tallest moment is during the 'GCD-apply chunked sub-ripple' phase. I've already done the easy truncation notches. What's my next move to get below 1185 — and how do I avoid wasting time on changes that won't lower the peak?",
+      "expected_output": "Tells them to inventory the qubits alive specifically during the GCD-apply ripple phase and classify them (scratch/passenger/transcript/truncatable), proposes uncompute-recompute holes and per-step scheduling for that phase, and crucially warns that only shaving qubits LIVE AT the binder lowers width — anything off-peak is a Toffoli-only play. Should mention re-measuring to see where the binder moves next.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "shor-modexp-where-is-space-going",
+      "prompt": "Working on the modular exponentiation block of a Shor's-algorithm implementation. The thing eats ancilla like crazy and I can't tell where it's all going. The windowed lookup table and the running product both seem to stay alive the whole time. Can you help me figure out how to think about cutting the qubit count?",
+      "expected_output": "Reframes the problem as a left-to-right timeline with a single peak, tells them to trace live-qubits-vs-time to find the binding phase rather than guessing, then for the always-live lookup table and running product suggests live-range analysis (are they passengers at the peak? can the table be uncomputed/recomputed per window?), the exchange-rate caveat, and the entanglement/correctness risk of freeing a not-actually-dead register.",
+      "files": []
+    }
+  ]
+}
