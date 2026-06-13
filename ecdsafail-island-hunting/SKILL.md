@@ -31,6 +31,47 @@ Use this skill to run disciplined island-hunting experiments for ECDSA Fail circ
 8. Validate every newly flushed candidate in fast modes.
 9. Submit only measured clean solutions whose score beats current promoted SOTA, unless the user explicitly gives different submission rules.
 
+## The Optimization → Triage Loop (knobs → structure → island)
+
+The end-to-end loop for pushing a new frontier from the current SOTA. Run it in order; the
+escalation in step 1 is the part people skip.
+
+1. **Find a lever — quick knobs first, then structure.** Try the cheap config knobs first:
+   one notch on a truncation / width / segmentation / carry / chunk knob, measured on
+   **count-only peak** (`TRACE_PEAK=1 build_circuit`) and **emitted Toffoli** (`count_tof`).
+   A target (lower qubit, Toffoli, or score) that *no* knob can move is the signal to STOP
+   turning knobs. In particular, if **every** knob leaves the qubit peak unchanged, the qubit
+   count is **allocation-bound**: the registers are declared full-width in code, so knobs only
+   change which bits are *used* (→ Toffoli, landability), never how many are *allocated*.
+   Escalate to a **structural code change** via the `peak-qubit-reduction` skill — instrument
+   the live-set composition at the binder (an alloc-phase histogram: which phase each live
+   qubit was allocated in), find the persistent register to narrow / stream / overlap / hole,
+   and edit the circuit. Do not stall at "it needs code"; make the edit. (Verified instance:
+   on the 1185q SOTA, ~15 knobs across every class — chunking, codec, transcript-release,
+   runway, active-iters, width-margin/slope/compare, segmentation, carry-trunc, apply-window —
+   *all* pinned the peak at exactly 1185; only a code change to the 256-wide `u` / ~372-bit
+   transcript allocation goes lower.)
+2. **Small triage scan** (5–10M nonces) → GCD-clean candidate **density** (candidates/Mnonce).
+3. **Collect `cls/pha/anc` for EVERY GCD-clean candidate** — validate the whole batch, not one
+   lucky triple. You need the *distribution*, not an anecdote.
+4. **If the batch is too dirty** (no low near-misses), re-apply the skills to *reduce the
+   errors before hunting*: restore one carry/compare bit, widen one envelope, fix one cleanup,
+   move one alias — until real near-misses appear (`0/1/0`, `1/1/0`, `2/0/0`, …). A route whose
+   candidates are uniformly high-severity is not huntable; make it landable first.
+5. **When the errors drop, move to a larger triage — judged on TWO bars:**
+   - **(5.1) Proximity:** the best near-misses are close to `0/0/0` (low total severity).
+   - **(5.2) Per-channel zero-reachability — each of `cls`, `pha`, `anc` must independently
+     touch 0 *somewhere* in the candidate set.** A clean island needs all three at 0
+     *simultaneously*; if a channel never reaches 0 even *alone* across many candidates, it has
+     a **per-channel structural floor** and `0/0/0` is unreachable no matter how the others
+     behave. Prefer a route where {cls→0, pha→0, anc→0} each occurs somewhere over a route with
+     lower *average* severity but one channel stuck above 0.
+       - Example: `A = {(2,0,0), (0,1,1), (0,2,0)}` is preferable to
+         `B = {(2,0,0), (1,2,0), (2,1,0)}` — in A every channel hits 0 somewhere; in B `cls` is
+         never 0 (a non-zero floor), so B can never reach `0/0/0`.
+6. **Pick the most promising candidate** — healthy density, low near-misses, and all three
+   channels reaching 0 — and commit GPUs to the full island hunt.
+
 ## Shared Hunt Memory With `ecdsafail notes`
 
 Use `ecdsafail notes` as benchmark-scoped shared memory for approaches, failures, partial progress, and frontier deltas. Before starting a new route or extending an old one:
@@ -270,6 +311,13 @@ validated candidates, no `cls <= 1` ever appears. This is the single most import
 go/no-go question for a route: is `K` a **structural floor** (a fixed set of shots that mismatch
 for *every* nonce → `0/0/0` is unreachable → the route is dead) or just a **deep statistical
 tail** (`cls=0` reachable at rate `~e^-lambda`, the route is fine, just slow)?
+
+**Cheapest first screen — does each channel reach 0 at all? (loop step 5.2).** Before any
+histogram or shot-overlap work, check per-channel zero-reachability across the batch: does each
+of `cls`, `pha`, `anc` independently hit 0 *somewhere*? A channel that is **never** 0 over many
+candidates is already floored — `0/0/0` is unreachable — and you can demote the route with no
+further diagnostics. The overlap test below is for the harder case: a channel that *does* reach
+0 sometimes but whose best value still plateaus at `K`.
 
 **Weak first-pass signal (histogram shape) — suggestive, not conclusive.** Build the `cls`
 histogram. A **pile-up** at `K` (count at `cls=K` *exceeds* the smooth-tail extrapolation; e.g.
