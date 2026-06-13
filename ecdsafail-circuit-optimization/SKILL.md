@@ -177,9 +177,27 @@ Look for:
 Relevant knobs and ideas from our experiments:
 
 - `DIALOG_GCD_APPLY_RELEASE_CLEAN_SCRATCH_DURING_FOLD=1`
+- `DIALOG_GCD_K5_FREE_CLEAN_BLOCK_DURING_SHIFT=1`
 - `DIALOG_GCD_APPLY_CHUNK_TOPCLEAN=0/1`
 - `DIALOG_GCD_APPLY_FINAL_TOPCLEAN=0`
 - `SQUARE_ROW_WINDOW_MEASURED_CARRY_CLEAR=1`
+
+**The live-range HOLE pattern (1211q -> 1193q SOTA, submission ad4cf86d, 2026-06-13).**
+This is the strongest recent qubit win and the canonical example of the pattern. The K5
+apply phase holds a `compressed_block` transcript scratch live across the whole block, but
+that block is DEAD during the y-double shift sub-phase (`mod_double_inplace_fast` +
+`cmod_double_inplace_lazy`). `DIALOG_GCD_K5_FREE_CLEAN_BLOCK_DURING_SHIFT=1` punches a hole:
+`free_vec(compressed_block)` right before the shift and `reacquire_vec` right after (code:
+`src/point_add/rounds/dialog/compressed.rs:1977`). That drops the GCD-apply peak below the
+round84 square's peak, so the binding peak owner moves to
+`round84_inplace_solinas_square_forward`. Paired with `SQUARE_ROW_MAX_SEG` 176->166 (the
+square is now the binder, so segment it harder), `DIALOG_GCD_APPLY_CLEAN_COMPARE_BITS` 19->20
+and `DIALOG_GCD_FOLD_CARRY_TRUNC_W` 17->18 (loosen the now-non-binding knobs for island
+landability), plus a fresh `DIALOG_TAIL_NONCE` hunt, this dropped 18 qubits (1211->1193) for
+only +7,727 avg-T (1,404,664->1,412,391) = 429 T/q, far under the ~1,212 T/q break-even.
+Gate conditions in code: `!inplace_raw && recompressed_s2.is_none() && replay_swap_host`.
+Lesson: when you free a binding-phase scratch, the NEXT peak owner becomes the new target —
+re-trace `TRACE_PEAK` after every hole to find who binds now, then attack THAT phase.
 
 Risk: early release can silently create classical/phase errors if a supposedly dead bit is still entangled or reused as a control later.
 
