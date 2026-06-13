@@ -1,0 +1,8 @@
+{
+  "skill_name": "benchmark-frontier-archaeology",
+  "evals": [
+    {"id":0,"name":"reverse-engineer-competitor-submission","prompt":"A competitor just beat my score on a compiler-autotuning benchmark we both submit to, and all accepted submissions are public in the project's git history. I want to figure out exactly what they changed and whether I can actually use it in my own line. How should I go about reverse-engineering their improvement?","files":[]},
+    {"id":1,"name":"multifactor-decompose-and-next-target","prompt":"A new SOTA just landed on the reversible point-addition benchmark, which scores qubits times average Toffoli. It dropped from 1192 to 1185 qubits but I'm pretty sure the Toffoli count went up. I've synced it. How do I work out exactly which lever did what, whether it was actually a net win, and where I should push next?","files":[]},
+    {"id":2,"name":"untangle-bundled-changes","prompt":"I diffed the current leaderboard #1 against the version from a week ago and there are like five config changes at once — I can't tell which one actually mattered. The leaderboard accepted maybe eight intermediate submissions in between those two. How do I untangle which change actually drove the improvement?","files":[]}
+  ]
+}
