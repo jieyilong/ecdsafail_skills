@@ -16,3 +16,4 @@
 # macOS cruft
 .DS_Store
 peak-qubit-reduction-workspace/
+*-workspace/

@@ -1,0 +1,26 @@
+{
+  "skill_name": "toffoli-reduction",
+  "evals": [
+    {
+      "id": 0,
+      "name": "adder-carry-uncompute-vent",
+      "prompt": "My reversible arithmetic is dominated by Toffoli gates and the carry uncomputation in my adders is something like half the total. I've actually got spare ancilla on this device. How do I cut the Toffoli count without just shuffling it around — and without blowing past my qubit budget?",
+      "expected_output": "Should locate the carry-uncompute as the hot-spot, propose venting (replace each carry-uncompute Toffoli with an X-basis measurement + CZ phase fixup, T-count 0), give the -1 Toffoli/+1 qubit dial and the 'vent off-peak where you have headroom, not on the binding phase' rule, mention fused adders, flag depth-neutrality and the phase-correctness validation, and the exchange rate for spending qubits on vents.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "executed-toffoli-fixed-qubits",
+      "prompt": "My reversible point-addition circuit is scored qubits times average-executed Toffoli. The qubit count is pinned where I want it, so I only want to cut the average executed Toffoli without raising the peak. Where should I be looking?",
+      "expected_output": "Should distinguish emitted vs average-executed Toffoli, propose conditional/measured replay (wrap a block under a measurable predicate so its CCX only count when it fires) with the hard constraint that it only works on recomputed self-uncomputing scratch (comparators) NOT data-controlled ops or reused live-qubit predicates, plus peak-neutral structural cuts (ancilla-free majority, fused folds, off-peak loosening, per-step scheduling), and re-measuring to keep the peak fixed.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "shor-modmul-tcount-faulttolerant",
+      "prompt": "The T-count of the modular multiplier in my Shor implementation is the bottleneck for our fault-tolerant runtime estimate — each Toffoli decomposes into 7 T gates and the magic-state factories are the limiter. How should I systematically bring the non-Clifford cost down?",
+      "expected_output": "Connects Toffoli to T-count (7T each, magic-state limited), tells them to find the Toffoli hot-spot, proposes measurement-based/vented uncompute (T-free), avoiding full materialization (short/streamed products), fused stages and ancilla-free majority, and crucially raises that Toffoli/T-DEPTH (not count) is the non-refundable trap at the reaction floor, with the qubit/exchange-rate and phase-correctness caveats.",
+      "files": []
+    }
+  ]
+}
