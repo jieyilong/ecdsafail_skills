@@ -104,6 +104,33 @@ graded inputs all dodge the hard set, giving `0/0/0` on exactly that set. Valida
 *confirm* `0/0/0` across all graded shots — and to keep the random-input failure rate at the
 designed level, no higher.
 
+### Per-channel zero-reachability: a cheap go/no-go for that search
+
+When you are *searching* a candidate set (seeds, nonces, parameters) for one instance clean in
+**all** channels at once, you can read the verdict off a modest sample before committing to a
+long search:
+
+> A jointly-clean candidate (`0/0/0`) needs every channel at 0 **simultaneously**. A *necessary*
+> condition is that each channel reaches 0 **independently** somewhere in your sample. If a
+> channel is **never** 0 across many candidates, it has a **per-channel floor** — a defect no
+> choice of seed removes — and the joint-clean is **unreachable**, no matter how the other
+> channels behave.
+
+So rank candidate sets by whether **{cls→0, pha→0, anc→0} each occur somewhere**, even over a set
+with lower *average* severity:
+
+- `A = {(2,0,0), (0,1,1), (0,2,0)}` — every channel hits 0 in some row → `0/0/0` is plausibly
+  reachable; keep searching.
+- `B = {(2,0,0), (1,2,0), (2,1,0)}` — `cls` is *never* 0 (a non-zero floor) → `0/0/0` is
+  unreachable; **stop searching and fix the `cls` mechanism** (a real bug or an over-aggressive
+  truncation), then resample.
+
+This is *necessary, not sufficient*: each channel reaching 0 separately doesn't prove they reach
+0 *together* (the coverage caveats above still apply). But it is the cheapest screen there is — a
+single floored channel kills the search outright, and it names *which* channel to repair (use the
+Step 5 channel→cause map). The best outcome is the strongest version of this: near-misses
+clustered close to `0/0/0` **and** each channel touching 0.
+
 ## Step 5 — Localize a real bug to the first broken op
 
 When a failure is unexpected, treat the circuit as a program under debugging and find the
