@@ -46,6 +46,43 @@ The mistake to avoid at every step: **optimizing a qubit that isn't actually at 
 feels productive and changes nothing. Before proposing any shave, confirm the qubit you're
 targeting is live at the binder instant.
 
+## Match the method to the lever's failure mode
+
+Before reaching for a lever, know *how it can fail* — because that decides whether you "tweak
+and iterate" or "prove correct, then commit." There are two fundamentally different kinds:
+
+- **Graded-failure levers** (truncate a carry/compare width, drop a loop iteration, approximate
+  a reduction). Correctness degrades *continuously*: a small, characterizable fraction of inputs
+  go wrong, by a little. These usually reduce *gate* cost, and you can **iterate on the
+  dirtiness** — measure the per-input error, restore one bit, re-measure — and, when the input
+  set is fixed, **search for an input subset / seed that dodges the failures**. This is the
+  domain of triage / search loops: low near-misses are progress.
+
+- **Binary-failure levers** (free, overlap, stream, or hole a register to cut *peak width*).
+  Correctness is **all-or-nothing**: the edit is value-exact (right on every input) or it
+  corrupts phase/ancilla on essentially *every* input. There is **no graded near-miss ladder to
+  climb.** So you cannot tweak-and-triage a width cut — you must get it value-exact, **validate
+  clean (e.g. classical/phase/ancilla all zero on random inputs) BEFORE any downstream search**,
+  and only then proceed.
+
+**The trap:** applying the graded-failure playbook to a binary-failure lever. A structural width
+cut that isn't value-exact yields all-dirty garbage, not near-misses — there is nothing to
+iterate *toward*. Cutting peak width is therefore "write a correct value-exact edit, validate it
+clean, then search," not "turn a knob and triage."
+
+**Corollary — when no parameter moves the target, the cost is allocation-bound.** If *every*
+available knob leaves the peak unchanged, the registers are declared full-width and the only
+remaining lever is a **structural code change** — which is the binary kind. Escalate to it
+deliberately: inventory the binder's live set (next step), make the *smallest* value-exact edit,
+validate, and only then re-measure/search. Don't keep turning knobs once they've gone flat.
+
+**A peak can be several independent binders, not one shared floor.** The inventory (Step 2) may
+show that two *unrelated* phases each independently reach the peak (e.g. an arithmetic core and a
+separate squaring), co-equal but sharing no register. Then one edit that relieves one of them
+leaves the other still at the peak — lowering the number requires **coordinated edits to every
+co-equal binder**, and you re-trace after each to see which walls remain. Budget for "more than
+one edit" before assuming a single hole drops the count.
+
 ## Step 1 — Measure: find the binder
 
 You need a **live-qubit-vs-time trace**, not just a total count. Two ways to get one:
