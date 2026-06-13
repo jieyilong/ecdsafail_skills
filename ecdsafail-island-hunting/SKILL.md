@@ -195,8 +195,19 @@ route when strong structural-failure evidence appears, even if one metric looks 
 
 Useful comparison cues:
 
-- Prefer the route with the **lower mean/median severity** — a route whose mass is at `(1, *, 0)`
-  beats one at `(3, *, 0)` even if the `<=2` fractions are close.
+- **Each channel must reach 0 somewhere — the per-channel-zero go/no-go (loop step 5.2). This
+  outranks every soft cue below.** Over a *sufficient* sample (tens of candidates, not 2–3),
+  check that `cls`, `pha`, and `anc` *each* hit 0 in at least one candidate. A channel that is
+  **never** 0 over many candidates has a floor that `0/0/0` can never clear → the route is dead
+  regardless of how low its *average* severity is, because a clean island needs all three at 0
+  *simultaneously*. Prefer a route where {cls→0, pha→0, anc→0} each occur over one with lower
+  mean severity but a floored channel — e.g. `A = {(2,0,0), (0,1,1), (0,2,0)}` beats
+  `B = {(2,0,0), (1,2,0), (2,1,0)}` (in A each channel reaches 0; in B `cls` is never 0). A few
+  candidates with no 0 is *inconclusive*, not floored — that's the same statistical-vs-structural
+  call as the failing-shot overlap test; confirm a floor over a real sample before killing a route.
+- Within the routes that pass the per-channel-zero screen, prefer the **lower mean/median
+  severity** — a route whose mass is at `(1, *, 0)` beats one at `(3, *, 0)` even if the `<=2`
+  fractions are close.
 - **Penalize nonzero `pha` and `anc`.** Classical (`cls`) residuals are what nonce hunting most
   directly drives to zero; persistent `pha`/`anc` across candidates is usually a structural defect
   that no nonce will fix (see Stop Rules). A route at `(1, 0, 0)` ranks well above `(1, 0, 1)`.
@@ -211,15 +222,17 @@ Useful comparison cues:
 
 | route | density (c/Mn) | typical validation pattern | supporting signals | decision |
 |-------|---------------:|----------------------------|--------------------|----------|
-| A | 0.8 | many `(1, 2, 0)` / `(2, 1, 0)` candidates | diverse fingerprints, range-stable, good score margin | hunt first |
-| B | 1.6 | mostly `(4, 5, 1)` with persistent `pha/anc` | higher density, but poorer residual type | hold or hunt second |
-| C | 0.3 | a few `(2, 0, 0)` candidates | low density, but clean residual type | hold for fallback |
+| A | 0.8 | spread incl. `(1,0,0)`, `(0,2,0)`, `(2,1,0)` — **each channel reaches 0** | diverse fingerprints, range-stable, good score margin | hunt first |
+| B | 1.6 | mostly `(4, 5, 1)` — `pha`/`anc` **never reach 0** | higher density, but a floored channel | drop / hold last |
+| C | 0.3 | a few `(2, 0, 0)` — `cls` floor *suspected* but sample too small | low density, inconclusive | hold for fallback, validate more |
 | D | 1.2 | repeated `9024 / 141 / 0` | uniform high fingerprint | drop as structural |
 
-Route B has the highest raw density, but its candidates sit far from clean and carry persistent
-phase/ancilla dirt. Route A has fewer shots on goal but healthier near misses and more independent
-supporting signals, so it is the better first hunt. D is dropped outright on the uniform high
-fingerprint regardless of density.
+Route B has the highest raw density, but its `pha`/`anc` **never reach 0** across the sample — a
+per-channel floor that no nonce removes, so `0/0/0` is unreachable and B is dead despite the
+density. Route A passes the per-channel-zero screen (`cls`, `pha`, `anc` each hit 0 somewhere) and
+has healthy low-diverse residuals, so it is the first hunt. C *looks* like it might have a `cls`
+floor, but a handful of candidates is inconclusive — validate more before judging. D is dropped
+outright on the uniform high fingerprint regardless of density.
 
 ### Cost discipline
 
@@ -551,7 +564,9 @@ Prefer routes that have:
 - lower estimated score than SOTA
 - enough score margin to survive final measurement drift or a small SOTA movement
 - healthy GCD-clean density
-- low single-digit near misses
+- each of `cls`, `pha`, `anc` reaching 0 in at least one candidate over a sufficient sample (the
+  per-channel-zero rule — necessary for a reachable `0/0/0`)
+- low single-digit near misses, ideally clustered close to `0/0/0`
 - diverse dirty fingerprints
 - stable fast/full and local/remote validation
 - mostly classical residuals rather than persistent phase or ancilla dirt
@@ -565,6 +580,8 @@ Avoid routes that have:
 - score at or above SOTA
 - score margin so small that final measurement drift would likely lose
 - starved candidate density
+- a channel (`cls`, `pha`, or `anc`) that **never reaches 0** over a sufficient sample — a
+  per-channel floor makes `0/0/0` unreachable no matter the nonce, so the route is dead
 - repeated high dirty triples
 - no severity `<= 10` after dozens of candidates
 - stale validator or CFG uncertainty
