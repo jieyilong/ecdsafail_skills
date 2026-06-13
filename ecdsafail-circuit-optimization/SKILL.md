@@ -205,15 +205,29 @@ re-`TRACE_PEAK`, read the new owning phase, and design the next lever against TH
 - **1211q** — binder = GCD-apply compressed-block.
 - `DIALOG_GCD_K5_FREE_CLEAN_BLOCK_DURING_SHIFT=1` (the live-range hole above) ->
 - **1193q** (SOTA ad4cf86d) — binder migrated to `round84_inplace_solinas_square_forward`.
-- attack the square: **`SQUARE_ROW_WINDOW_CLEAN_COMPARE_BITS` 21->19** (fewer clean compare
-  bits held live across the square window) + `SQUARE_ROW_MAX_SEG` 166->165, re-hunt island ->
-- **1192q** (SOTA a39ce501, `cf99209`, 1,683,083,736 = 1192 x 1,411,983 — strict win on BOTH
-  axes, -1 q AND -408 avg-T) — binder migrated AGAIN to
+- attack the square's SIZE: **`SQUARE_ROW_MAX_SEG` 166->165** (one segment notch, +fresh island
+  `2107498317`) ->
+- **1192q** (SOTA a7ec174f, `0fa5c6f`, 1,683,610,600 = 1192 x 1,412,425; -1 q for +34 avg-T —
+  the tighter segment costs a hair of recompute). The seg notch dropped the square's peak below
+  the next phase, so the binder migrated AGAIN to
   `dialog_gcd_materialized_special_underflow_fold` (ops_idx ~1.82M, early in the GCD).
+- THEN, square now OFF-peak, **`SQUARE_ROW_WINDOW_CLEAN_COMPARE_BITS` 21->19** (+island
+  `11556565`) ->
+- **1192q** (SOTA a39ce501, `cf99209`, 1,683,083,736 = 1192 x 1,411,983) — a PURE peak-neutral
+  Toffoli trim: -442 avg-T, **0 qubits**. Shrinking the square's clean-compare window frees no
+  qubits because the square no longer binds the peak; it only cuts gates.
 - **Next sub-1192 target is therefore the materialized_special_underflow_fold phase**, NOT
   the square or the GCD-apply. Do not re-attack a phase that is no longer the binder.
-The cheap workflow: `rm -f ops.bin; TRACE_PEAK=1 build_circuit | grep peak_qubits` prints
-`peak_qubits=<N> at phase='<owner>'` — that phase name IS your next lever's target.
+
+Two lessons fall out of this leg pair: (1) the QUBIT win only ever comes from shrinking
+whoever CURRENTLY binds the peak (here the seg notch on the square); (2) once a phase falls
+OFF-peak, shrinking it further is a pure-Toffoli play — judge it on avg-T alone, expect zero
+qubit movement (here clean-compare 21->19 bought -442 T at 0 q). Don't expect a qubit drop
+from squeezing an off-peak phase, and don't skip a real Toffoli win just because it doesn't
+move qubits. The cheap workflow to tell which case you are in:
+`rm -f ops.bin; TRACE_PEAK=1 build_circuit | grep peak_qubits` prints
+`peak_qubits=<N> at phase='<owner>'` — that phase name IS your next QUBIT lever's target;
+everything else you tighten is a Toffoli-only play.
 
 Risk: early release can silently create classical/phase errors if a supposedly dead bit is still entangled or reused as a control later.
 
