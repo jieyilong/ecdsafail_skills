@@ -365,20 +365,49 @@ recompute is where the Toffoli goes. That the persistent 1149 floor is still sta
 qubit headroom remains *if* a cheaper-Toffoli mechanism (or a denser transcript) is found.
 
 **q1170 SOTA — the CHEAP lever (denser transcript codec + transcript release): a real score win.**
-Commit `674d0d8` (nasqret, score **1,678,948,830** — beats the 1185 SOTA's 1,681,025,595) cut
-**−15 qubits for only +16,412 avg-Toffoli (~1,094 T/qubit, UNDER the ~1,200 break-even)**, so the
-*product* dropped. Composition vs 1185 (637 + 512 + 36): it took **−7 from the persistent
-transcript** (637→630) **and** −8 from the transient (36→28). The −7 floor cut is the headline and
-the cheap part:
+Submission `1278a07` / commit `674d0d8` (nasqret, promoted 2026-06-13) is the first verified
+sub-1175 score win: **1170 q**, average Toffoli **1,434,998.727** (rounded `1,434,999`), score
+**1,678,948,830**, nonce `11,156,415`. It beats the 1185 SOTA's `1,681,025,595` despite spending
+more Toffoli, because the qubit cut is cheap enough. Relative to q1185 it cut **−15 qubits for
+only +16,412 avg-Toffoli (~1,094 T/qubit, UNDER the ~1,200 break-even)**, so the product dropped.
+Composition vs 1185 (637 + 512 + 36): it took **−7 from the persistent transcript** (637→630) **and**
+−8 from the transient (36→28). The −7 floor cut is the headline and the cheap part:
 
 - **Denser tail transcript codec** (`DIALOG_GCD_K5_TAIL3_TOP32_CODEC=1` +
-  `..._TAIL3_TOP32_STREAM_APPLY=1`) — a tail-specific re-encode that streams the apply, packing the
-  transcript tighter than head-11 alone.
+  `..._TAIL3_TOP32_STREAM_APPLY=1`) — a tail-specific re-encode for the final 3-step K5 tail.
+  The reachable support has exactly 32 patterns and is packed into 5 code bits via an ANF
+  encoder/decoder (`DIALOG_GCD_K5_TAIL3_TOP32_SUPPORT`, `*_ENCODER_ANF`, `*_DECODER_ANF`).
+  The shipped self-test (`DIALOG_GCD_K5_TAIL3_TOP32_SELFTEST`) proves bijection/coverage and
+  phase-clean forward/reverse behavior. This is a value-exact width cut, not a nonce-side
+  approximation.
+- **Streaming tail apply** (`DIALOG_GCD_K5_TAIL3_TOP32_STREAM_APPLY=1`) — do not materialize the
+  old raw tail during apply. Recompute only the current slot's `(b0, b0_and_b1, s2)`, run the
+  apply primitive, then clear that slot. Verified ablation: turning off streaming while keeping
+  the new codec raises the GCD/apply/fold plateau **1170→1171**.
+- **Codec itself is the large GCD/apply cut.** Verified ablation: disabling the new top32 codec
+  (and its streaming apply) raises the GCD/apply/fold plateau **1170→1177**, while the square
+  remains at 1170. The codec therefore accounts for about seven GCD-side peak qubits, and the
+  streamed apply accounts for the last one.
 - **Transcript-bit release** (`DIALOG_GCD_K5_PARTIAL_RAW_RELEASE=6`,
   `DIALOG_GCD_K5_RELEASE_SCALE_BITS=5`, `DIALOG_GCD_RUNWAY_PARTIAL_BLOCK=1`) — free/host transcript
   bits no longer needed in full.
-- Its −8 transient came cheaply too: `APPLY_CHUNKED_F_BLOCKS` 18→20 + deeper park (`FOLD_PARK` 15,
-  `SPECIAL_FOLD_PARK` 13) + `FOLD_HOST_DERIVED_CONTROLS=1` — **not** the expensive dirty-qoffset hosting.
+- Its −8 transient came cheaply too: `APPLY_CHUNKED_F_BLOCKS` 18→20 with explicit cuts
+  `17,34,50,66,81,96,110,124,137,150,163,175,187,198,209,219,229,238,247`, deeper park
+  (`FOLD_PARK` 15 with per-step 16/17 map, `SPECIAL_FOLD_PARK` 13 with per-step 14/15 map),
+  `FOLD_HOST_DERIVED_CONTROLS=1`, and `APPLY_BORROW_FUTURE_BOUNDARY_CARRIES=1` — **not** the
+  expensive dirty-qoffset hosting.
+- **Selective repair inside the same peak budget.** The route keeps global `DIALOG_GCD_COMPARE_BITS=46`
+  but adds seven 48-bit compare repairs (`181,194,199,202,207,212,216`). Regular and special
+  pseudo-Mersenne folds keep aggressive global windows (`FOLD_CARRY_TRUNC_W=18`,
+  `SPECIAL_FOLD_PARK_LOW_CARRIES=13`) and widen only empirically failing steps to 19/20 bits via
+  `*_STEP_WINDOWS`. Special overflow/underflow cleanup uses existing clean scratch for hosted
+  phase-conditioned comparison, so repairs restore correctness without adding global scratch.
+- **Square must be co-balanced.** The q1170 GCD side alone is not enough: the final route also sets
+  `SQUARE_ROW_MAX_SEG=143` and square-row measured cleanup schedules. Verified ablation: reverting
+  just `SQUARE_ROW_MAX_SEG` to the old q1185-ish `158` makes the square bind at **1185** while the
+  GCD side stays at 1170. The final trace is a deliberate co-binder plateau:
+  apply add/sub ripple, apply final ripple, compressed apply double/halve, special over/underflow
+  fold, and square forward/inverse all hit exactly **1170**.
 
 **Decisive lesson — match the lever to its exchange rate:**
 
@@ -395,10 +424,11 @@ codec plus raw/scale-bit *release* (not pure entropy/VLC coding — which is why
 missed it) found 7 more transcript qubits at a good rate. The floor *is* reducible; the lever is
 the codec, not entropy coding.
 
-Method behind q1170 (from the committed `memory/2026-06-13-q1192-*.md` note): an exact **CUDA island
-filter cross-checked for Rust/Metal/CUDA parity**, run as 1M-nonce shards on a GPU cluster, walking
-a ladder q1192→q1191→…→q1187→q1186→…→1170 — each a small structural shave, each held back until a
-nonce passes the trusted 9024-shot evaluator at `0/0/0`.
+Method behind q1170 (from the public submission note plus the committed
+`memory/2026-06-13-q1192-*.md` search note): exact GPU/WMI island filters were cross-checked
+against Rust/Metal/CUDA parity before large search, then the final nonce was replayed through the
+trusted 9024-shot evaluator at `0/0/0`. Preserve this discipline for future sub-1170 work: codec
+self-test first, peak ablations second, local/remote validator parity third, island hunt last.
 
 ### Compare-Bit Narrowing
 
