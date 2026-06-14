@@ -410,12 +410,31 @@ a large backlog — and validate FULL only (no fast-reject): the near-miss `cls 
 distribution and the per-channel-zero check (loop step 5.2) both need exact counts, which the
 fast path's early-out cannot give.**
 
-During an active island hunt, **candidate validation is part of every heartbeat**. Do not let the
-GPU scan frontier advance while the GCD-clean candidate backlog grows unchecked. Each heartbeat
-should do real validation work: validate newly flushed candidates, report the validation backlog,
-and say which candidates or shards were validated. If remote validation is blocked, stale, or not
-yet trusted, say so explicitly and keep a small local validation sample moving so the route's
-`cls / pha / anc` distribution stays current.
+During an active island hunt, **candidate validation is part of every heartbeat**, and it has
+**TWO distinct jobs that must not be conflated**:
+
+1. **Remote-validate EVERY newly-discovered GCD-clean candidate** on the GPU boxes (distributed,
+   FULL mode). This is the heartbeat's *main* validation work — **drain the whole new-candidate
+   backlog every beat.** Do not let the GPU scan frontier advance while GCD-clean candidates pile
+   up unvalidated. The remote validators exist precisely so you can validate *all* of them in
+   parallel, not a handful.
+2. **Cross-check exactly 5 of those candidates against local validation** — this is a **trust gate
+   on the remote validator, NOT the validation itself.** Re-run 5 of the just-validated candidates
+   on the local CPU and require exact `cls / pha / anc` agreement before trusting the node's
+   verdicts for the rest.
+
+> **The single most common failure here:** treating the 5-sample cross-check *as* the validation
+> and only validating 5 candidates per heartbeat. That is WRONG. Validate **all** newly-discovered
+> GCD-clean candidates remotely; the 5 local re-runs are *only* to confirm the remote validator
+> agrees with local. If you ever find yourself validating just 5 and leaving the rest of the new
+> candidates unchecked, stop — you are doing it wrong.
+
+Each heartbeat, report: how many new candidates were remote-validated (backlog drained to zero or
+the remaining count), which shards/nodes did the validating, the 5-sample cross-check result, and
+any clean `0/0/0`. If remote validation is blocked, stale, or not yet trusted, say so explicitly
+and keep a local validation sample moving so the route's `cls / pha / anc` distribution stays
+current — but the goal is still to validate *every* new candidate, just locally until the remote
+node is trusted again.
 
 For large candidate batches, use **distributed validation** across the available Linux GPU-node host
 CPUs whenever possible. Shard the candidate list across prepared nodes, write per-node logs, and
@@ -478,9 +497,10 @@ The heartbeat prompt should be self-contained. Include:
 - GPU node inventory and SSH commands
 - current assigned ranges, highest frontier, and already completed windows
 - known candidate totals, density, and best validated `cls / pha / anc` near misses
-- a validation mandate: every heartbeat must drain candidate backlog using distributed validation
-  when possible, and must **cross-check 5 sampled GCD-clean candidates** against local validation
-  before trusting remote validator output (exact `cls / pha / anc` agreement is the trust gate)
+- a validation mandate: every heartbeat must **remote-validate ALL newly-discovered GCD-clean
+  candidates** (distributed, full mode — drain the backlog, not just a sample), and **separately
+  cross-check 5 of them against local validation** as the remote-validator trust gate (exact
+  `cls / pha / anc` agreement). The 5 are the trust check, NOT the validation — validate them all.
 - submission policy: submit to ecdsafail only if measured score beats SOTA, unless the user explicitly says otherwise
 - branch policy for clean-but-worse low-qubit results, if requested
 - a reminder not to commit temp configs, scan logs, helper binaries, `ops.bin`, GPU states, or generated artifacts
@@ -491,10 +511,11 @@ Heartbeat work order:
 
 1. Poll scans, parse completed ranges, and extend idle trusted GPUs if policy allows.
 2. Extract newly flushed GCD-clean candidates and update the backlog.
-3. Validate candidates during the heartbeat. Prefer remote distributed validation for nontrivial
-   batches.
-4. Before accepting remote results, cross-check **5 sampled GCD-clean candidates** locally against
-   the remote validator output. Use exact `cls / pha / anc` agreement as the trust gate.
+3. **Remote-validate every newly-discovered GCD-clean candidate** this beat — distributed across the
+   GPU boxes, full mode. The aim is to drain the *entire* new-candidate backlog, not to spot-check.
+4. **Additionally** cross-check **5** of those candidates with a local re-run; require exact
+   `cls / pha / anc` agreement before trusting the remote node's verdicts for the rest. (This is a
+   trust gate *on top of* step 3 — it does not replace remote-validating all the others.)
 5. Report validation progress, backlog remaining, validator trust status, best near misses, and any
    clean `0 / 0 / 0` immediately.
 

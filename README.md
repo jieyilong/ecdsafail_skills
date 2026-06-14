@@ -48,9 +48,11 @@ qubit and Toffoli savings, brainstorm further improvements, and start improving 
 current SOTA. When you find a new solution, pull the latest SOTA again and compare
 score = qubit_count * average_executed_Toffoli; if your score is lower, submit it.
 
-Distribute island scanning across the remote GPUs below over DISJOINT nonce ranges; run a
-15-minute heartbeat with progress + debugging info; validate on the GPU boxes in parallel
-but cross-check 5 sampled candidates against local validation before trusting a node:
+Distribute island scanning across the remote GPUs below over DISJOINT nonce ranges. Run a
+15-minute heartbeat with progress + debugging info. On EACH heartbeat, remote-validate ALL
+newly-discovered GCD-clean candidates on the GPU boxes in parallel (full validation, drain the
+whole backlog) — and SEPARATELY cross-check just 5 of them against local validation as a trust
+check on the remote validator (the 5 are only the cross-check, NOT the validation; validate them all):
 
 ssh -i <path/to/key> -p <port1> ubuntu@<gpu_machine_ip1>
 ssh -i <path/to/key> -p <port2> ubuntu@<gpu_machine_ip2>
@@ -108,9 +110,11 @@ runs, failures, submission candidates) so the shared pool compounds.
 
 5. **Pick the most promising candidate → distributed GPU island hunt.**
    - assign **disjoint nonce ranges** across the GPU fleet;
-   - **validate on the GPU machines in parallel** (full validation, no fast-reject) — but
-     **cross-check 5 sampled candidates against local validation** each cycle, so a stale remote
-     validator or wrong binary can't silently corrupt the result;
+   - **each heartbeat, remote-validate EVERY newly-discovered GCD-clean candidate** on the GPU
+     machines in parallel (full validation, no fast-reject — drain the whole backlog, not a sample);
+   - **separately, cross-check just 5 of those candidates against local validation** — that's only a
+     trust gate on the remote validator (exact `cls/pha/anc` agreement before trusting a node), **not
+     the validation itself.** Validating only the 5 and skipping the rest is the mistake to avoid;
    - run a **15-minute heartbeat** that prints progress and useful debugging info: per-GPU
      rate / range / density, validation backlog + validator-trust status, the best `cls/pha/anc`
      near-misses, any clean `0/0/0` immediately, and anomalies (idle GPU, stale state file,
