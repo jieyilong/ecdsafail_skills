@@ -21,6 +21,13 @@
       "prompt": "Working on the modular exponentiation block of a Shor's-algorithm implementation. The thing eats ancilla like crazy and I can't tell where it's all going. The windowed lookup table and the running product both seem to stay alive the whole time. Can you help me figure out how to think about cutting the qubit count?",
       "expected_output": "Reframes the problem as a left-to-right timeline with a single peak, tells them to trace live-qubits-vs-time to find the binding phase rather than guessing, then for the always-live lookup table and running product suggests live-range analysis (are they passengers at the peak? can the table be uncomputed/recomputed per window?), the exchange-rate caveat, and the entanglement/correctness risk of freeing a not-actually-dead register.",
       "files": []
+    },
+    {
+      "id": 3,
+      "name": "co-binder-plateau-decomposition",
+      "prompt": "My circuit trace says peak_qubits=1170, but there are several phases all reaching 1170: square forward/inverse, apply add/sub ripple, final ripple, and special overflow/underflow folds. I tried lowering the square and the total peak did not move. How should I proceed?",
+      "expected_output": "Explains that this is a co-binder plateau, not a failed square optimization. Tells them to list all plateau owners, test one-family reductions independently, keep local wins even if global peak does not move, watch for neighboring peak regressions, then combine compatible reductions across every binder. Should mention that new arithmetic width cuts need primitive self-tests before hunting.",
+      "files": []
     }
   ]
 }

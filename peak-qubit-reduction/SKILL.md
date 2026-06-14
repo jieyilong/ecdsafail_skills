@@ -9,8 +9,9 @@ description: >-
   Trigger even if the user describes the goal informally (e.g. "this adder needs way fewer
   wires", "where's all my space going", "can I reuse that register") without naming peak
   width. Provides a left-to-right timeline analysis: find the tallest moment, inventory the
-  qubits alive there, and brainstorm uncompute-early/recompute-later holes, live-range
-  shortening, truncation, and transcript compression to cut them.
+  qubits alive there, identify whether the peak is a single binder or a multi-phase plateau,
+  and brainstorm uncompute-early/recompute-later holes, live-range shortening, truncation,
+  transcript compression, and coordinated co-binder reductions to cut it.
 ---
 
 # Peak Qubit Reduction
@@ -46,6 +47,12 @@ The mistake to avoid at every step: **optimizing a qubit that isn't actually at 
 feels productive and changes nothing. Before proposing any shave, confirm the qubit you're
 targeting is live at the binder instant.
 
+The second mistake is just as costly: **treating a multi-phase plateau like a single peak.** If
+several independent phases all reach the same height, lowering only one phase can be a real local
+win while the global number stays fixed. In that regime the unit of progress is not "did the
+reported peak move?" but "which plateau owners have been pushed below the old height?" Keep a
+co-binder ledger and build a package of compatible reductions across all of them.
+
 ## Match the method to the lever's failure mode
 
 Before reaching for a lever, know *how it can fail* — because that decides whether you "tweak
@@ -77,11 +84,12 @@ deliberately: inventory the binder's live set (next step), make the *smallest* v
 validate, and only then re-measure/search. Don't keep turning knobs once they've gone flat.
 
 **A peak can be several independent binders, not one shared floor.** The inventory (Step 2) may
-show that two *unrelated* phases each independently reach the peak (e.g. an arithmetic core and a
-separate squaring), co-equal but sharing no register. Then one edit that relieves one of them
-leaves the other still at the peak — lowering the number requires **coordinated edits to every
-co-equal binder**, and you re-trace after each to see which walls remain. Budget for "more than
-one edit" before assuming a single hole drops the count.
+show that two or ten *unrelated* phases each independently reach the peak (e.g. an arithmetic core,
+a fold, a final ripple, and a separate squaring), co-equal but sharing no register. Then one edit
+that relieves one of them leaves the others still at the peak. This is not failure; it is plateau
+decomposition. Lowering the number requires **coordinated edits to every co-equal binder**, and
+you re-trace after each to see which walls remain. Budget for "more than one edit" before assuming
+a single hole drops the count.
 
 **The deepest cuts usually end on a co-binder plateau.** Once the obvious tallest owner is shaved,
 expect several phases to tie at the same peak. A real next-qubit win then needs a package of small
@@ -272,6 +280,101 @@ Re-measure the actual composition before each floor claim; more than one publish
 fallen to a better encoding of the *same* state, not to a new algorithm. The reliable signal that
 you've truly hit bottom is a *measured* composition where every remaining live qubit is essential
 data of the peak operation — not an analysis that concluded a layer "should be" irreducible.
+
+## Plateau decomposition: lower every co-binder together
+
+When a trace shows many phases tied at the same peak, **switch into plateau mode immediately**.
+Do not chase only the first `peak_qubits` line, and do not abandon a local reduction just because
+the global peak stayed unchanged. Treat the peak as a **plateau**: several independent binders all
+reach the current height, and the reported qubit count cannot fall until every member of that
+plateau is pushed down.
+
+This is one of the highest-value peak-reduction techniques. Mature low-width circuits often no
+longer have a single obvious tall tower; they have a carefully balanced skyline. The next qubit
+usually comes from coordinated pressure on every co-binder, not from one spectacular trick.
+
+Use this protocol:
+
+1. **List all plateau owners.** Run the detailed peak trace and write down every phase that reaches
+   the max, not just the first one. Keep a ledger with phase name, peak height, live-set suspects,
+   knobs or code paths that can affect it, correctness risk, gate-cost risk, and current status:
+   `unmoved`, `locally lowered`, `regressed`, or `combined`.
+2. **Attack one peak family at a time.** Test each lever independently. A lever is still valuable
+   if its phase drops by one qubit while the total circuit peak stays unchanged; it means another
+   plateau owner is now blocking the global number. Mark that owner `locally lowered` instead of
+   discarding the result.
+3. **Classify the lever.** Prefer live-range holes, passenger relocation, transcript streaming,
+   carry parking, source-as-carry suffixes, and segment/notch changes that target qubits live at
+   that exact phase. Be suspicious of edits that add boundary-carry lifetime or widen a neighboring
+   phase even while they help the local phase.
+4. **Re-trace after every local win.** Confirm whether the phase left the plateau, whether a new
+   phase joined it, and whether the edit caused an accidental taller spike elsewhere.
+5. **Keep the package small and orthogonal.** A good plateau package usually has one lever per
+   family: one square segment notch, one carry-park map, one final-ripple low-width mode, one
+   transcript/live-range hole, one suffix-carry primitive. Avoid stacking multiple unproven edits
+   on the same phase before all other co-binders have a local answer.
+6. **Combine only compatible local wins.** Once each co-binder has a local reduction, turn the
+   package on together and remeasure peak qubits, emitted gates, estimated average gates, score,
+   and validation dirt. If the combined route fails, bisect by family while preserving the ledger.
+7. **Self-test new arithmetic primitives before hunting.** A plateau cut that introduces a new
+   reversible primitive is a binary-failure lever. Prove the primitive value-exact on focused tests,
+   then run full circuit validation, then consider island hunting.
+
+The working mental model is: **one local peak reduction is a lemma; the combined package is the
+theorem.** Do not declare the route impossible just because any single lemma leaves the global peak
+unchanged.
+
+Plateau progress report format:
+
+```text
+current plateau height: <N>
+owners:
+- <phase A>: locally lowered by <lever>, now <N-1>, cost <delta gates>
+- <phase B>: still binding at <N>, next lever <idea>
+- <phase C>: locally lowered but regresses <neighbor phase>, needs repair
+combined package:
+- enabled: <lever list>
+- measured peak: <N or N-1>
+- emitted/avg gate delta: <delta>
+- validation: <cls/pha/anc or pending>
+```
+
+### Example: q1170 plateau to q1169 candidate
+
+A 1170-qubit point-addition SOTA had a wide plateau rather than one dominant owner. The tied peak
+families included:
+
+- Solinas square forward/inverse
+- GCD apply chunk add/sub ripple
+- GCD apply chunk add/sub final ripple
+- compressed-block apply double / reverse halve
+- materialized special overflow/underflow folds
+- boundary-clear phases just below the top
+
+The one-family reductions were:
+
+| Plateau owner | Lever | Effect |
+|---|---|---|
+| Solinas square | smaller square segment notch | square peak 1170 -> 1169 |
+| apply final ripple | low-qubit final ripple variant | final ripple 1170 -> 1162 |
+| apply double / reverse halve | fold carry parking plus per-step map | 1170 -> 1169 |
+| special over/underflow folds | special fold parking plus per-step map | 1170 -> 1169 |
+| non-final apply ripple | source-as-carry suffix for one carry lane | 1170 -> 1169 |
+
+The non-final apply ripple was the hard binder. Naive chunk reshaping backfired because extra
+chunks increased boundary-carry liveness. The useful structural move was a source-as-carry suffix:
+trade one live carry lane for extra Toffoli by using source wires as temporary suffix carries, then
+restore them. That is a value-exact arithmetic change, so it needs primitive self-tests before any
+serious hunt.
+
+Combined, the route reached a new 1169-qubit plateau, with higher gate count. The important lesson
+is not the exact knobs; it is the workflow:
+
+- isolate every co-binder
+- prove a local one-qubit reduction for each
+- reject local fixes that create worse neighboring peaks
+- combine the compatible reductions
+- then decide whether the gate cost and validation dirt justify further repair or hunting
 
 ## Worked example (this lineage, for grounding)
 
