@@ -315,7 +315,7 @@ Trail of Bits/trailmix-inspired framing:
 
 Risk: operand aliasing often produces low qubits but can cause uniform high `cls / pha / anc` failures if one dependency was misclassified as dead.
 
-### Transient-vs-Floor: cut the apply-chunk transient, not the persistent floor (verified q1185 → q1175)
+### Transient vs persistent-transcript floor — two qubit levers, very different exchange rates (verified q1185 → q1175 → q1170)
 
 Decompose the binder's live set into a **persistent floor** (held across the whole region) and a
 **transient** (the working registers of the *current* step). Get this from an alloc-phase
@@ -328,9 +328,10 @@ phase that allocated them). On the dialog-GCD route at the 1185q binder
 - **~36 transient** = the current apply chunk's load (~20) + carry-ripple lane (~15).
 
 The verified **q1175** route (commit `757e6e7`, full-clean `0/0/0`) cut **−10 qubits entirely from
-the transient** (load 20→13, ripple 15→12); the 1149 persistent floor was **untouched**. Lesson:
-the cheapest sub-frontier qubit is usually the *transient working register*, not the hard
-persistent u/transcript floor — attack the transient first.
+the transient** (load 20→13, ripple 15→12); the 1149 persistent floor was **untouched**. The
+transient is the *easiest* lever — but, as the q1170 SOTA below proves, **not the cheapest per
+qubit.** Both the transient and the persistent transcript floor are reducible; they have very
+different exchange rates (see the comparison at the end of this section).
 
 **Mechanism — source the current-chunk scratch from qubits that already exist, and chunk finer:**
 
@@ -362,6 +363,42 @@ clean **qubit-record branch, not a score win** (1175 × 1,545,825 = 1,816,344,37
 1,681,025,595). Gate every transient cut on the exchange rate — finer chunking + hosting/borrow
 recompute is where the Toffoli goes. That the persistent 1149 floor is still standing means real
 qubit headroom remains *if* a cheaper-Toffoli mechanism (or a denser transcript) is found.
+
+**q1170 SOTA — the CHEAP lever (denser transcript codec + transcript release): a real score win.**
+Commit `674d0d8` (nasqret, score **1,678,948,830** — beats the 1185 SOTA's 1,681,025,595) cut
+**−15 qubits for only +16,412 avg-Toffoli (~1,094 T/qubit, UNDER the ~1,200 break-even)**, so the
+*product* dropped. Composition vs 1185 (637 + 512 + 36): it took **−7 from the persistent
+transcript** (637→630) **and** −8 from the transient (36→28). The −7 floor cut is the headline and
+the cheap part:
+
+- **Denser tail transcript codec** (`DIALOG_GCD_K5_TAIL3_TOP32_CODEC=1` +
+  `..._TAIL3_TOP32_STREAM_APPLY=1`) — a tail-specific re-encode that streams the apply, packing the
+  transcript tighter than head-11 alone.
+- **Transcript-bit release** (`DIALOG_GCD_K5_PARTIAL_RAW_RELEASE=6`,
+  `DIALOG_GCD_K5_RELEASE_SCALE_BITS=5`, `DIALOG_GCD_RUNWAY_PARTIAL_BLOCK=1`) — free/host transcript
+  bits no longer needed in full.
+- Its −8 transient came cheaply too: `APPLY_CHUNKED_F_BLOCKS` 18→20 + deeper park (`FOLD_PARK` 15,
+  `SPECIAL_FOLD_PARK` 13) + `FOLD_HOST_DERIVED_CONTROLS=1` — **not** the expensive dirty-qoffset hosting.
+
+**Decisive lesson — match the lever to its exchange rate:**
+
+| route | what it cut | −q | +avg-T | T/qubit | score |
+|---|---|---:|---:|---:|---|
+| q1175 (`757e6e7`) | transient only, via DIRTY-qubit hosting | 10 | +127k | ~12,700 (~10× b/e) | **worse** (1,816M) |
+| q1170 (`674d0d8`) | persistent transcript −7 + cheap transient −8 | 15 | +16k | ~1,094 (under b/e) | **better** (1,679M) |
+
+**Attacking the persistent transcript with a denser/streamed codec is the CHEAP qubit lever;
+attacking the transient with dirty-qubit hosting is the EXPENSIVE one.** Reach for the transcript
+codec first when you want a *score* win, not just a qubit record. This also **corrects the old
+"transcript is near-incompressible / route is at its qubit floor" conclusion**: a *tail-specific*
+codec plus raw/scale-bit *release* (not pure entropy/VLC coding — which is why a VLC-only analysis
+missed it) found 7 more transcript qubits at a good rate. The floor *is* reducible; the lever is
+the codec, not entropy coding.
+
+Method behind q1170 (from the committed `memory/2026-06-13-q1192-*.md` note): an exact **CUDA island
+filter cross-checked for Rust/Metal/CUDA parity**, run as 1M-nonce shards on a GPU cluster, walking
+a ladder q1192→q1191→…→q1187→q1186→…→1170 — each a small structural shave, each held back until a
+nonce passes the trusted 9024-shot evaluator at `0/0/0`.
 
 ### Compare-Bit Narrowing
 
