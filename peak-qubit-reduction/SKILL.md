@@ -209,6 +209,18 @@ the trade is worth it:
 - Compute your **break-even rate** = (gates you'd add) ÷ (qubits you'd save). Compare it to the
   prevailing cost of a qubit in your objective. If your score is `qubits × gates`, a rough
   break-even is `gates_total / qubits_total` — spend fewer gates-per-qubit than that and you win.
+- **Different layers of the peak have very different exchange rates — price each reducible layer
+  separately; don't go by which *looks* most wasteful.** The peak is usually a **persistent floor**
+  (long-lived state held across the whole region) plus a **transient** (the current step's working
+  registers). Counter-intuitively, freeing the transient — which looks like wasteful scratch — is
+  often the *expensive* qubit, because freeing it means recompute / dirty-borrow / finer chunking,
+  i.e. lots of added gates. Meanwhile a long-lived **log/transcript** in the floor — which looks
+  irreducible — is often the *cheap* qubit, because a denser or **streamed/partial-release**
+  re-encoding shrinks it for very few gates. So when more than one layer is reducible, compute
+  gates-per-qubit for *each* and take the cheap one (frequently: **compress the log before you free
+  the scratch**). Verified instance: on one circuit, freeing transient working registers cost ~10×
+  break-even (a qubit *record* but a score *loss*), while compressing the persistent transcript on
+  the same circuit cost *under* break-even (an actual score *win*) — same −qubits, opposite verdicts.
 - **Depth is the hidden tax.** Uncompute/recompute and fewer-ancilla tricks inflate circuit
   *depth*. A `qubits × gate-count` score doesn't see depth, but real error-corrected hardware
   does (it can dominate runtime). Prefer width reductions that are depth-neutral; treat a big
@@ -226,6 +238,16 @@ when the binder is an irreducible structural floor (the essential data of the pe
 when every remaining shave costs more than the exchange rate allows. Keep a short log of which
 phase owned the peak at each height and which move dislodged it — that history is the map for the
 next person (and tells you when you're going in circles).
+
+**Treat "we've hit the floor" as a hypothesis to disprove, not a conclusion.** Before declaring a
+layer irreducible, re-inventory (Step 2) and ask of each persistent register: is this *genuinely
+essential data*, or just an **encoding** I haven't beaten yet? A long-lived log can still shrink
+under a tail-specific codec or a streamed/partial release even when generic entropy coding looked
+saturated — so a "this can't compress further" verdict from one coding model is weak evidence.
+Re-measure the actual composition before each floor claim; more than one published "floor" has
+fallen to a better encoding of the *same* state, not to a new algorithm. The reliable signal that
+you've truly hit bottom is a *measured* composition where every remaining live qubit is essential
+data of the peak operation — not an analysis that concluded a layer "should be" irreducible.
 
 ## Worked example (this lineage, for grounding)
 
