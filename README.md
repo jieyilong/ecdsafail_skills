@@ -13,14 +13,14 @@ reversible (`0 classical / 0 phase / 0 ancilla` violations). A free 96-gate iden
 ## How to Use
 
 ### 1. Install the skills
-Symlink each skill directory into a location your agent scans — `~/.claude/skills/` (every
-project) or `<project>/.claude/skills/` (scoped). **Symlinks, not copies**, so they keep tracking
+Use the following command to symlink each skill directory into a location your agent scans — `~/.claude/skills/` (every project) or `<project>/.claude/skills/` (scoped). **Symlinks, not copies**, so they keep tracking
 this repo as it's updated:
 
 ```bash
 SKILLS=/path/to/ecdsafail_skills
 for d in "$SKILLS"/*/; do
   [ -f "$d/SKILL.md" ] && ln -sfn "${d%/}" ~/.claude/skills/"$(basename "$d")"
+  [ -f "$d/SKILL.md" ] && ln -sfn "${d%/}" ~/.codex/skills/"$(basename "$d")"
 done
 ```
 
@@ -28,28 +28,9 @@ The four **general** skills are self-contained (any reversible/quantum circuit);
 skills + the Agentic loop also need the prerequisites below.
 
 ### 2. Prerequisites (for the ecdsa.fail loop)
-- the **`ecdsafail` CLI** (`ecdsafail login`; the separate `ecdsafail-cli` skill documents it) for
-  `sync` / `run` / `submit` / `notes`;
-- the **challenge repo** (`ecdsafail clone` + `setup`) and a **Rust toolchain**, to build
-  `build_circuit` / `eval_circuit`;
-- the **GPU island toolkit** — use the latest from
-  **<https://github.com/jieyilong/ecdsafail_gpu_toolkit>** (the CUDA `island.sh` searcher). Wire a
-  remote GPU with `./island.sh init-remote "ssh -p PORT user@IP"`. Recommended **safer fast**
-  settings:
+- the **`ecdsafail` toolchain**: Please see https://www.ecdsa.fail/ for the instructions;
 
-  ```bash
-  # Phase 1 — GPU scan for GCD-clean candidates
-  GPU_BATCH_INV=1 GPU_COMB_BITS=22 GPU_GCD_MODE=trunc_first GPU_FAN_BITS=22 GPU_WAVE=128 \
-    ./island.sh search s.bin <START> <N>
-
-  # Phase 2 — CPU validate to confirm 0/0/0
-  EVAL_FAST_REJECT=1 ./island.sh validate "<CFG>" <nonce> [<nonce>...]
-  ```
-
-  (Phase-2 fast-reject is for a quick confirm; for the bake-off near-miss distribution and the
-  hunt heartbeat, validate **full** — `EVAL_FAST_REJECT=0` — per `ecdsafail-island-hunting`.)
-
-### 3. Kick off an agent
+### 3. Kick off an agent loop (see the "The Agentic loop" section for more details)
 Once installed, **describe the task and let the skill descriptions route it** — you rarely name a
 skill. For a full distributed run, paste a prompt like this (fill in your GPU SSH endpoints):
 
@@ -88,7 +69,7 @@ If the skills **aren't** installed (a one-off agent / subagent / CI), point at t
 **Anti-pattern:** don't tell an agent to "use all the skills" on a narrow task — they are
 *selectively* triggered. Describe the task and the right subset fires.
 
-## Agentic loop
+## The Agentic loop
 
 The full life cycle of an autonomous search for a new (lower-score) solution. Each stage names the
 skill that drives it; throughout, publish concise `ecdsafail notes` (hypotheses, local gates, full
