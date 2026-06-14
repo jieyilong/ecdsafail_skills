@@ -13,8 +13,7 @@ reversible (`0 classical / 0 phase / 0 ancilla` violations). A free 96-gate iden
 ## How to Use
 
 ### 1. Install the skills
-Use the following command to symlink each skill directory into a location your agent scans — `~/.claude/skills/` (every project) or `<project>/.claude/skills/` (scoped). **Symlinks, not copies**, so they keep tracking
-this repo as it's updated:
+Use the following command to symlink each skill directory into a location your agent scans. Do **symlinks, not copies**, so they keep tracking this repo as it's updated:
 
 ```bash
 SKILLS=/path/to/ecdsafail_skills
@@ -32,7 +31,7 @@ skills + the Agentic loop also need the prerequisites below.
 
 ### 3. Kick off an agent loop (see the "The Agentic loop" section for more details)
 Once installed, **describe the task and let the skill descriptions route it** — you rarely name a
-skill. For a full distributed run, paste a prompt like this (fill in your GPU SSH endpoints):
+skill. For a full distributed run, paste a prompt like this into Claude Code or Codex (fill in your GPU SSH endpoints):
 
 ```text
 The latest ecdsafail GPU toolkit is at https://github.com/jieyilong/ecdsafail_gpu_toolkit —
