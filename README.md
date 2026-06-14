@@ -10,6 +10,84 @@ reversible (`0 classical / 0 phase / 0 ancilla` violations). A free 96-gate iden
 (`DIALOG_TAIL_NONCE`) reseeds those shots, so any config change requires re-hunting a clean
 "island" nonce.
 
+## How to Use
+
+### 1. Install the skills
+Symlink each skill directory into a location your agent scans — `~/.claude/skills/` (every
+project) or `<project>/.claude/skills/` (scoped). **Symlinks, not copies**, so they keep tracking
+this repo as it's updated:
+
+```bash
+SKILLS=/path/to/ecdsafail_skills
+for d in "$SKILLS"/*/; do
+  [ -f "$d/SKILL.md" ] && ln -sfn "${d%/}" ~/.claude/skills/"$(basename "$d")"
+done
+```
+
+The four **general** skills are self-contained (any reversible/quantum circuit); the two **domain**
+skills + the Agentic loop also need the prerequisites below.
+
+### 2. Prerequisites (for the ecdsa.fail loop)
+- the **`ecdsafail` CLI** (`ecdsafail login`; the separate `ecdsafail-cli` skill documents it) for
+  `sync` / `run` / `submit` / `notes`;
+- the **challenge repo** (`ecdsafail clone` + `setup`) and a **Rust toolchain**, to build
+  `build_circuit` / `eval_circuit`;
+- the **GPU island toolkit** — use the latest from
+  **<https://github.com/jieyilong/ecdsafail_gpu_toolkit>** (the CUDA `island.sh` searcher). Wire a
+  remote GPU with `./island.sh init-remote "ssh -p PORT user@IP"`. Recommended **safer fast**
+  settings:
+
+  ```bash
+  # Phase 1 — GPU scan for GCD-clean candidates
+  GPU_BATCH_INV=1 GPU_COMB_BITS=22 GPU_GCD_MODE=trunc_first GPU_FAN_BITS=22 GPU_WAVE=128 \
+    ./island.sh search s.bin <START> <N>
+
+  # Phase 2 — CPU validate to confirm 0/0/0
+  EVAL_FAST_REJECT=1 ./island.sh validate "<CFG>" <nonce> [<nonce>...]
+  ```
+
+  (Phase-2 fast-reject is for a quick confirm; for the bake-off near-miss distribution and the
+  hunt heartbeat, validate **full** — `EVAL_FAST_REJECT=0` — per `ecdsafail-island-hunting`.)
+
+### 3. Kick off an agent
+Once installed, **describe the task and let the skill descriptions route it** — you rarely name a
+skill. For a full distributed run, paste a prompt like this (fill in your GPU SSH endpoints):
+
+```text
+The latest ecdsafail GPU toolkit is at https://github.com/jieyilong/ecdsafail_gpu_toolkit —
+read all its markdown docs and follow the usage. Use these recommended safer fast settings:
+
+# Phase 1 — GPU scan to find GCD-clean candidates
+GPU_BATCH_INV=1 GPU_COMB_BITS=22 GPU_GCD_MODE=trunc_first GPU_FAN_BITS=22 GPU_WAVE=128 ./island.sh search s.bin <START> <N>
+
+# Phase 2 — CPU validate to confirm 0/0/0
+EVAL_FAST_REJECT=1 ./island.sh validate "<CFG>" <nonce> [<nonce>...]
+
+Pull the ecdsa.fail SOTA and recent submission notes, analyze the techniques behind the
+qubit and Toffoli savings, brainstorm further improvements, and start improving from the
+current SOTA. When you find a new solution, pull the latest SOTA again and compare
+score = qubit_count * average_executed_Toffoli; if your score is lower, submit it.
+
+Distribute island scanning across the remote GPUs below over DISJOINT nonce ranges; run a
+15-minute heartbeat with progress + debugging info; validate on the GPU boxes in parallel
+but cross-check 5 sampled candidates against local validation before trusting a node:
+
+ssh -i <path/to/key> -p <port1> ubuntu@<gpu_machine_ip1>
+ssh -i <path/to/key> -p <port2> ubuntu@<gpu_machine_ip2>
+ssh -i <path/to/key> -p <port3> ubuntu@<gpu_machine_ip3>
+ssh -i <path/to/key> -p <port4> ubuntu@<gpu_machine_ip4>
+```
+
+For a **focused job** instead of the full loop, just say it: "this reversible adder peaks at 5n
+qubits, get it to 3n" → `peak-qubit-reduction`; "cut the T-count of this multiplier" →
+`toffoli-reduction`; "a competitor beat my benchmark, what changed?" → `benchmark-frontier-archaeology`.
+
+If the skills **aren't** installed (a one-off agent / subagent / CI), point at the files instead:
+"Read every `SKILL.md` under `<path>/ecdsafail_skills/` and apply the relevant methodologies."
+
+**Anti-pattern:** don't tell an agent to "use all the skills" on a narrow task — they are
+*selectively* triggered. Describe the task and the right subset fires.
+
 ## Agentic loop
 
 The full life cycle of an autonomous search for a new (lower-score) solution. Each stage names the
