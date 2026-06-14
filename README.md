@@ -76,7 +76,11 @@ When running Claude + Codex, several Codex sessions, or any pair of agents on th
 also use [`ecdsafail-multi-agent-collaboration`](ecdsafail-multi-agent-collaboration/SKILL.md).
 This skill is the coordination layer around the other skills: it tells agents how to exchange exact
 measurements, split structural/autopsy/GPU work, independently verify each other's claims, and
-converge on one score-gated route.
+converge on one score-gated route. It also covers the other axis of parallelism — a single agent
+**fanning out orthogonal sub-investigations** (literature survey, multi-dimension failure autopsy,
+multi-route bake-off) and reading their convergence/conflict as signal (the "multi-agent
+autoresearch" pattern; pairs with the separate `expert-autoresearch` / `super-autoresearch`
+skills).
 
 The mailbox itself can be improvised per session. A common pattern is that one agent creates a
 small local mailbox server with endpoints like "read messages since cursor" and "post addressed
