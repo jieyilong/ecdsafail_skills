@@ -1,4 +1,4 @@
-# ecdsafail_skills
+# Skills for the ECDSAFail Challenge
 
 Agent skills for optimizing the [ecdsa.fail](https://ecdsa.fail) challenge — a reversible
 quantum circuit that adds a quantum elliptic-curve point to a classical one on secp256k1 — plus
