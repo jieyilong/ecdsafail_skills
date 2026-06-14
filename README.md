@@ -23,8 +23,8 @@ for d in "$SKILLS"/*/; do
 done
 ```
 
-The four **general** skills are self-contained (any reversible/quantum circuit); the two **domain**
-skills + the Agentic loop also need the prerequisites below.
+The four **general** skills are self-contained (any reversible/quantum circuit); the three
+**domain** skills + the Agentic loop also need the prerequisites below.
 
 ### 2. Prerequisites (for the ecdsa.fail loop)
 - the **`ecdsafail` toolchain**: Please see https://www.ecdsa.fail/ for the instructions;
@@ -69,6 +69,35 @@ If the skills **aren't** installed (a one-off agent / subagent / CI), point at t
 
 **Anti-pattern:** don't tell an agent to "use all the skills" on a narrow task — they are
 *selectively* triggered. Describe the task and the right subset fires.
+
+### 4. Coordinate multiple agents with a mailbox
+
+When running Claude + Codex, several Codex sessions, or any pair of agents on the same SOTA hunt,
+also use [`ecdsafail-multi-agent-collaboration`](ecdsafail-multi-agent-collaboration/SKILL.md).
+This skill is the coordination layer around the other skills: it tells agents how to exchange exact
+measurements, split structural/autopsy/GPU work, independently verify each other's claims, and
+converge on one score-gated route.
+
+The mailbox itself can be improvised per session. A common pattern is that one agent creates a
+small local mailbox server with endpoints like "read messages since cursor" and "post addressed
+message"; a file-backed queue or sqlite-backed script is also fine. The important contract is:
+
+- every agent reads from its last cursor before acting;
+- every substantive message includes exact config/worktree/commit/nonce, q, emitted ops, average
+  executed Toffoli, score basis, `cls/pha/anc`, density or validation status, and the proposed next
+  split of work;
+- promising peer claims are treated as hypotheses until independently rebuilt or re-evaluated;
+- broad GPU scans wait until both score-gating and short density triage justify them.
+
+Example prompt:
+
+```text
+Collaborate with the Claude/Codex peer through the local mailbox created for this session.
+Use ecdsafail-multi-agent-collaboration: read the thread from your last cursor, report exact local
+measurements, split the next experiments, and keep polling until you converge on one q<1170 route.
+One agent should run source/autopsy work while the other score-gates and runs short GPU density
+triage. Independently verify any promising peer result before scanning broadly or submitting.
+```
 
 ## The Agentic loop
 
@@ -138,6 +167,7 @@ runs, failures, submission candidates) so the shared pool compounds.
 |-------|------|
 | [`ecdsafail-circuit-optimization`](ecdsafail-circuit-optimization/SKILL.md) | **Design & score** structural circuit changes *before* spending GPU time. Qubit/Toffoli reduction patterns, the qubit↔Toffoli exchange model, the verified public SOTA knob-ladder, the current frontier lever, and documented dead-ends. |
 | [`ecdsafail-island-hunting`](ecdsafail-island-hunting/SKILL.md) | **Validate & search.** Disciplined GPU island hunting: score-gate against SOTA, run a multi-route bake-off ranked by *landability*, triage `cls/pha/anc` candidate quality, validate `0/0/0`, and submit only confirmed score-beating islands. |
+| [`ecdsafail-multi-agent-collaboration`](ecdsafail-multi-agent-collaboration/SKILL.md) | **Coordinate parallel agents.** Claude/Codex mailbox discipline for benchmark hunts: exchange exact configs and measurements, split route/autopsy/GPU work, independently verify claims, reconcile disagreements, and converge on one score-gated route. |
 
 (The `ecdsafail-cli` skill — driving the `ecdsafail` CLI itself — is maintained separately, not in
 this repo.)
