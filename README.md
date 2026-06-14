@@ -55,20 +55,62 @@ confirms the change stayed correct (and that any re-hunted island is `0/0/0`). O
 the general skills hand off to `ecdsafail-circuit-optimization` / `ecdsafail-island-hunting` for
 the concrete knobs and the GPU search.
 
-## Typical loop
+## Agentic loop
 
-0. Run `ecdsafail update` when starting a fresh work session, then check shared hunt memory with
-   `ecdsafail notes list` and `ecdsafail notes search "<approach>"`. Publish concise notes for
-   useful hypotheses, failures, local gates, full runs, and submission candidates.
-1. Pull the current SOTA; pick a lever from `ecdsafail-circuit-optimization` whose estimated
-   `qubits × Toffoli` beats it.
-2. Generate a *slate* of distinct candidate routes (don't bet on the first idea).
-3. Bake-off triage each on a small GPU scan; rank by `density × fraction(severity ≤ 2)`
-   (`ecdsafail-island-hunting`).
-4. Hunt the winner at scale, validate the first `0/0/0`, bake + submit if it beats SOTA.
+The full life cycle of an autonomous search for a new (lower-score) solution. Each stage names the
+skill that drives it; throughout, publish concise `ecdsafail notes` (hypotheses, local gates, full
+runs, failures, submission candidates) so the shared pool compounds.
 
-When a competitor lands a new SOTA, run `benchmark-frontier-archaeology` first to decode exactly
-which lever drove it and where the bottleneck moved before choosing your next route.
+0. **Session setup — pull the SOTA as the basis.** `ecdsafail update`, then `ecdsafail sync` to
+   download the current promoted SOTA as the working basis. Read shared hunt memory
+   (`ecdsafail notes list`, `ecdsafail notes search "<approach>"`) so you don't re-walk dead
+   routes, and **load the skills** in this repo.
+
+1. **Understand the basis.** Measure what you just pulled — peak qubits
+   (`TRACE_PEAK=1 build_circuit`), emitted / average-executed Toffoli, and the binder phase + its
+   live-set composition. If the SOTA is *new* (a competitor just moved it), run
+   **`benchmark-frontier-archaeology`** first to decode which lever drove it and where the
+   bottleneck sits now.
+
+2. **Look for a couple of candidates** (a *slate*, not one bet) with
+   **`ecdsafail-circuit-optimization`**: try quick config knobs first; when knobs go flat (the cost
+   is allocation-bound), escalate to a structural code change via **`peak-qubit-reduction`** (width
+   axis) or **`toffoli-reduction`** (gate axis). Score-gate each candidate's estimated
+   `qubits × Toffoli` against SOTA; keep the few that plausibly beat it.
+
+3. **Small-scale test first.** Build each surviving candidate and check structural correctness on
+   **random inputs** with **`reversible-circuit-validation`** — a width cut must be `0/0/0`
+   value-exact *before* any hunt. Then a short GPU triage scan (**5–10M nonces**) to read the
+   **GCD-clean candidate density**.
+
+4. **Triage / bake-off** with **`ecdsafail-island-hunting`**. Per candidate route, collect the two
+   landability signals: **GCD-clean density** (candidates/Mnonce) and the **`cls/pha/anc`
+   distribution** of its candidates (validate the whole batch, full mode). Rank by:
+   - **density gate** — GREEN `> 0.5`, YELLOW `0.2–0.5`, RED `< 0.2` candidates/Mnonce;
+   - **per-channel-zero** — each of `cls`, `pha`, `anc` must independently reach 0 *somewhere*, or
+     that channel is floored and `0/0/0` is unreachable no matter the nonce;
+   - prefer low near-misses clustered toward `0/0/0`.
+   If a route is too dirty, repair the errors (restore a carry/compare bit, widen an envelope)
+   until real near-misses appear, then re-triage.
+
+5. **Pick the most promising candidate → distributed GPU island hunt.**
+   - assign **disjoint nonce ranges** across the GPU fleet;
+   - **validate on the GPU machines in parallel** (full validation, no fast-reject) — but
+     **cross-check 5 sampled candidates against local validation** each cycle, so a stale remote
+     validator or wrong binary can't silently corrupt the result;
+   - run a **15-minute heartbeat** that prints progress and useful debugging info: per-GPU
+     rate / range / density, validation backlog + validator-trust status, the best `cls/pha/anc`
+     near-misses, any clean `0/0/0` immediately, and anomalies (idle GPU, stale state file,
+     zero-candidate node).
+
+6. **Close the loop.**
+   - **If a clean `0/0/0` island with a lower score is found:** bake the config + nonce, re-measure
+     the canonical score (`ecdsafail run`), and **`ecdsafail submit`** if it beats the current
+     promoted SOTA.
+   - **Otherwise (no win, or a competitor moved the frontier mid-hunt):** **rebase onto the new
+     SOTA** (`ecdsafail sync`), run **`benchmark-frontier-archaeology`** to decode its lever, **add
+     the new technique to `ecdsafail-circuit-optimization`**, commit/push, and restart the loop from
+     the new basis.
 
 ## References
 
