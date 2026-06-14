@@ -83,6 +83,15 @@ leaves the other still at the peak — lowering the number requires **coordinate
 co-equal binder**, and you re-trace after each to see which walls remain. Budget for "more than
 one edit" before assuming a single hole drops the count.
 
+**The deepest cuts usually end on a co-binder plateau.** Once the obvious tallest owner is shaved,
+expect several phases to tie at the same peak. A real next-qubit win then needs a package of small
+edits whose effects land together: one codec or live-range hole for the persistent floor, one
+streaming/recompute trick for the transient apply path, one segment/notch change for a separate
+arithmetic phase, and selective repairs for the iterations made fragile by the cut. Treat a
+"1170 everywhere" style trace as intentional: if apply ripple, special folds, compressed apply,
+and square all hit the same height, the next reduction must move *all* of them or the peak number
+will not budge.
+
 ## Step 1 — Measure: find the binder
 
 You need a **live-qubit-vs-time trace**, not just a total count. Two ways to get one:
@@ -193,6 +202,21 @@ classical compression, *lossy is not an option.* Ship a self-test that proves th
 collision-free over all reachable inputs before trusting it. A related free win: bits you can
 *prove* are always a constant (e.g. a known-zero high word) need not be stored at all.
 
+**Finite-support tail codecs beat generic entropy arguments.** Do not only ask "how many bits of
+entropy does this whole transcript have?" Also isolate late/tail windows and enumerate the exact
+reachable support there. If a tail has, say, 32 reachable patterns, encode those patterns directly
+into five code bits and stream the apply from that code instead of re-materializing the raw tail.
+The general tactic is:
+
+1. Identify a long-lived transcript slice that is still live at the binder.
+2. Enumerate its reachable states for the narrow phase/tail where it is used.
+3. Build an explicit reversible encoder/decoder for only that support.
+4. Stream each apply slot from the code, recomputing only the slot's local controls, then clear it.
+5. Add a self-test proving bijection, support coverage, and phase-clean forward/reverse behavior.
+
+This is a width lever, so it is binary-failure: if the codec or streaming apply is not exactly
+reversible, the circuit is structurally dirty. Validate the codec first, then re-measure the peak.
+
 ### Aliasing / dirty-scratch borrow
 
 If you need scratch and a register already live holds a value you can **restore before it is next
@@ -263,6 +287,12 @@ this — each step a different binder, each shave a different move:
 - **1192**, binder = the fold → **per-step scheduling** of the fold's carry truncation + a
   **denser transcript codec** (head-11, with a bijectivity self-test) → **1185**, binder moves to
   a GCD-apply ripple.
+- **1185**, binders = GCD apply/fold plus square → **finite-support tail codec + streaming apply**
+  for a 32-state final transcript tail, **partial raw transcript release**, selective compare
+  repairs, deeper per-step carry parking, and a square segment rebalance → **1170**. The important
+  ablations were diagnostic: disabling streaming raised the GCD plateau to 1171; disabling the
+  tail codec raised it to 1177; reverting the square segmentation made square bind at 1185. The
+  win was not one magic knob — it was coordinated pressure on every co-equal binder.
 
 Notice the pattern: every height was unlocked by attacking *that height's specific binder* with
 the move that fit it, and the win always came from the phase that was currently tallest.
