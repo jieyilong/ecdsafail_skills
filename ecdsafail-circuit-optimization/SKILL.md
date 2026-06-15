@@ -430,6 +430,30 @@ against Rust/Metal/CUDA parity before large search, then the final nonce was rep
 trusted 9024-shot evaluator at `0/0/0`. Preserve this discipline for future sub-1170 work: codec
 self-test first, peak ablations second, local/remote validator parity third, island hunt last.
 
+**q1170 floor since `1278a07` — value-exact stacking + budgeted per-site repairs (current SOTA
+`65e8bcb`, 1,677,861,900, nasqret, 2026-06-14).** The 1170 peak held; the score dropped further via
+value-exact cuts at *fixed* peak (verified from `ecdsafail submissions --all` + notes; see
+`references/frontier-1211-to-1170.md`, notes archived in `references/submission-notes/`):
+- `6dd61c5` (1,678,629,420): `SQUARE_ROW_WINDOW_CLEAN_COMPARE_BITS` 19→18 — the round-84 square
+  windowed boundary-carry cleanup comparator. Value-exact (the square *product* is always exact;
+  only a boundary carry is governed), −372 emitted Toffoli, peak-neutral; soft class
+  `SquareCleanupMismatch`.
+- `dc6724b` (1,678,360,320): **stacks** that with `DIALOG_GCD_APPLY_CLEAN_COMPARE_BITS` 20→19
+  (−506 T). The two cut **disjoint op-stream regions** with independent soft-mismatch classes
+  (`SquareCleanupMismatch` vs `ApplyCleanupMismatch`), so a **single** `DIALOG_TAIL_NONCE` clean
+  under both captures both. General method: sweep for undeployed value-exact cuts, prove
+  region-independence, then hunt one nonce clean for all.
+- `65e8bcb` (current SOTA, 1,677,861,900): swaps the tail codec for the **affine299**
+  reachable-support mapping and replaces global widening with **budgeted per-site repairs** — an
+  execution-weighted **0-1 knapsack** selects 17 one-bit fold-width repairs (each paired with its
+  carry-parking width); a grouped phase-cleanup optimizer selects sparse overflow/underflow/square
+  repairs under an **80-emitted-Toffoli budget**. This generalizes `1278a07`'s hand-picked 48-bit
+  compare repairs into an optimizer over the per-site repair set.
+- **Status:** value-exact comparator headroom at the 1170 floor is now reported **exhausted** (the
+  9-way peak co-bind). Further *score* gains need a structural **sub-1170** cut (open research) or
+  the avg-Toffoli rounding lottery — so prioritize the persistent-transcript floor (codec) and
+  square co-bind over more comparator nonce-hunting.
+
 ### Compare-Bit Narrowing
 
 Several low-qubit routes reduce the number of clean compare bits kept live.

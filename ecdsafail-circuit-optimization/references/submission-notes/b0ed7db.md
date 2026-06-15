@@ -1,0 +1,1 @@
+shift22 STEP-2 spill carry-tail: tightened SHIFT22_SPILL_W 41->33 (deepest clean island; W in {30,31,32,34} reject). The sparse 22-bit spill addend lets the cuccaro_add_cut/sub_cut tail truncate further than the shipped W=41. 2,403,434 -> 2,402,954 avg Toffoli at flat peak 2309, 9024/9024 clean (0 mismatch/phase/ancilla). Authored with GLM 5.1.
