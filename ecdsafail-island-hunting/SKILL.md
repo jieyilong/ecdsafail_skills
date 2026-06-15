@@ -402,6 +402,84 @@ requires shots whose inputs are *nonce-independent*. Most truncation error is dr
 nonce-derived inputs (no floor), but some stacked apply-side truncations create a fixed bad set
 anyway (the 1210q case). Reseeding does **not** guarantee no floor — run the test.
 
+## Quantitative Runtime Model (two-stage: density × channel-distribution × throughput)
+
+The informal `e^lambda` depth estimate above is the *classical-channel-only* term. **Density alone
+is an optimistic predictor of time-to-island** because the cheap GPU pre-filter screens only the
+`cls` channel — a GCD-clean candidate can still die on `pha` or `anc` under the full evaluator.
+Model the hunt as **two stages** and combine all three measured inputs. Tool:
+`scripts/island_runtime_model.py` (bundled).
+
+**The two stages.**
+
+- **Stage 1 — cheap GPU classical screen.** Screens nonces at aggregate rate `R` (nonce/s); a nonce
+  passes ("GCD-clean") with probability `d = e^(-lambda_cls)` = the **GCD-clean density** (input #1).
+- **Stage 2 — expensive full 9024-shot eval** (cost `T_eval` s/candidate). Each Stage-1 pass is
+  fully evaluated for `cls`/`pha`/`anc`; it is a real island with conditional probability
+  `q = P(pha=0 AND anc=0 | cls-clean)` — derived from the **`cls/pha/anc` distribution of GCD-clean
+  candidates** (input #2). `q` is exactly the term density-only estimates drop.
+
+**The formulas.**
+
+```text
+p (per-nonce success) = d * q
+N (expected nonces)   = 1 / p
+screen_time = 1 / (d * q * R)     # Stage-1, dominated by rare density
+eval_time   = T_eval / q          # Stage-2, dominated by INDEPENDENT pha/anc thinning
+total (shared HW)      = screen_time + eval_time
+total (concurrent HW)  = max(screen_time, eval_time)
+```
+
+Time-to-island is Geometric(p) → ~exponential, **heavy-tailed**: percentile `P` needs
+`ln(1/(1-P))/p` nonces, so **p99 ≈ 4.6 × the mean**. Always report the tail, not just the mean —
+"expected 4 h" routinely means "1-in-100 chance it takes >18 h."
+
+**Two regimes, two bottlenecks (the model prints which):**
+
+- **Screen-bound** (`q ≈ 1`, low density): `time ≈ 1/(d·q·R)`. More GPUs on Stage 1 helps linearly.
+- **Eval-bound** (independent `pha`/`anc` mode, small `q`): `time ≈ T_eval/q`. **Adding screening
+  GPUs does nothing** — you must speed up the evaluator, or *teach the pre-filter the `pha`/`anc`
+  trigger* (the apply-aware filter) so Stage 1 catches it and `q` rises back toward 1.
+
+**The `q` measurement is where density-vs-reality is decided.** Feed the model a panel of GCD-clean
+candidates, each full-evaluated (`cls pha anc` per line) via `--qpanel`. It computes `q` **and**
+flags the **leak past the screen** — `pha`/`anc` failures that occur on `cls`-clean candidates.
+Leak = 0 → `pha`/`anc` are a subset of `cls` (shared truncation trigger: a dropped bit being
+nonzero both corrupts the result *and* leaves phase garbage from its measured uncompute) → density
+is a faithful predictor (`q≈1`). Leak > 0 → an **independent** `pha`/`anc` mode (a vent `cz_if`
+fixup or conditional-replay phase wrong on `cls`-clean inputs) → density is optimistic by exactly
+the `1/q` factor, and the eval stage may dominate. This is the quantitative form of the
+per-channel-zero triage rule: judge a route by the full `(cls,pha,anc)` distribution, never density
+alone.
+
+**How to measure the three inputs (don't infer — measure):**
+
+1. `d` / `lambda_cls` — `gcd_density.rs` (or the GPU scan's candidate density) over a random-nonce
+   panel; its `displacement = 18048 * h` **is** `lambda_cls`, and `d = e^(-lambda_cls)`.
+   (`18048 = 9024 shots × 2 GCD factors`.)
+2. `q` — screen for GCD-clean candidates (Stage-1 passes), **full-eval each** to record
+   `(cls,pha,anc)`, feed to `--qpanel`. A *random*-nonce `(cls,pha,anc)` is the **wrong
+   population** — `q` is conditioned on `cls`-clean, so the panel must be Stage-1 survivors.
+3. `R` — time the GPU pre-filter on a fixed batch (`EVAL_FAST_REJECT=1 ./island.sh search ... <N>`),
+   `N / elapsed`, summed across GPUs.
+
+**Usage:**
+
+```bash
+# inputs from real measurement:
+python scripts/island_runtime_model.py --lambda-cls 18 --qpanel panel.tsv --rate 5e3 --t-eval 15
+# or specify q directly, density directly, and concurrent hardware:
+python scripts/island_runtime_model.py --density 1.5e-8 --q 0.7 --rate 5e3 --t-eval 15 --concurrent
+```
+
+**Worked sensitivity** (`lambda_cls=18`, `R=5e3` nonce/s, `T_eval=15 s`): `q=1.0` → ~3.7 h
+(screen-bound); `q=0.1` → ~1.5 days (still screen-bound, 10× worse); high-density `lambda_cls=8`
+with `q=0.002` → ~2.1 h but now **eval-bound** (adding scan GPUs wouldn't help). **Each ~+1 to
+`lambda_cls` multiplies screen time by `e ≈ 2.7`; each 10× drop in `q` multiplies total by 10** — so
+a truncation-heavy conversion that raises `lambda_cls` *or* opens an independent `pha` mode is far
+more expensive than its score delta suggests. Prefer exact/value-exact levers that keep both `d` and
+`q` at the frontier's values.
+
 ## Remote Validation Hygiene
 
 Prefer remote parallel validation for large batches because local CPU validation is slow.
