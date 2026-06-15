@@ -7,8 +7,9 @@ description: >-
   gates", "need fewer magic states", "my carry uncomputation is half my gates", or improve the
   gate factor of a qubits×Toffoli score. Covers venting carry-uncompute into measurement+phase
   fixups, conditional/measured replay so gates only execute on the branch that needs them,
-  fused adders/folds, ancilla-free majority, skipping provably-redundant cleanup, and avoiding
-  full materialization. Fires on informal phrasing ("too many Toffolis", "T-count is my
+  fused adders/folds, cross-block algebraic fusion of modular add/negate chains, ancilla-free
+  majority, skipping provably-redundant cleanup, and avoiding full materialization. Fires on
+  informal phrasing ("too many Toffolis", "T-count is my
   bottleneck", "can I make this uncompute free") and distinguishes emitted vs average-executed
   gate counts. For lowering the QUBIT/width count instead, use peak-qubit-reduction; this skill
   owns the GATE axis.
@@ -69,7 +70,7 @@ Mirrors the width loop, but the resource is gates, not wires.
 | **Majority / MAJ gadgets** (3-CCX majority) | **Ancilla-free majority** (2-CCX) — peak-neutral count cut |
 | **Redundant final cleanup** (a top-clean made unnecessary by the folded structure) | **Skip it** — but only if provably redundant |
 | **Full intermediate products / wide rows** | **Avoid materialization** — short/streamed/segmented forms emit fewer gates |
-| **Repeated stages with separate carry chains** | **Fuse** into one shared carry chain (value-identical) |
+| **Repeated algebraic stages** (back-to-back add/negate/subtract chains, or stages with separate carry chains) | **Fuse** into one equivalent modular operation or shared carry chain (value-identical) |
 
 ## Step 3 — The moves
 
@@ -110,6 +111,39 @@ Fusing adjacent stages removes redundant controls, duplicated cleanup, and repea
 Examples that paid off: fusing `mod_double + cmod_double` into a single shared carry chain
 (value-identical); turning coherent small adders into measured-fast form. These are usually the
 first thing to try when you have a little qubit slack — low risk, real count savings.
+
+### Cross-block algebraic fusion: collapse add/negate chains
+
+Look for adjacent modular-arithmetic stages that are separated in the program because they
+belong to different semantic phases, but algebraically telescope when composed. If the
+intermediate value is not externally observed and the next phase immediately transforms it
+again, replace the whole chain with one equivalent modular operation.
+
+ECDSA Fail example (`DIALOG_FUSE_C_FORM`, `DIALOG_FUSE_X_RESTORE`):
+- Square tail + c-form originally does
+  `tx += 2*Qx; tx = -tx; tx -= Qx; tx = -tx`.
+  The two negations cancel and the constants combine, so this is exactly `tx += 3*Qx`.
+- x-restore originally does `tx = -tx; tx += Qx`.
+  This is exactly `tx = Qx - tx`.
+
+This reduces Toffoli because each removed modular negate/add/subtract avoids a carry chain,
+reduction fold, and cleanup. It is not a truncation or approximation; it is an exact identity
+over the modulus.
+
+Checklist before trusting a fusion:
+1. Prove the algebra in modular form, including underflow/overflow reduction behavior.
+2. Confirm the intermediate value is not used as a control, measured, or needed by a later
+   uncompute before the fused replacement.
+3. Implement the fused primitive behind a default-off knob and verify knob-off is byte-identical.
+4. Add or run component selftests for value, phase, and ancilla cleanliness.
+5. Re-measure both q and average-executed Toffoli. A fusion should usually be peak-neutral,
+   but the new primitive can briefly allocate different scratch.
+6. If the op stream changes, assume the old Fiat-Shamir nonce is stale. Re-hunt or revalidate
+   clean islands; algebraic exactness does not preserve the old transcript seed.
+
+Treat fusion as a high-quality first move on the Toffoli axis: depth-neutral, peak-neutral
+when scratch fits, and stackable with width/slope/truncation routes. Do not combine it with
+risky truncation and then blame Fusion for density collapse; isolate Fusion-only density first.
 
 ### Ancilla-free majority
 
