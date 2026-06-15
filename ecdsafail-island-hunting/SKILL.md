@@ -480,6 +480,61 @@ a truncation-heavy conversion that raises `lambda_cls` *or* opens an independent
 more expensive than its score delta suggests. Prefer exact/value-exact levers that keep both `d` and
 `q` at the frontier's values.
 
+### Refinement: conditional funnel, count model, and calibration
+
+Three corrections that make the estimate honest. Intuition first, then the recipe.
+
+**1. The channels are rare-event COUNTS — model as Poisson/Negative-Binomial, never Gaussian.**
+`cls/pha/anc` are non-negative integer counts of failing shots (a few out of 9024). At the typical
+small means (μ≈2–6) a Gaussian is the wrong shape (symmetric, continuous, puts mass on negative
+counts) and mis-estimates `P(count=0)` — the one quantity that matters. Use:
+- **Poisson** (dispersion `σ²/μ ≈ 1`): `P(channel=0) = e^(−μ)`.
+- **Negative Binomial** (`σ²/μ > ~1.2`, the usual case — GCD-clean nonces are a heterogeneous,
+  screened subpopulation → overdispersed): `P(0) = (1+μ/r)^(−r)`, `r = μ²/(σ²−μ)`. NB captures your
+  intuition that *both* a small mean **and** a fat variance make a zero more likely; it degrades to
+  Poisson as `σ²→μ`. Run a dispersion/χ² check to pick; until you have ~50–100 candidates, the
+  variance is unreliable — fall back to Poisson on the mean.
+
+**2. Use the CONDITIONAL FUNNEL, not the independent product `∏ P(channel=0)`.** `cls` and `pha` are
+positively correlated (one dropped truncation bit breaks the result *and* leaves phase garbage), so
+multiplying marginal zero-rates overestimates `E[N]`. Chain the conditionals instead — each measured
+*inside* the previous-clean subset, which captures the correlation by construction:
+```
+island_rate = d · P(c=0) · P(p=0 | c=0) · P(a=0 | c=0,p=0)
+```
+Measure `P(p=0|c=0)` **directly** as the fraction of c-clean candidates that are also p-clean (more
+robust than modeling the `pha` distribution); only model it as `e^(−mean_p over c-clean)` when it's
+too rare to observe directly. (`a` is usually deterministic-0 → `P(a=0|…)≈1`.) Equivalent and
+correlation-free if you can dump failing-shot indices: fit one NB to the **union** bad-shot count
+(#shots failing *any* channel) → `q = P(union=0)`.
+
+**3. Estimate every rate from the MEAN, not the zero-fraction.** Don't estimate a `~1e-6` probability
+by counting rare zeros. Get `d` from the **all-nonce** GCD-hard count: `d = e^(−λ_GCD)`,
+`λ_GCD = mean GCD-hard shots over all scanned nonces` (millions of samples → tight). pha/anc never
+exist for GCD-dirty nonces, so those rates come only from the c-clean candidate panel — but still via
+their means, not by waiting for a zero.
+
+**4. CALIBRATE — don't over-derive (the load-bearing caveat).** No closed form is reliable to better
+than ~an order of magnitude: shot-level correlations break the independence every formula assumes.
+Treat the closed form as a **relative ranker + ETA prior**, and wrap it with an empirically-learned
+correction:
+```
+E[N] ≈ k · (1 / island_rate),   k = running median(actual_N / predicted_N) over landed hunts
+```
+Log `(predicted, actual)` for every island you land and update `k` continuously (observed spread
+~0.3×–73× across configs). The formula tells you *which route is more huntable* and a first ETA; `k`
+is what makes the absolute number trustworthy. Also report p50/p90/p99 (the wait is exponential).
+
+**Final recipe (end to end):**
+```
+d           = e^(−λ_GCD)                 λ_GCD from all-nonce GCD-hard mean
+P(c=0)      = e^(−mean_c)   [NB if overdispersed]    mean_c = residual cls on c-clean candidates
+P(p=0|c=0)  = measured fraction of c-clean candidates that are p-clean (else e^(−mean_p))
+P(a=0|…)    ≈ 1
+island_rate = d · P(c=0) · P(p=0|c=0) · P(a=0|…)
+E[N]        = k · 1/island_rate ;  report p50/p90/p99 ;  update k from each landed hunt
+```
+
 ## Remote Validation Hygiene
 
 Prefer remote parallel validation for large batches because local CPU validation is slow.
