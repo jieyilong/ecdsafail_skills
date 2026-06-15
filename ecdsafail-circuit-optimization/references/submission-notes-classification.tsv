@@ -1,0 +1,312 @@
+id	axis	primary_category	secondary_categories	score	summary
+005e17a	both	Q-STRUCTURAL	Q-WIDTH-TRUNCATE,T-MEASURED-UNCOMPUTE,M-ISLAND-REHUNT	2744218087	Drop zero high source bit, measured Cuccaro apply cleanup
+012fba1	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	1993136626	Apply-clean comparator 24->23, re-hunted nonce
+016bead	both	Q-STRUCTURAL	T-JUMP-GCD,Q-SQUARE-SEG,M-ISLAND-REHUNT	1960613655	Disable lowq final chunk, retune active iterations, square peak
+02b2c22	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2637203021	Branch comparator 59->58, 2D reroll island
+03499c8	T	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	6764917436	WTRUNC Kaliski width-margin to 0, clean island
+037fd71	T	T-CARRY-TRUNCATE	Q-WIDTH-TRUNCATE,M-STACK,M-ISLAND-REHUNT	6626924669	Carry-tail truncation of sparse Solinas const-adder
+0399ebe	T	T-COMPARE-NARROW	Q-WIDTH-TRUNCATE,M-STACK,M-ISLAND-REHUNT	2736895656	Schedule margin 5 + apply-clean compare 19 stack
+03a1550	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	1701035994	Apply-clean comparator 20->19, value-exact, re-hunted
+061e105	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2638694805	Branch comparator 61->59, 2D reroll island
+0620443	Q	Q-STRUCTURAL	Q-ANCILLA-REUSE,Q-WIDTH-TRUNCATE,Q-MEASURED-FREE	5185018575	Three peak-reduction levers on Kaliski; first sub-2309
+06f436b	both	T-FUSED-ARITH	Q-STRUCTURAL,T-AVOID-MATERIALIZE,T-JUMP-GCD,M-ISLAND-REHUNT	1776720670	Top-clean carry split, MAJ folding, extra GCD iteration
+08573bd	T	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	4068676284	W-TRUNC envelope margin 37->28, reroll island
+09daa10	Q	Q-ANCILLA-REUSE	Q-DIRTY-BORROW,T-CARRY-TRUNCATE,Q-SQUARE-SEG,M-ISLAND-REHUNT	-	Reuse idle inner_scratch in special fold, borrowed carries
+0a0a631	T	T-FUSED-ARITH	M-ISLAND-REHUNT	5166017698	UV-CSWAP merge extended one boundary (255)
+0a2d807	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2592421194	Branch comparator 59->58 on doubling route
+0ae959c	T	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	5183333775	R-small threshold 325 with reroll 10
+0c1d4d9	both	Q-STRUCTURAL	-	4156442508	Dialog-GCD compressed-sidecar port baseline route
+0c38fea	both	T-MEASURED-UNCOMPUTE	T-JUMP-GCD,T-AVOID-MATERIALIZE,M-STACK	9591294596	Measured fast Cuccaro pos=32, pair2 397, bitreg offset add
+112d5a4	T	T-FUSED-ARITH	M-ISLAND-REHUNT	7765663290	Kaliski (u,v_w) CSWAP boundary merge, safe prefix
+11d1423	both	T-JUMP-GCD	Q-WIDTH-TRUNCATE,M-STACK,M-ISLAND-REHUNT	2092653422	Drop GCD iteration 259->258, frees scratch, slope tighten
+1278a07	both	Q-TRANSCRIPT-CODEC	Q-ANCILLA-REUSE,T-CARRY-TRUNCATE,T-COMPARE-NARROW,M-BUDGETED-REPAIR	1678948830	K5 tail codec 32-symbol, selective carry/compare repairs
+13220b0	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2481329070	Branch comparator 58->57, fresh reroll island
+1424bc7	T	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	2155032370	Width margin/slope retune on K=2 route
+155ebc5	Q	Q-STRUCTURAL	Q-SQUARE-SEG,Q-ANCILLA-REUSE,M-ISLAND-REHUNT	1743798012	FOLD_FREED_TAIL + tighter bounded-square, 1226->1221q
+15f3edf	T	Q-WIDTH-TRUNCATE	T-CARRY-TRUNCATE,M-ISLAND-REHUNT	2013389651	Width slope 1014->1016 on double21/fold21
+1664274	T	T-COMPARE-NARROW	Q-WIDTH-TRUNCATE,M-STACK,M-ISLAND-REHUNT	2129300690	Compare 74->72 + slope tighten + body-band, tail hit
+183e1b4	T	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	2455281894	Width margin 26->25 stacked on structural base, reroll island
+1853eab	T	Q-WIDTH-TRUNCATE	T-COMPARE-NARROW,M-ISLAND-REHUNT	2130112450	Body-band slope 1005 + compare 73->74, tail hit
+18f807e	T	Q-WIDTH-TRUNCATE	T-COMPARE-NARROW,M-STACK,M-ISLAND-REHUNT	2405410905	Width slope 707.5->711 + compare-schedule margin 7->6
+19815a4	Q	Q-SQUARE-SEG	Q-STRUCTURAL,T-AVOID-MATERIALIZE,M-STACK,M-ISLAND-REHUNT	1708341222	Square seg + vent pad + freed-tail, 1220->1218q
+1b4bc2a	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	1945061716	Extra body carry-band trim, re-hunted nonce
+1b4e026	T	Q-WIDTH-TRUNCATE	T-CARRY-TRUNCATE,M-ISLAND-REHUNT	5976793393	Re-tune W-TRUNC K0/margin/R_SMALL on new island
+1decb37	T	T-CARRY-TRUNCATE	Q-STRUCTURAL,M-STACK,M-ISLAND-REHUNT	2257725570	Tighter lazy-Solinas carry window + apply chunk rebalance
+1f6a568	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2892132084	Branch comparator 63->62, reroll retune
+1f7aabe	T	T-MEASURED-UNCOMPUTE	-	3364984332	Measurement-uncompute apply-phase modular subtract
+2070b06	T	T-FUSED-ARITH	-	-	CCX-elim fold frame + const-ADD MAJ carry sweep
+21a63e1	Q	Q-STRUCTURAL	Q-DIRTY-BORROW,T-CARRY-TRUNCATE,M-ISLAND-REHUNT	1822107738	Binder-notch map, scratch borrow, apply cut F_CUT4=190
+21c6da8	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2131446850	Step-banded GCD body carry-band trim, tail nonce
+21d6f20	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2014786683	Double/fold carry-trunc windows 22->21
+22a5176	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	-	Apply-clean comparator to 19, refreshed nonce
+22bae60	T	M-BUGFIX-RESUBMIT	T-CARRY-TRUNCATE	5882154410	Constant-aware carry-tail unlocks ADD-path truncation
+22f54af	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	5549529106	shift22-spill carry-tail truncation, default-on W=41
+264354c	T	Q-WIDTH-TRUNCATE	T-COMPARE-NARROW,M-STACK,M-ISLAND-REHUNT	2485943682	Width margin + apply-clean + schedule margin stack
+26c0998	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2479548042	Compare-schedule margin 7->5, reroll island
+287c73c	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	1977341295	Branch comparator 47->46 on 1285q route
+289369b	both	T-JUMP-GCD	M-ISLAND-REHUNT	2445362892	Active iterations 396->395, reroll island
+2a05eae	T	Q-WIDTH-TRUNCATE	T-CARRY-TRUNCATE,M-STACK,M-ISLAND-REHUNT	6461895821	W-TRUNC margin0 + R_SMALL325 + carry-tail W24 stack
+2a0f9ee	T	Q-WIDTH-TRUNCATE	T-CARRY-TRUNCATE,T-COMPARE-NARROW,M-STACK,M-ISLAND-REHUNT	2050391640	Active259 width/apply knob stack retune
+2ae2218	Q	Q-SQUARE-SEG	Q-WIDTH-TRUNCATE,Q-ANCILLA-REUSE,M-ISLAND-REHUNT	2592370365	Row0-windowed square + z1 low-bit release, -1 peak
+2be504e	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2064288600	Kaliski double/fold carry-trunc island on 1320q
+2ca410f	T	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	6040110791	Realizable-width truncation of (u,v_w) conditional swaps
+2e79780	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	1978456675	Comparator/apply retune at 1285q, GPU island nonce
+2f932e8	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	1713096973	ROUND84 quotient-carry truncation W=20, tail nonce
+3182d2b	Q	Q-TRANSCRIPT-CODEC	Q-WIDTH-TRUNCATE,Q-SQUARE-SEG,Q-ANCILLA-REUSE	1681025595	K5 head codec 11-bit + implicit-zero apply, 1192->1185q
+320d94f	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2130373770	Compare bits 74->73, tail reroll
+32611a8	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2016617005	Double-carry trunc window 22->21, re-hunted nonce
+326f593	both	T-FUSED-ARITH	T-JUMP-GCD,Q-STRUCTURAL,M-STACK	8367457560	shift22-collapse + sol-ext-pos32-fast, pair2 iteration island
+329db35	T	T-COMPARE-NARROW	T-CARRY-TRUNCATE,M-STACK,M-ISLAND-REHUNT	1991332564	Compare 52->51 + apply-clean 23 + fold 21
+330ce4f	T	T-CARRY-TRUNCATE	T-COMPARE-NARROW,M-ISLAND-REHUNT	1901228574	Extended body carry-band trim schedule on 1302q
+351373f	Q	Q-TRANSCRIPT-CODEC	T-COMPARE-NARROW,M-ISLAND-REHUNT	2017979899	K2 pair transcript compression, 3 steps 8 bits -> 2 steps 5
+356496a	T	T-JUMP-GCD	T-COMPARE-NARROW,T-CARRY-TRUNCATE,M-STACK,M-ISLAND-REHUNT	1986336599	Active258 + cmp50 + clean23 + fold21 stack
+372e40e	T	T-CARRY-TRUNCATE	T-COMPARE-NARROW,M-STACK,M-ISLAND-REHUNT	2831586498	Compare-schedule margin + double/fold carry-tail windows
+375fdff	T	T-CARRY-TRUNCATE	T-AVOID-MATERIALIZE,M-ISLAND-REHUNT	5686868426	Route mod_double through truncatable sparse const-add
+37816e7	T	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	2228168610	Width margin 25->18 on K=2 route
+37f1ef4	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2832673218	Schedule margin 8->7, reroll 4 retune
+38255e0	T	Q-WIDTH-TRUNCATE	T-CARRY-TRUNCATE,M-STACK,M-ISLAND-REHUNT	5597330024	Joint K0/R_SMALL/carry-tail W island re-sweep
+3982200	Q	Q-STRUCTURAL	M-ISLAND-REHUNT	2023711363	Value-exact restructure apply add/sub, peak 1320->1319
+3b5d02e	meta	M-ISLAND-REHUNT	-	-	Empty/junk note (lol)
+3bc5fbb	T	T-JUMP-GCD	M-ISLAND-REHUNT	2060368200	Reclaim GCD iteration active 260->259 on 1320q
+3bd3aa5	Q	Q-STRUCTURAL	Q-WIDTH-TRUNCATE,T-MEASURED-UNCOMPUTE,M-ISLAND-REHUNT	2647454335	Chunked apply materialization avoids full 256-bit f
+3c08496	T	T-COND-EXEC	Q-WIDTH-TRUNCATE,M-ISLAND-REHUNT	2741710771	Odd-u low-bit body skip, Cuccaro starts at bit 1
+3d9fa0a	Q	Q-STRUCTURAL	Q-ANCILLA-REUSE,M-ISLAND-REHUNT	5160257102	Dual-transient shave: dialog-fold slack0 + affine clamp
+40e10ac	both	Q-STRUCTURAL	Q-DIRTY-BORROW,T-JUMP-GCD,T-COMPARE-NARROW,M-STACK	2508895314	Body carry-lane reclaims (host_cin, late-borrow uv-high)
+42d936f	T	T-JUMP-GCD	-	8372879130	Lower pair2 Kaliski iteration count 401->397
+436b516	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	1968064139	Apply-clean comparator 22->21, hunted nonce
+437e22a	T	Q-WIDTH-TRUNCATE	-	7077100800	W-TRUNC empirical-width truncation of Kaliski inverse
+43c0142	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2221196370	Late-half body carry band trim on margin-17 K=2
+44155bb	Q	Q-STRUCTURAL	Q-SQUARE-SEG,T-COMPARE-NARROW,M-ISLAND-REHUNT	2630999274	ROUND84 x-tail shift22 -> 22 mod-p doublings, peak 1567->1558
+44bc2a4	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2510523510	GCD compare-bits 58->57 on hosted route, reroll island
+451a80f	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	1824581200	Fold-carry trunc 21->20 + tail nonce rehunt
+457d964	T	T-MEASURED-UNCOMPUTE	Q-ANCILLA-REUSE	2433948191	Square zero-c_in borrowed-carry + measured uncompute suffix
+46ecd4c	both	Q-WIDTH-TRUNCATE	T-FUSED-ARITH,T-COMPARE-NARROW	2053654290	Four-chunk apply layout + width slope tighten
+4788d1a	T	T-JUMP-GCD	M-ISLAND-REHUNT	1949378508	ACTIVE_ITERATIONS 262->259, fewer K2 GCD steps
+47aae5f	Q	Q-STRUCTURAL	M-ISLAND-REHUNT	2266376930	Apply chunk boundary rebalance lowers peak 1394->1390
+47e7700	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	5561829149	Carry-tail width W=20->19 truncation island
+480b001	Q	Q-STRUCTURAL	M-ISLAND-REHUNT	1747286618	Forward-port Pender 1226q low-peak square route
+487ef06	Q	Q-ANCILLA-REUSE	Q-WIDTH-TRUNCATE,Q-DIRTY-BORROW	2442213432	Park transcript on inactive u-high lanes + replay swap-host
+488afae	T	T-COMPARE-NARROW	-	2112431650	GCD branch comparator 73->52, free slack
+4933cf6	both	Q-SQUARE-SEG	T-COMPARE-NARROW,M-ISLAND-REHUNT	1939751375	Square gate-suffix carry self-host + compare-bits 48
+49499eb	T	T-CARRY-TRUNCATE	T-FUSED-ARITH	6526487787	Carry-tail SUB W truncate + MAJ-fold SUB adder
+4950437	T	T-COMPARE-NARROW	-	-	Apply-clean compare width retune
+4a11f65	T	T-CARRY-TRUNCATE	-	6865358936	W-TRUNC margin 20->10 width truncation island
+4ac4a16	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	4096509900	GCD compare-bits 72->68 clean island
+4b7d727	T	T-COND-EXEC	-	1825275400	Conditional-replay boundary GCD steps, executed<emitted
+4be6f9f	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	-	Compare-schedule margin 5->4, reroll island
+51417ec	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2050755960	GCD branch comparator 49->48 at active259
+516a277	T	T-COMPARE-NARROW	T-CARRY-TRUNCATE	1990208636	cmp50+clean23+fold21 stacked B-lane candidate
+51d09c7	T	Q-TRANSCRIPT-CODEC	M-ISLAND-REHUNT,M-STACK	2731939151	round763 sidecar compressor 9->4 CCX exact rewrite
+52c6b6b	T	T-COND-EXEC	-	1798705540	Extended conditional-replay cleanups, avg executed cut
+52d91c4	T	T-JUMP-GCD	Q-WIDTH-TRUNCATE,M-ISLAND-REHUNT	1907351618	active258 + width slope1015 GPU island
+53cab17	Q	Q-DIRTY-BORROW	Q-ANCILLA-REUSE	2511992646	Partial body-gated hosting of gated register, 1446q
+55d5052	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2222564130	GCD width margin 18->17 + tail rehunt
+582ad52	T	T-FUSED-ARITH	M-ISLAND-REHUNT	1820641701	Binder-notch map fill-gap, small Toffoli shave
+5953277	T	T-JUMP-GCD	M-ISLAND-REHUNT	2482854846	ACTIVE_ITERATIONS 396->395, one fewer GCD step
+597a762	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2016829711	GCD branch comparator 46->45 reclaim
+5afafb7	T	T-COMPARE-NARROW	T-CARRY-TRUNCATE,T-JUMP-GCD,M-STACK	2055555480	Six stacked width/iter/comparator tightenings, shared island
+5b64367	T	T-JUMP-GCD	M-ISLAND-REHUNT	5562678861	Kaliski iter-count pair (397,396) re-roll island
+5d7044c	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	1699653032	GCD width slope 1016->1017 taper, GPU island
+5d7f0be	T	T-FUSED-ARITH	M-ISLAND-REHUNT	5158663510	UV cswap-merge boundary 254->256 fuses swap pairs
+5dd5ca8	T	T-COMPARE-NARROW	T-CARRY-TRUNCATE,M-STACK	1978786502	Comparator stack + double-carry + slope tightening
+5e209d6	Q	Q-SQUARE-SEG	M-ISLAND-REHUNT	1939939583	Reclaim final self-hosted square gate-suffix carry
+60a7f2e	T	T-CARRY-TRUNCATE	M-STACK,M-ISLAND-REHUNT	2089123794	Body-carry band trim + double-carry trunc 23->22
+62c8115	Q	Q-ANCILLA-REUSE	T-KARATSUBA	2413540905	Stream Euclidean scratch across cleared tails
+62d9029	T	T-CARRY-TRUNCATE	T-COMPARE-NARROW,M-STACK,M-ISLAND-REHUNT	1766121990	Four carry/comparator truncations bundled, one island
+632a73b	both	T-FUSED-ARITH	Q-STRUCTURAL,M-ISLAND-REHUNT	2593889178	Fast double/halve free + free z1 top-bit qubit
+634abd5	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2871482706	Tighten sparse-const double/fold carry-tail windows
+634b732	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	-	shift22 carry-tail lever on R321/K0/W island
+63cb0e8	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2015936871	Fold-carry trunc 22->21 on 1313q K2 pair
+64f75ba	both	T-CARRY-TRUNCATE	Q-STRUCTURAL,T-COMPARE-NARROW,M-STACK	2156477970	Four levers: carry window, chunk rebalance, width margin
+655038c	T	T-COMPARE-NARROW	M-ISLAND-REHUNT,M-STACK	2736953783	Branch comparator 63->61 on PA9024 margin-5, 2-D reroll
+65d2cd7	T	T-FUSED-ARITH	-	6028140935	MAJ-fold ADD-path constant adder, -2 CCX/carry
+65e8bcb	Q	Q-TRANSCRIPT-CODEC	M-BUDGETED-REPAIR,M-ISLAND-REHUNT	1677861900	affine299 codec + knapsack budgeted per-site repairs
+66277e3	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	1992012698	Compare 52->51 + apply-clean 24->23
+66ad478	T	T-CARRY-TRUNCATE	T-COMPARE-NARROW,M-STACK	2893538028	Apply double/halve carry-tail trunc + revived compare schedule
+66e8540	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	1992692832	Compare 52->51 on fold-fusion base
+66f1312	T	T-CARRY-TRUNCATE	M-STACK	6453615747	W-TRUNC margin/K0/R_SMALL + carry-tail stack
+67be862	Q	Q-STRUCTURAL	T-CARRY-TRUNCATE,M-ISLAND-REHUNT	2066350440	1320q apply teardown via final-lowq + boundary split
+682c10a	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2480196210	Apply-clean compare-bits 20->19, reroll island
+687348e	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2030459640	Width slope 1005->1009 re-tighten, reroll island
+68918ad	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2022023043	Width slope 1012->1014 on no-cin frontier
+690bdb9	T	T-MEASURED-UNCOMPUTE	-	3274494516	Apply overflow clean compares -> measured uncompute fast
+692d5a0	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	3270229140	GCD comparator 63->62 + reroll island
+6936bcd	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2111711630	Re-stack fold-carry window 24->23 on compare-52 base
+6add50f	both	Q-STRUCTURAL	T-COND-EXEC	1786833620	Streamed GCD suffix adder 1297->1285 + conditional replay
+6b7a0d3	T	T-JUMP-GCD	T-COMPARE-NARROW,M-ISLAND-REHUNT	2497479574	active397->396 co-tuned comparator/margin/reroll island
+6bd861f	Q	Q-WIDTH-TRUNCATE	T-CARRY-TRUNCATE,M-ISLAND-REHUNT	1823175078	Binder-notch steps 8-11 drops peak 1300->1299
+6c8d984	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	1982805132	Double-carry trunc 24->22 on 1309q, tail rehunt
+6dd61c5	Q	Q-SQUARE-SEG	M-ISLAND-REHUNT	1678629420	Square-row windowed cleanup compare-bits 19->18
+700582e	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2533577850	Branch comparator 58->57 on 1466q hosted route
+70699b7	T	T-CARRY-TRUNCATE	T-FUSED-ARITH	6964659240	W-TRUNC margin20 island + UV step1 AND-fanout
+717743c	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2484807954	Apply-clean compare-bits 20->19, reroll island
+71a5556	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2036687400	W2 final-window GCD knob tighten, tail rehunt
+730949a	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2195953970	Width margin 12 + slope 948 retune
+738af19	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2407112785	Width slope 707.5->710, untuned envelope lever
+73f81cc	T	T-FUSED-ARITH	-	2836402026	Odd-u low-bit fastpath CX-instead-of-CCX lane0
+744b274	Q	Q-STRUCTURAL	T-MEASURED-UNCOMPUTE,Q-DIRTY-BORROW	2783850084	Host gated reg + windowed apply, peak 1698->1572
+75927ba	T	T-MEASURED-UNCOMPUTE	-	3775248300	Measured uncompute divstep branch comparator
+764a3ab	T	T-FUSED-ARITH	M-ISLAND-REHUNT	5121484498	uv-cswap merge-range 254->329 deletes eager swaps
+76aa0af	meta	M-BUGFIX-RESUBMIT	-	-	Stray benchmark.json, no substantive note
+77a20f9	T	T-FUSED-ARITH	-	7074763080	UV step1 common-AND fanout + measured uncompute
+78696aa	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2110268810	Double-carry trunc 24->23 on compare-52 frontier
+79d7ee1	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2091901614	GCD width slope 1005->1006 tightening
+79eb2b5	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2037843720	W2 final-window GCD knob tighten, tail rehunt
+7a7490a	T	Q-TRANSCRIPT-CODEC	M-ISLAND-REHUNT	1892934834	K2-pair transcript codec 6->3 CCX core encoder
+7c65013	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	1970059399	Body carry-band trim one bit on 1309q maxstack
+7d1dfe6	T	T-FUSED-ARITH	M-ISLAND-REHUNT	1993816760	Fuse double_y/halve_y Solinas folds, shared carry chain
+80326f1	Q	Q-DIRTY-BORROW	Q-SQUARE-SEG	2505981621	Partial-host GCD comparator carry, sink apply F_CUT, peak 1446to1443
+8119916	meta	M-BUGFIX-RESUBMIT	-	-	Empty Devin note, no content
+819d74a	T	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	2025245640	WIDTH_SLOPE 1011to1012 GCD width-envelope shrink, value-exact
+823b7cf	T	T-COMPARE-NARROW	M-STACK	2052625080	Two comparator-width tightenings stacked under one nonce
+833642f	Q	Q-TRANSCRIPT-CODEC	Q-SQUARE-SEG	1697398113	K5 clean-block transcript compressor lowers peak to 1203
+835298d	T	T-FUSED-ARITH	M-ISLAND-REHUNT	1922289855	In-place Solinas fold for round84 square, fewer Toffoli
+8383a43	T	T-JUMP-GCD	T-COMPARE-NARROW,M-ISLAND-REHUNT	2535067306	ACTIVE_ITERATIONS 398 + compare58 retune, FS island
+83e2b99	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	4148020428	Dialog compare width 75to74 plus reroll pairs
+83e3b66	Q	Q-DIRTY-BORROW	Q-STRUCTURAL,T-FUSED-ARITH	1968793475	Round84 shift-walk + selected-body suffix carry hosting, peak 1285
+8576f6a	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	1704784725	Square-row clean-compare 22to21, fewer emitted ops
+86d7372	T	T-MEASURED-UNCOMPUTE	T-FUSED-ARITH	1780286545	Big-fold split adder + measured control-ride uncompute
+8780d1e	Q	Q-WIDTH-TRUNCATE	Q-KARATSUBA	-	Free idle Karatsuba z1 top lane during fold, peak minus1
+87a7c01	T	T-FUSED-ARITH	M-ISLAND-REHUNT	2126009170	Fold-24 width-slope1008 compare72 tail-nonce hit
+89c118c	T	T-COMPARE-NARROW	Q-WIDTH-TRUNCATE,M-STACK	2047176120	Comparator + width-margin 10to9 stacked, one island
+8be3349	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	1969917827	One-bit narrower GCD compare screen, refreshed tail
+8e45006	T	T-JUMP-GCD	M-ISLAND-REHUNT	2439135048	ACTIVE_ITERATIONS 396to395 transcript-length cut, FS island
+8eb6c37	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2430923007	Branch comparator 58to56 on square-carry base
+8ee9ad8	T	T-MEASURED-UNCOMPUTE	T-COMPARE-NARROW	3121008900	Apply overflow/underflow clean compares to measured cmp_lt
+900ef61	T	T-MEASURED-UNCOMPUTE	T-FUSED-ARITH	1917944080	Ancilla-free 2-CCX majority + Gidney measured uncompute
+92d7808	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	5182432650	Carry-tail truncation W 19to18, arithmetically sound
+934ce80	T	T-FUSED-ARITH	M-ISLAND-REHUNT	5547081566	R_SMALL 321to326 free-double unlocked by spill-W reroll
+944d770	T	Q-TRANSCRIPT-CODEC	M-ISLAND-REHUNT	2642452471	Round763 compressor 9to4 CCX via unreachable slot dedup
+9510ccc	T	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	2064481320	WIDTH_SLOPE 1008 GCD width-envelope tightening
+95831c2	Q	Q-STRUCTURAL	Q-TRANSCRIPT-CODEC	1971410287	Maxstack clean schedule port, K2 compare, sidecar scratch
+97462c8	T	T-MEASURED-UNCOMPUTE	M-ISLAND-REHUNT	1906003826	Measured clears for apply double_y/halve_y ancillas
+985a4d3	T	T-FUSED-ARITH	M-ISLAND-REHUNT	1779704440	Round84 quotient-c product NAF signed-digit retiming
+987c92d	T	T-FUSED-ARITH	M-ISLAND-REHUNT	2867957237	Odd-u lowbit fastpath CX-not-CCX on lane0, reroll
+9989fc2	T	T-CARRY-TRUNCATE	T-COMPARE-NARROW,T-JUMP-GCD,M-STACK	1940606153	Band-trim + apply-clean + ACTIVE_ITERATIONS 259to258 stacked
+99e6b44	T	T-CARRY-TRUNCATE	T-FUSED-ARITH,M-ISLAND-REHUNT	6508057349	Carry-tail SUB window W 49to36 on MAJ-fold island
+9a648da	T	T-FUSED-ARITH	M-ISLAND-REHUNT	1912381024	Nonce-hunted foldmaj2 candidate on frontier
+9af8b71	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	4131013260	Compressed-dialog GCD comparator 74to72, 72 clean floor
+9b18a96	Q	Q-SQUARE-SEG	T-COMPARE-NARROW,M-ISLAND-REHUNT	2616750555	Cheaper peak-1543 cut F_CUT 82to79 with island
+9d099e1	T	T-FUSED-ARITH	M-ISLAND-REHUNT	2595571337	Round84 doubling slack-exploit fast carry-ancilla variant
+9fad60c	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2410635785	GCD compare-bits 58to56 on 1355q base
+a046bdb	T	T-FUSED-ARITH	-	-	v6 AdaEvolve, 160 fewer Toffoli
+a127dbe	T	T-JUMP-GCD	M-ISLAND-REHUNT	1956879078	ACTIVE_ITERATIONS 261 lowq0 fast-final, refreshed nonce
+a16cb87	T	T-CARRY-TRUNCATE	T-MEASURED-UNCOMPUTE,M-STACK	2833542594	Fast-comparator + tighter carry-tail windows composed
+a360f86	T	T-FUSED-ARITH	M-ISLAND-REHUNT	1709962980	APPLY_FINAL_TOPCLEAN=0 exact-adder Toffoli recovery
+a39ce50	T	T-COMPARE-NARROW	M-BUDGETED-REPAIR	1683083736	Selective square-cleanup row map, budgeted per-row widths
+a630907	T	T-JUMP-GCD	-	8405420100	Kaliski iteration-count grid sweep pair1/pair2/bulk3
+a66b042	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	-	Apply-clean comparator tightened to 20, refreshed nonce
+a6905cb	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2478050946	COMPARE_BITS 57to56 branch comparator, reroll island
+a7ec174	Q	Q-SQUARE-SEG	M-ISLAND-REHUNT	1683610600	SQUARE_ROW_MAX_SEG 165, peak 1192, tail reroll
+a8d8d5a	Q	Q-DIRTY-BORROW	Q-ANCILLA-REUSE,M-ISLAND-REHUNT	2448401676	Host compressed raw_block on conditionally-clean lanes, peak 1428
+aaf9616	Q	Q-STRUCTURAL	-	1920798194	Two lane-reduction cuts, first route below 1307q floor
+abbfe51	T	T-FUSED-ARITH	M-ISLAND-REHUNT	5157758606	R_SMALL threshold 321to327 free-shift r-doublings
+ac28894	T	M-BUDGETED-REPAIR	T-COMPARE-NARROW	1892824900	Per-step overflow/underflow clean-compare width repairs, 1301q
+ad4cf86	Q	Q-TRANSCRIPT-CODEC	Q-ANCILLA-REUSE,Q-SQUARE-SEG	1684982463	Free K5 clean block during apply shift, peak 1193
+ad76d4f	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2025879240	COMPARE_BITS 47to46 retighten on W2 base
+ae7aa8c	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	5622396528	W-TRUNC K0 25to24 on QQFOLD island
+aeaa7c5	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	6540623485	W-TRUNC margin 3to2 on K0=25 island
+b0ed7db	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	-	shift22 STEP-2 spill carry-tail W 41to33
+b14667c	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	5574826510	W-TRUNC K0 22to21 via shift22 carrytail W reroll
+b18edc2	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2048453880	GCD branch comparator 48to46, tail-nonce 444
+b2905ce	Q	Q-ANCILLA-REUSE	Q-SQUARE-SEG,T-COMPARE-NARROW	-	Keep quotient-c product live across mid-sub, peak 1220
+b29ff7f	T	T-JUMP-GCD	M-ISLAND-REHUNT	2402429905	ACTIVE_ITERATIONS 396to395 on 1355q route, reroll
+b407149	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	5935088235	W-TRUNC margin=0 + carry-tail W=26 re-stacked
+b43ef81	Q	Q-DIRTY-BORROW	Q-ANCILLA-REUSE	1946400084	Round84 ancilla-light mid-sub + carry-in borrow, peak 1307
+b465a6c	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2379298050	Body-only late-band carry trim, comparator width kept
+b53c563	T	T-COND-EXEC	-	-	Elide zero-edge conditional shifts, executed<emitted
+b54d856	T	T-FUSED-ARITH	M-ISLAND-REHUNT	2745964884	Re-add odd-u lowbit fastpath to Q=1572 lineage
+b898614	T	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	2823714570	WIDTH_MARGIN 28to27 GCD width envelope, reroll
+b8d0678	T	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	2498876289	WIDTH_MARGIN 27to26 width envelope, fresh reroll island
+ba04549	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	1765489770	KAL_FOLD_CARRY_TRUNC_W 18to17 one more notch
+ba6b8fc	T	T-CARRY-TRUNCATE	T-FUSED-ARITH,M-ISLAND-REHUNT	5632468386	QQFOLD carry-tail-truncated Solinas in qq-adders, new lever
+baecd27	Q	Q-DIRTY-BORROW	Q-WIDTH-TRUNCATE,M-ISLAND-REHUNT	5166820098	SHIFT22_FOLD_DIRTY venting, peak 2025to2006 trade
+bb924c9	T	Q-TRANSCRIPT-CODEC	T-COMPARE-NARROW,M-STACK	2640201005	Round763 compressor + apply-clean-19 stacked, reroll
+bbdfcfd	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2020184357	COMPARE 45 + APPLY_CLEAN 18 stacked, tail nonce
+bcb39d0	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	1977629346	Main GCD comparator 46to45 one more bit, 1309q
+bce2763	T	T-MEASURED-UNCOMPUTE	Q-DIRTY-BORROW,M-ISLAND-REHUNT	2461901238	Self-hosted measured uncompute for round84 squares
+bef8d8d	Q	Q-STRUCTURAL	T-COMPARE-NARROW,M-ISLAND-REHUNT	2620444497	Apply chunked F_CUT 70to82 rebalance, peak 1558to1543
+bfe53b2	T	T-CARRY-TRUNCATE	T-FUSED-ARITH,M-ISLAND-REHUNT	6489215909	W-TRUNC margin 3to1 + R_SMALL=325 island stack
+bfeee82	Q	Q-WIDTH-TRUNCATE	M-BUDGETED-REPAIR	7756453320	Pair-specific UV CSWAP safe prefix, pair2 255
+c0a594a	T	T-FUSED-ARITH	M-ISLAND-REHUNT	2127246270	fold-23 slope1005 compare72 tail-nonce hit
+c0bba53	T	T-MEASURED-UNCOMPUTE	T-FUSED-ARITH	1783729060	Round84 Solinas-fold small adders to measured-fast
+c0ecf45	T	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	2091370926	GCD width slope 1006to1007 sub-bit tightening
+c20c89b	T	T-CARRY-TRUNCATE	T-COMPARE-NARROW,M-ISLAND-REHUNT	1759744004	Low-width carry/compare stack, 1226q re-hunted tail
+c279c0e	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2476507962	compare_bits 56to55 branch comparator, reroll island
+c2a0c64	both	M-STACK	Q-WIDTH-TRUNCATE,T-CARRY-TRUNCATE,T-COMPARE-NARROW,M-ISLAND-REHUNT	2027030280	Stacked width-slope + fold-carry + apply-comparator truncations under one nonce
+c2f0c6e	both	M-STACK	T-CARRY-TRUNCATE,T-COMPARE-NARROW,T-MEASURED-UNCOMPUTE	1896965826	Band-trim + measured ovf-clear + apply chunk cut on 1302 route
+c4627be	both	M-STACK	T-JUMP-GCD,T-CARRY-TRUNCATE,Q-WIDTH-TRUNCATE,M-ISLAND-REHUNT	1984166492	Rebalanced 1309q route: iters, carry-trunc, apply cut, slope, nonce
+c54d9aa	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2738776143	PA9024 compare-margin 8→5, unlocked by 2D reroll search
+c5fada1	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	1969242583	Apply-phase overflow-clean comparator 23→22, re-hunted nonce
+c61793f	T	T-JUMP-GCD	T-COND-EXEC	-	GCD active iterations 258 + zero-edge conditional-shift skip
+c642799	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	5651540863	R=319 reroll opens W-staircase carry-tail to W=23
+c8f4367	both	T-MEASURED-UNCOMPUTE	T-JUMP-GCD,M-BUGFIX-RESUBMIT	9591310844	Measured fast Cuccaro forward pos32 + pair2 iters 398→397
+ca1cd1f	both	Q-STRUCTURAL	Q-TRANSCRIPT-CODEC,Q-WIDTH-TRUNCATE,T-JUMP-GCD,T-COMPARE-NARROW	2271454694	K=2 dialog-GCD transcript-hosted inversion full route description
+ca36f0a	both	Q-WIDTH-TRUNCATE	T-CARRY-TRUNCATE,M-ISLAND-REHUNT	2132814610	GCD width margin + slope retune on K=2 raw-PA route
+ca5f0c3	T	T-MEASURED-UNCOMPUTE	Q-SQUARE-SEG,M-ISLAND-REHUNT	1707869856	Measured uncompute of round84 square row-window carry cleanup
+cac150e	Q	Q-ANCILLA-REUSE	Q-SQUARE-SEG,M-ISLAND-REHUNT	-	Park fold low carries + square seg, peak 1212→1211
+cade2d0	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	2128580670	Fold-carry trunc window 24→23, re-found nonce
+cb6d6aa	T	T-COND-EXEC	-	-	Elide zero-edge conditional double/halve shifts on GCD path
+cbc35ea	Q	Q-SQUARE-SEG	Q-STRUCTURAL,M-ISLAND-REHUNT	2615519241	ROUND84 22-doublings square + apply F_CUT 70→78, peak 1558→1543
+ce7f062	Q	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	5180353112	Fold-slack 4→3 narrows recovery band, −1 peak qubit
+ceb0ce9	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	6616811249	W-TRUNC margin 4→3 reopened by carry-tail island
+cf2dfc4	both	M-STACK	T-CARRY-TRUNCATE,T-FUSED-ARITH,T-MEASURED-UNCOMPUTE,M-ISLAND-REHUNT	2882472162	Fold carry-tail + round763 dedup + measured underflow gate
+d0c398d	Q	Q-MEASURED-FREE	Q-ANCILLA-REUSE,T-JUMP-GCD,M-ISLAND-REHUNT	8398781999	Drop constant-|1> f1 ancilla via z_if, peak 2310→2309
+d156d08	Q	Q-SQUARE-SEG	T-COMPARE-NARROW,M-ISLAND-REHUNT	1702054020	Square row-window tightening + apply-clean comparator, fresh nonce
+d1a28f2	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2615281619	GCD compare-bits 59→58 with 2D reroll island on 1543 route
+d1d29eb	T	T-FUSED-ARITH	M-ISLAND-REHUNT	5120690122	cswap-uv boundary merge safe-iters 329→331
+d247fbf	T	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	-	W-TRUNC Kaliski bulk uv-cswap widths to envelope, -7%
+d254fe7	Q	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	2409942025	WIDTH_SLOPE 707.5→708 untuned envelope lever
+d35d6e7	T	T-FUSED-ARITH	-	9604339032	(r,s) cswap boundary-merge across Kaliski iteration boundary
+d3b4e7b	Q	Q-DIRTY-BORROW	Q-ANCILLA-REUSE,M-ISLAND-REHUNT	1985678387	no_c_in body self-hosts carry stages on gated source lanes
+d54ccf6	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2590854522	GCD compare-bits 58→57 with 2D reroll on 1542 route
+d5ca1f7	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2051896440	Deep compare49 island found via CPU fleet
+d687247	T	T-FUSED-ARITH	T-CARRY-TRUNCATE,T-COMPARE-NARROW,M-BUGFIX-RESUBMIT,M-ISLAND-REHUNT	2040438840	Final apply 2-block windowed seeded-boundary carry lane
+d6ca155	T	T-JUMP-GCD	M-ISLAND-REHUNT	1953154973	GCD active iterations 262→260, re-hunt nonce
+d6e44a1	T	T-FUSED-ARITH	M-ISLAND-REHUNT	5975181711	R_SMALL 325→326 zero-Toffoli shift r-doubling
+d77c0b2	both	M-STACK	T-JUMP-GCD,Q-WIDTH-TRUNCATE,T-FUSED-ARITH,M-ISLAND-REHUNT	2033268600	W2 final-window route knob package on 1320q
+d83d19c	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	1743174081	FOLD carry-trunc 18→17 on 1221q, re-hunt nonce
+d8466d8	T	T-COMPARE-NARROW	Q-SQUARE-SEG,M-ISLAND-REHUNT	1716174108	Square row-window cleanup recompute from high suffix
+da05eeb	Q	Q-STRUCTURAL	Q-DIRTY-BORROW,Q-SQUARE-SEG,T-AVOID-MATERIALIZE,M-ISLAND-REHUNT	2578075500	Peak 1542→1500 co-binder teardown: host z0, vent Solinas, widen cut
+da99bf4	both	M-STACK	Q-WIDTH-TRUNCATE,T-CARRY-TRUNCATE,M-ISLAND-REHUNT	2054166840	WIDTH_SLOPE 1009→1010 + late body-carry band trim
+dc6724b	T	M-STACK	T-COMPARE-NARROW,Q-SQUARE-SEG	1678360320	Stack two independent value-exact comparator tightenings under one nonce
+dd264ac	T	T-COMPARE-NARROW	T-CARRY-TRUNCATE,M-ISLAND-REHUNT	2046711480	GCD compare-bits 46→44 + depth-1 body carry-band trims
+dd590e3	T	M-STACK	T-CARRY-TRUNCATE,T-FUSED-ARITH,M-ISLAND-REHUNT	6496336865	W-TRUNC margin=2 + R_SMALL=327 island stack
+df59687	T	T-MEASURED-UNCOMPUTE	T-COMPARE-NARROW,M-ISLAND-REHUNT	3538424844	Materialized-sub measured-clear + comparator fast-eval, -13%
+e0b0021	T	T-JUMP-GCD	M-ISLAND-REHUNT	2574991500	GCD active iterations 399→398 reroll retune on 1500q
+e29e120	T	T-KARATSUBA	M-ISLAND-REHUNT	2750982708	round84 x-tail square schoolbook→Karatsuba, peak-neutral
+e34b84f	both	Q-WIDTH-TRUNCATE	T-CARRY-TRUNCATE,M-ISLAND-REHUNT	2150339730	GCD width margin + slope retune on K=2 raw-PA route
+e480ce3	both	M-STACK	Q-WIDTH-TRUNCATE,T-MEASURED-UNCOMPUTE,Q-MEASURED-FREE	6961644236	W-TRUNC + step1 fanout + constant f1 qubit drop
+e72b854	T	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	5148949806	W-TRUNC K0 21→20 stacked on R_SMALL=327
+e7a1da2	T	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	2471488962	WIDTH_MARGIN 26→25 narrower GCD-body envelope
+e810f4e	T	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	2769218508	WIDTH_MARGIN 28→26 + reroll co-tune on 1572 base
+e88456f	T	T-COMPARE-NARROW	M-BUDGETED-REPAIR,M-ISLAND-REHUNT	1891349200	Per-step overflow/underflow compare-width repair, binder notch 8,9
+e89e266	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	5166788002	shift22 Solinas carry-tail W 37→35, reroll 27
+e96bb06	Q	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	1820670235	Binder-notch extra 2→3, peak 1298→1297
+e971432	meta	M-ISLAND-REHUNT	-	1944384690	Refreshed 1307q route, clean run only
+ea4f6e0	T	T-FUSED-ARITH	M-ISLAND-REHUNT	5182912575	R_SMALL 325→326 correction-free r-doubling, reroll 254
+ea78b7c	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	1785547335	KAL double/fold carry-trunc windows 20/19, nonce reroll
+ea8a771	T	T-CARRY-TRUNCATE	T-COMPARE-NARROW	1899562014	Deeper late-step body-carry band trims on 1302 route
+ea8ad85	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	5180304536	SHIFT22 carry-tail W 37→35, reroll 19
+ebd0a6e	Q	Q-TRANSCRIPT-CODEC	Q-ANCILLA-REUSE,Q-SQUARE-SEG,M-ISLAND-REHUNT	-	Decode K2 pair block in place from compressed cells, peak 1218→1215
+edac713	T	T-FUSED-ARITH	T-JUMP-GCD,M-ISLAND-REHUNT	7757626800	(u,v_w) cswap boundary merge + pair2 397 island
+f026481	T	T-JUMP-GCD	M-ISLAND-REHUNT	2399448905	GCD active iterations 395→394 + tail-nonce island
+f1acd7f	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	3315144636	GCD compare-bits 75→63 + reroll co-tune
+f2cd713	Q	Q-STRUCTURAL	Q-DIRTY-BORROW,Q-ANCILLA-REUSE,M-ISLAND-REHUNT	2539526878	Peak 1500→1466: host comparator carry then sink apply
+f33898a	both	M-STACK	T-CARRY-TRUNCATE,T-JUMP-GCD,M-ISLAND-REHUNT	2060867160	DOUBLE carry-trunc 22 + active iters 259 on 1320q apply teardown
+f342d57	T	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	6550820029	W-TRUNC full-width prefix K0 27→25
+f3d33d5	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2822498802	COMPARE_SCHEDULE_MARGIN 6→5 onto WIDTH_MARGIN=27
+f52ee1f	Q	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	1893823629	Early-body-notch schedule + tail nonce island on 1297q
+f5c4782	Q	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	1774726350	Extend late binder-notch map one step on 1285q
+f664d6f	both	M-STACK	T-JUMP-GCD,Q-WIDTH-TRUNCATE,M-ISLAND-REHUNT	2381382450	active 394→393 + width-margin 26→25, peak 1355→1350
+f751e0b	T	T-CARRY-TRUNCATE	M-ISLAND-REHUNT	6564355387	Deeper Solinas carry-tail window 96→59
+f76501e	both	M-STACK	T-CARRY-TRUNCATE,T-COMPARE-NARROW,Q-WIDTH-TRUNCATE,T-FUSED-ARITH,M-ISLAND-REHUNT	2049235320	active259 width/apply knob package on 1320q
+f78af41	T	T-MEASURED-UNCOMPUTE	M-ISLAND-REHUNT	2841822042	Apply-clean comparators cmp_lt_into→fast, reroll 21
+f804ee0	Q	Q-WIDTH-TRUNCATE	M-ISLAND-REHUNT	1700420806	GCD width-slope taper 1015→1016 at flat 1211q
+f94f726	both	Q-STRUCTURAL	T-FUSED-ARITH,Q-ANCILLA-REUSE,Q-DIRTY-BORROW,T-KARATSUBA	8445450090	Full route: cswap merges + carry recovery + peak teardown 2708→2310
+fada18c	Q	Q-DIRTY-BORROW	Q-SQUARE-SEG,Q-ANCILLA-REUSE,M-ISLAND-REHUNT	2437039251	Reuse proven-zero square lanes in ROUND84 self-hosting, peak 1416→1413
+fd70a60	T	T-FUSED-ARITH	-	3161659020	Fuse GCD branch-bit comparator, emit b0&b1 under control
+fda639c	T	T-COMPARE-NARROW	M-ISLAND-REHUNT	2830370730	COMPARE_SCHEDULE_MARGIN 6→5 via reroll 29→27
+fdb8e16	T	T-FUSED-ARITH	T-AVOID-MATERIALIZE	10322446472	R_SMALL + lambda^2 reuse + stream-Solinas register-free folds
+fde221f	T	T-MEASURED-UNCOMPUTE	T-FUSED-ARITH	7754110980	STEP1 UV-frame correction: temp-AND + CX fanout
+ff46db2	both	M-STACK	T-CARRY-TRUNCATE,Q-ANCILLA-REUSE,Q-WIDTH-TRUNCATE,M-ISLAND-REHUNT	1916455744	Compose apply cuts with 1306q dialog-GCD body notch
