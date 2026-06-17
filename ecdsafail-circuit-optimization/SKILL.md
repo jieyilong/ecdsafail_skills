@@ -607,6 +607,11 @@ For detailed Andre Schrottenloher paper findings, read
 multiplication, EEA/Bezout splitting, pseudo-Mersenne approximate arithmetic,
 or reproducing the Qarton reference implementation.
 
+For Shrunken-PZ q980 follow-ups, also read the sibling skill references:
+
+- `../peak-qubit-reduction/references/Q980_SHRUNKEN_PZ_85D5DAE_HANDOFF.md`
+- `../toffoli-reduction/references/Q980_TOFFOLI_CUT_4352CFB_HANDOFF.md`
+
 ### Verified provenance (read directly from the sources)
 
 - **Schrottenloher 2026** = arXiv **2606.02235v1**, "*Optimized Point Addition Circuits for
@@ -845,6 +850,29 @@ Verified mechanics (trailmix `shrunken_pz_state_machine`, `ghost.rs`):
   making termination flag-intrinsic (no halting-counter garbage).
 
 Use this as inspiration for sub-frontier qubit pushes, but score-gate aggressively. A route that saves 100+ qubits and adds tens of millions of Toffolis is useful as a lower-bound witness, not automatically as a challenge submission.
+
+### Shrunken-PZ Q980 Lessons
+
+The rejected q980 Shrunken-PZ submissions are idea references, not direct score frontiers:
+
+- `85d5dae`: q980 / avgT ~39.65M. The qubit drop came from a source-level Shrunken-PZ state
+  machine: dynamic live widths for PZ registers, thin support schedules, quotient/counter/rotation
+  narrowing, known-constant teardown, and HMR-style passenger ghosting.
+- `4352cfb`: q980 / avgT ~28.85M. The large Toffoli drop at the same qubit count came from the
+  `zero-dy/newdx` EC dataflow rewrite: defer final `y`, build the cancellation witness
+  `new_dy = lambda * new_dx` directly, and reuse zeroed `dy` as scratch.
+
+Generalize these beyond Shrunken-PZ as two reusable questions:
+
+1. Can this circuit use a time-varying source-level state machine instead of a fixed opaque op
+   stream, so only the currently live support is coherent?
+2. Can a later uncompute be driven by a cheaper witness relation instead of an eagerly materialized
+   output register?
+
+Classify each borrowed lever before scanning: dynamic state sizing, algebraic witness construction,
+terminal constant teardown, and exact passenger reconstruction are structural/exact-looking; q-caps,
+thin schedules, truncation widths, nonce tails, and support-mined bounds are island-gated and need
+fresh validation.
 
 ### Tooling Lessons From TraiMix
 

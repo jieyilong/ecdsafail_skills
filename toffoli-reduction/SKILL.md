@@ -145,6 +145,20 @@ Treat fusion as a high-quality first move on the Toffoli axis: depth-neutral, pe
 when scratch fits, and stackable with width/slope/truncation routes. Do not combine it with
 risky truncation and then blame Fusion for density collapse; isolate Fusion-only density first.
 
+### Witness-first / deferred-output dataflow
+
+Read `references/Q980_TOFFOLI_CUT_4352CFB_HANDOFF.md` when the task mentions Shrunken-PZ,
+TrailMix q980, `zero-dy/newdx`, deferred `y` materialization, elliptic-curve slope cancellation, or
+a large Toffoli cut that preserves the same qubit count.
+
+Reusable lesson: if a later uncompute/cancellation only needs a witness relation, build that witness
+directly instead of materializing the final coordinate early and then cleaning it. The q980
+`zero-dy/newdx` route zeroes the old `dy`, reuses it as scratch, constructs `new_dy = lambda *
+new_dx`, cancels `lambda` via the ratio `new_dy/new_dx`, and only materializes the final `new_y`
+after cancellation. This pattern is math-exact when the ratio identity and passenger restoration are
+proved, but still needs full `cls/pha/anc` validation because changed dataflow can expose phase or
+support assumptions.
+
 ### Ancilla-free majority
 
 Replace a 3-CCX majority with a 2-CCX ancilla-free majority (and its per-position variants).

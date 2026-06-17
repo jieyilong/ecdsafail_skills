@@ -225,6 +225,18 @@ The general tactic is:
 This is a width lever, so it is binary-failure: if the codec or streaming apply is not exactly
 reversible, the circuit is structurally dirty. Validate the codec first, then re-measure the peak.
 
+### Shrunken-PZ dynamic state and passenger ghosting
+
+Read `references/Q980_SHRUNKEN_PZ_85D5DAE_HANDOFF.md` when the task mentions TrailMix,
+Shrunken-PZ, q980, dynamic PZ widths, quotient caps, HMR ghosting, known-constant teardown,
+thin schedules, or source-level Proos-Zalka state machines.
+
+Reusable lesson: treat Euclidean-state registers as time-varying objects instead of fixed-width
+arrays. Resize `A/B/ca/cb/q` to the proven live support at each step, tear down terminal constants,
+and ghost passengers that can be algebraically reconstructed later. Keep the exact structural pieces
+separate from support-gated pieces such as thin schedules, q-caps, and nonce-dependent tails before
+deciding whether a route is clean enough to hunt.
+
 ### Aliasing / dirty-scratch borrow
 
 If you need scratch and a register already live holds a value you can **restore before it is next
