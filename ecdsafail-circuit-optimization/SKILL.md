@@ -915,6 +915,44 @@ terminal constant teardown, and exact passenger reconstruction are structural/ex
 thin schedules, truncation widths, nonce tails, and support-mined bounds are island-gated and need
 fresh validation.
 
+### Shrunken-PZ Q988 -> Q956 Lever Stack (the sub-1000q ladder)
+
+A community ladder drove the SAME shrunken-PZ port from q988 down to q956 as a **sealed, knob-gated
+stack**: each lever `assert!`s the previous ones are on and is named for the qubit count it unlocks.
+No new construction — every step squeezes **one wire** out of the single inversion peak. All verified
+in `trailmix_port/inversion/shrunken_pz_{state_machine,schedule}.rs` and the
+`configure_sub1000_trailmix_route()` knob stack. The five distinct mechanisms (deduped, ranked by
+qubits saved):
+
+1. **Selective per-step quotient-width clamp (~8-9q, 988->979) — the biggest lever.** Do NOT cap the
+   EEA quotient register globally (`TRAILMIX_Q_CAP`); trim it **only at the peak-binding divstep** via
+   a budget `q <= T - 2*max(w_a,w_b) - 2*max(w_ca,w_cb)` (`TRAILMIX_Q_TARGET`, `trailmix_q_width_step`).
+   General rule: a per-step "trim only at the binding instant" schedule beats any global cap, because
+   the cap is paid on every step while only one step owns the peak.
+2. **Exact in-place CLZ/CTZ (~6q, incl. a -5q jump to 968).** Count leading/trailing zeros with **no
+   ancilla allocation** — fold the result into existing registers (`LOWQ_HYBRID_CLZ`, `LOWQ_EXACT_CTZ`,
+   `LOWQ_HYBRID_CLZ_NOALLOC_ADD`; in `clz_diff_body_middle`).
+3. **Selective lane borrowing / flag aliasing (~8q, 965->956).** Borrow shift/boundary lanes only
+   where provably free (`Q959_SELECTIVE_BORROW`), gate the comparator's scratch to **only its live
+   window** (`Q958_GATED_COMPARE`), and alias a transient flag onto an already-live persistent lane —
+   e.g. the `off` flag onto `counter[0]` (`Q956_OFF_BORROW`, proven disjoint by `assert_q956_off_alias`).
+4. **Algebraic wire fusion (~3q).** Drop a known-constant EEA operand (`LOWQ_ONE_A_ELIM` removes the
+   `a=1` operand), and **fuse the immutable input-sign bit into the EEA parity bit** `s^p`, reclaiming
+   the persistent wire (`TRAILMIX_SIGN_PARITY_Q_REUSE`); the reverse-EEA restores it exactly.
+5. **Compute-into-existing-ancilla folds (~2q).** Fold the bitlen-difference into the existing `pa`
+   register (`LOWQ_CLZ_DIFF_CONST_FOLD`) instead of a caller-supplied diff register; compact the
+   Khattar-Gidney adder ancilla (`LOWQ_COMPACT_KGANC`).
+
+**Unifying recipe (reusable for any inversion-peak push):** drive a single peak down one wire at a
+time by making every per-step control/scratch/flag *either* compute-in-place-then-uncompute *or* alias
+an already-live persistent lane, so nothing extra crosses the peak instant — and trim variable-width
+registers (quotient/cofactor) only at the binding step, never globally. Classify before scanning: the
+in-place / alias / constant-teardown / sign-fusion levers are structural and value-exact; the
+q-target / thin-schedule / support-bound levers are island-gated (the op-stream changes re-roll the
+SHAKE256 9024-shot set, so each needs a fresh `DIALOG_TAIL_NONCE`). Sub-1000q is a pure-qubit play:
+these all carry tens of millions of Toffoli and lose the `qubits*Toffoli` product, so only chase the
+ladder when the objective is qubit count itself.
+
 ### Tooling Lessons From TraiMix
 
 TraiMix is valuable as much for its verification discipline as for its circuits:
