@@ -1,6 +1,6 @@
 ---
 name: ecdsafail-island-hunting
-description: Use this skill whenever working on ECDSA Fail / EC point-addition island hunting, GPU nonce scans, clean island validation, cls/pha/anc triage, SOTA score comparison, or deciding whether a quantum circuit optimization is worth scanning. This skill is especially important when the user asks to start, monitor, triage, validate, or extend island scans; compare against SOTA; run fast validation; or choose between circuit routes.
+description: Use this skill whenever working on ECDSA Fail / EC point-addition island hunting, GPU nonce scans, clean island validation, cls/pha/anc triage, random-nonce repair readiness, SOTA score comparison, or deciding whether a quantum circuit optimization is worth scanning. This skill is especially important when the user asks to start, monitor, triage, validate, or extend island scans; compare against SOTA; run fast/full validation; repair dirty candidates before scanning; or choose between circuit routes.
 ---
 
 # ECDSA Fail Island Hunting
@@ -21,15 +21,18 @@ Use this skill to run disciplined island-hunting experiments for ECDSA Fail circ
    levers: carry-truncation notches, compare-bit narrowing, segmentation, in-place/aliasing tricks,
    pseudo-Mersenne folds, apply-chunk rebalances, etc.). Score-gate each against SOTA and keep the
    handful that plausibly beat it.
-4. When you have **several** surviving candidates, do a **route bake-off**: run a short equal-size
+4. Before any GPU pilot, run the **Random-Nonce Repair Gate** below: full-evaluate the circuit at a
+   few random tail nonces, judge the raw `cls / pha / anc` profile, and repair structural errors until
+   the route is plausibly huntable.
+5. When you have **several** surviving candidates, do a **route bake-off**: run a short equal-size
    triage scan on each, then **rank them by island findability** (GCD-clean density combined with the
    `cls / pha / anc` distribution of those candidates) before committing large GPU ranges. Hunt the
    top-ranked route first.
-5. For the chosen route, start with a short triage scan, not a large frontier burn.
-6. Use GCD-clean candidate density and `cls / pha / anc` statistics to classify the route.
-7. Extend only routes that pass score, density, and validation gates.
-8. Validate every newly flushed candidate in fast modes.
-9. Submit only measured clean solutions whose score beats current promoted SOTA, unless the user explicitly gives different submission rules.
+6. For the chosen route, start with a short triage scan, not a large frontier burn.
+7. Use GCD-clean candidate density and `cls / pha / anc` statistics to classify the route.
+8. Extend only routes that pass score, density, and validation gates.
+9. Validate every newly flushed candidate in the mode requested for the hunt, usually full mode.
+10. Submit only measured clean solutions whose score beats current promoted SOTA, unless the user explicitly gives different submission rules.
 
 ## The Optimization → Triage Loop (knobs → structure → island)
 
@@ -71,6 +74,44 @@ escalation in step 1 is the part people skip.
          never 0 (a non-zero floor), so B can never reach `0/0/0`.
 6. **Pick the most promising candidate** — healthy density, low near-misses, and all three
    channels reaching 0 — and commit GPUs to the full island hunt.
+
+## Random-Nonce Repair Gate Before GPU Scanning
+
+Use this gate for a new low-qubit or high-risk circuit before spending GPU time. The purpose is to
+separate "structurally hopeless" routes from "dirty but repairable" routes while iteration is still
+cheap.
+
+1. **Freeze and measure the candidate.** Record the exact source commit/worktree, CFG, peak qubits,
+   peak owner, emitted CCX/CCZ, and active Toffoli from `eval_circuit`. Keep the qubit cap and
+   Toffoli budget explicit.
+2. **Evaluate a small random tail-nonce panel.** Pick a few arbitrary tail nonces (or the route's
+   equivalent nonce knob) and run full validation. These are not GPU-discovered GCD-clean candidates;
+   they are quick probes of the raw circuit error profile.
+3. **Classify the raw profile by judgment, not a formula.**
+   - Promising: low or moderate residuals, `anc=0`, at least one channel already near zero, and
+     failures that vary by nonce.
+   - Repairable: residuals are high but localized to a plausible structural shortcut such as
+     compare width, carry truncation, fold parking, boundary replay, or phase cleanup.
+   - Not scan-ready: uniform high fingerprints, persistent `anc`, very large `pha`, or no response
+     after restoring nearby safety knobs.
+4. **Repair before scanning.** Apply the circuit-optimization and peak-qubit-reduction skills:
+   trace failing inputs/shots when needed, identify the common failing section, and restore or
+   reroute one safety feature at a time. Prefer repairs that keep the qubit cap, then repairs that
+   spend modest Toffoli, then only if the user allows it spend qubits.
+5. **Keep a repair ledger.** For each iteration record CFG delta, q, active Toffoli, random-nonce
+   `cls / pha / anc`, peak owner, and the hypothesis about which structural error was fixed. Snapshot
+   the best route even if it is still dirty.
+6. **Declare scan readiness only after the raw profile has a near-miss tail.** As a rule of thumb,
+   start a small GPU scan when full validation on random nonces or cheap probe candidates has moved
+   into the low-double-digit or single-digit regime, with `anc=0` and no fixed high fingerprint.
+   Strong examples include patterns like `13 / 4 / 0`, `8 / 4 / 0`, `2 / 1 / 0`, or any route where
+   one or more channels already reach 0. If the best raw profile is still broadly high, keep repairing.
+7. **Then run the small GPU pilot.** Once scan-ready, run the normal 5-20M pilot and switch judgment
+   from random-nonce raw profile to the actual GCD-clean candidate density plus full-validation
+   `cls / pha / anc` distribution.
+
+This gate complements the route bake-off. Random-nonce repair decides whether a circuit deserves a
+GPU pilot at all; the bake-off decides which scan-ready route deserves larger ranges.
 
 ## Shared Hunt Memory With `ecdsafail notes`
 
