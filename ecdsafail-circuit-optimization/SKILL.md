@@ -574,6 +574,47 @@ Examples:
 
 This is both a qubit and Toffoli idea: fewer live wires can also mean fewer cleanup gates.
 
+### Dead-Branch-Wired Optimizations (the highest-yield meta-pattern)
+
+The single most productive Toffoli-hunt heuristic found on this route: **an optimization is
+implemented and validated, but wired only to a code branch that the live route bakes OFF — so the
+live path silently runs the un-optimized version.** Porting the existing optimization onto the live
+branch is then a value-exact, density-neutral, peak-neutral win that needs no new correctness proof
+(the optimization was already validated; only the wiring moved). This pattern has paid off repeatedly;
+actively grep for `if <knob>` guards whose default route disables them while a parallel live branch
+lacks the same guard.
+
+Worked example — the **vented divstep body** levers (verified, peak 1170, the dialog-GCD route bakes
+`DIALOG_GCD_RAW_TOBITVECTOR_MATERIALIZED_SUB=0` + `DIALOG_GCD_CTRL_BODY_VENTED=1`, so the live body is
+the `cuccaro_*_ctrl_vented` else-branch ≈ 18.5% of all Toffoli). A carry **band-trim schedule** and a
+**bit-0 fastpath** existed but were wired only to the *dead* materialized branch, so the live vented
+body ran full-width-including-bit-0. Two new gated, default-OFF, byte-identical-when-OFF knobs wire
+them onto the live path:
+
+- `DIALOG_GCD_VENTED_BODY_BAND_TRIM=1` — **trim the TOP carries** of the vented sub + reverse-add to
+  `body_carry_trunc_width(n,step)`. Value-exact because `WIDTH_MARGIN=10` and max GCD-operand overshoot
+  ≤8 ⇒ on reachable inputs `bitlen ≤ active_width−2`, so the trimmed top carry cells operate on
+  `|0>·|0>`; and the post-cswap body never borrows past the active operand (`v≥u`). −3.93M Toffoli.
+- `DIALOG_GCD_VENTED_BODY_ODD_LOWBIT=1` — **skip BIT 0** of the vented body. Kaliski keeps `u` odd
+  (`subtrahend[0]=1`) and `acc[0]=ctrl` at the sub site / `acc[0]=0` at the reverse-add site, so bit 0
+  is exactly `cx(ctrl, acc[0])` with no carry into bit 1 — run the body over `[1..bw]` + one CNOT.
+  Exploits an algebraic invariant, not a margin. −2.43M Toffoli.
+- `DIALOG_GCD_VENTED_BODY_TRIM_CAP=2` — caps the per-step band-trim at 2 bits (≤ the overshoot bound),
+  making BAND_TRIM **provably value-exact on ALL inputs** (not just "reachable support"). Use it for a
+  zero-risk density guarantee.
+
+They **stack near-additively** (top-carry trim ⟂ bottom-bit skip): combined **−6.34M Toffoli**, peak
+unchanged (1170), λ_classical unchanged — the largest peak/density-neutral win in this route's record
+(`1,676,067,120 → 1,669,731,570`). Only cost: the op-stream changed so the SHAKE256-derived 9024-shot
+set re-rolls ⇒ re-hunt a clean `DIALOG_TAIL_NONCE`; because it's density-neutral the hunt is the same
+difficulty as the frontier's island.
+
+**The discipline that separates these from truncation:** trim/skip ONLY what the schedule or invariant
+*proves* is determined. `WIDTH_MARGIN`/overshoot proves the top cells are `|0>`; the odd-u invariant
+proves bit 0 is a known CNOT. Contrast the same-shaped but APPROXIMATE `DIALOG_GCD_VENTED_BODY_UNIFORM_TRIM=N`
+(a flat `n−N` trim): catastrophic (classical 3987+) because early divsteps are full-width with no margin —
+a real truncation that breaks correctness. Same knob shape, opposite correctness; the proof is the line.
+
 ### Signed or Joint Windowing
 
 From Andre/Schrottenloher-style Shor-resource analysis, signed-digit or joint-window recodings can reduce lookup/table work by exploiting symmetry.
@@ -1343,6 +1384,12 @@ When multiple routes are viable, prefer the route with:
 - healthy density
 - best low-severity tail
 - fewer suspicious structural shortcuts
+
+Before reaching for a *new* optimization, first mine for **dead-branch-wired** ones (see
+*Dead-Branch-Wired Optimizations* under Toffoli Reduction Patterns): grep for `if <knob>` / branch
+guards where the live baked route runs the un-optimized side while an existing, validated optimization
+sits on a baked-OFF branch. Porting those onto the live path is the cheapest, lowest-risk win class —
+value-exact, density-neutral, no new correctness proof.
 
 ## Warning Signs
 
