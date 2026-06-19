@@ -1015,6 +1015,7 @@ Patterns observed across the full public submission ladder:
 - The 2025q and 1698q jumps came from rethinking where history, carry, and sidecar state live, not from tiny local gate rewrites.
 - The 1313q-to-1285q era mixed lower-width point-add stacks with average-executed Toffoli cuts and repeated island re-hunting.
 - The 1226q-to-1211q era used progressively riskier in-place decode, square-row cleanup tightening, special fold borrow-carry reuse, segmented rows, and low-carry parking.
+- The 1164q-to-1163q TrailMix era showed the opposite lesson from the big codec jumps: when only one qubit is needed, a tiny peak-window carry-layout trim can beat a broad structural route by tens of thousands of Toffolis.
 - Rejected/failed submissions often had stale scores, no clean island after a route change, or a claimed low width whose candidate quality was structurally bad.
 
 The lesson is not "turn on every aggressive knob." The lesson is to combine one aggressive live-range reduction with enough local safety knobs that candidate quality stays near-miss instead of structurally dead.
@@ -1022,6 +1023,43 @@ The lesson is not "turn on every aggressive knob." The lesson is to combine one 
 ## Submission Archaeology Lessons
 
 Use this section when pulling SOTA notes. It records the shape of the public frontier, including early solutions, so future optimization does not rediscover the same path blindly.
+
+### Current TrailMix 1164q -> 1163q Frontier: Local Late-GCD Carry Layout
+
+Public example: BitWonka submission `175749f`, commit `b310de9`, promoted 2026-06-19. Verified
+metrics: **1163 qubits**, avg executed Toffoli **1,412,401.873**, score **1,642,623,526**,
+validation **0 / 0 / 0** over all 9024 shots, nonce `100000688994`.
+
+The patch is not a new algorithm. It keeps the TrailMix "ludicrous" point-add family and keeps
+the GCD state width intact. The score win comes from a small, localized live-layout package:
+
+- `arith::PAD` 21->19 and `schedule::PAD` 21->20: shrink the pseudo-Mersenne +f support/padding
+  enough to remove surplus live bits without changing the high-level arithmetic.
+- `TLM_GCD_K_ADJUST_AFTER=172`, `TLM_GCD_K_ADJUST_BEFORE=196`, `TLM_GCD_K_ADJUST=-1`: reduce the
+  GCD carry-layout k by one **only** over the late GCD peak window.
+- `TLM_HYB_V_DELTA=2`, `TLM_COUT_K_DELTA=1`, `TLM_FOLD_DELTA=1`, `TLM_FFG_DELTA=2`: small adjacent
+  schedule relax/tighten deltas so the shifted peak does not reappear in neighboring apply/GCD
+  phases.
+- `LUD_EXTRA_FOLD_VENTS=0` in the baked defaults: avoid spending extra peak width on vents while
+  solving a width frontier.
+
+What we missed: our alternate 1163q streamed-triple / suffix-dirty route attacked the same one-qubit
+goal with a global transcript/branch mechanism. It did lower the measured peak but was dirty
+(`7 / 7 / 0`) and around **1,449,707 avg Toffoli**, roughly 37k avg Toffoli above the clean SOTA.
+That is the wrong exchange rate for a one-qubit frontier drop.
+
+Actionable rule for future agents:
+
+1. For a clean frontier at `N` where the target is `N-1`, first find whether the `N` peak is a
+   narrow step window.
+2. If yes, test local support/padding shrink, per-step carry-layout trim, and neighboring schedule
+   deltas before any global codec or branch rewrite.
+3. Only escalate to global transcript codecs when the required qubit drop is larger than the local
+   window can provide or when the plateau ledger shows persistent transcript floor bits across many
+   phases.
+4. After a one-qubit drop, immediately compute the same-width Toffoli break-even. At this frontier,
+   a 1163q candidate must be below about **1,412,402 avg Toffoli** to beat `175749f`; any q1163
+   route with a broad Toffoli tax is not worth island hunting until the tax is removed.
 
 ### Early Wide-Circuit Toffoli Wins: Boundary Merges
 

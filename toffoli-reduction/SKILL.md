@@ -191,6 +191,20 @@ iteration, emitting cleanup/carry gates the easy iterations don't need. A per-st
 `width(step)` trims the gate work to each step's tolerance. (Same lever as in
 `peak-qubit-reduction`, here aimed at gates.)
 
+### Local peak-window trims beat global Toffoli taxes
+
+For a one-qubit frontier drop, measure whether the peak is owned by a narrow loop window before
+introducing a global structure. A global codec or branch-layout rewrite can lower width but add
+non-Clifford work on every iteration; a local `width(step)` or carry-layout trim can lower the same
+peak with only a tiny executed-Toffoli change.
+
+ECDSA Fail TrailMix case study (`b310de9`, submission `175749f`): the 1164q->1163q score win used
+`TLM_GCD_K_ADJUST=-1` only for GCD steps `172..196`, plus small `HYB_V/COUT/FOLD/FFG` schedule
+deltas and padding shrink. It landed at 1163q with avg Toffoli about 1,412,401.873. A broader
+streamed-triple / dirty-suffix approach also reached 1163q locally, but measured around
+1,449,707 avg Toffoli and was dirty. The lesson is a Toffoli rule as much as a qubit rule: do not
+pay a circuit-wide tax when the live-qubit surplus is localized to one peak window.
+
 ## Step 4 — Cost the move
 
 - **Depth first.** Is the rewrite non-Clifford-depth-neutral? Vents and fusion roughly are;

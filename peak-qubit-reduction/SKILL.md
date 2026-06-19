@@ -293,6 +293,27 @@ fallen to a better encoding of the *same* state, not to a new algorithm. The rel
 you've truly hit bottom is a *measured* composition where every remaining live qubit is essential
 data of the peak operation — not an analysis that concluded a layer "should be" irreducible.
 
+### One-qubit frontier drops: localize before globalizing
+
+When the current clean frontier only needs **one** more qubit shaved, bias hard toward localized
+peak-window moves before inventing a new global structure. A broad codec, branch-layout rewrite,
+or dirty-borrow sidecar may drop the peak, but if it touches hundreds of steps it can add tens of
+thousands of Toffolis and still lose the score.
+
+ECDSA Fail TrailMix case study (`b310de9`, submission `175749f`, 2026-06-19): the clean 1164q
+frontier fell to 1163q without cutting GCD state width. The winning patch tightened arithmetic
+padding (`arith::PAD` 21->19, `schedule::PAD` 21->20), then applied a **-1 carry-layout k trim only
+inside the late GCD peak window** (`TLM_GCD_K_ADJUST_AFTER=172`,
+`TLM_GCD_K_ADJUST_BEFORE=196`, `TLM_GCD_K_ADJUST=-1`) with small neighboring schedule deltas
+(`HYB_V`, `COUT`, `FOLD`, `FFG`). It validated clean at 1163q with avg Toffoli about
+1,412,401.873. A competing streamed transcript / dirty-suffix route also reached 1163q, but was
+dirty and around 1,449,707 avg Toffoli — the wrong exchange rate for a one-qubit drop.
+
+Rule: if the measured peak is a narrow late-window plateau, first try per-step carry layout,
+padding/support shrink, and adjacent schedule deltas on that window. Escalate to global codecs or
+branch rewrites only after the local levers are exhausted or the required qubit drop is larger
+than the local window can plausibly supply.
+
 ## Plateau decomposition: lower every co-binder together
 
 When a trace shows many phases tied at the same peak, **switch into plateau mode immediately**.
