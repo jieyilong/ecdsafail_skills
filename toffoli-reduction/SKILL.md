@@ -255,3 +255,125 @@ on-peak status of a phase decides whether a gate cut is free or costs width.
 This is the domain-agnostic method. For the concrete knob names, the executed-Toffoli metric
 mechanics, and the validated exchange-rate numbers of the ECDSA-fail / quantum-ECC
 point-addition circuit, use the companion **ecdsafail-circuit-optimization** skill.
+
+---
+
+## Appendix — Concrete lever catalog (credit: benhuang2025)
+
+> **Source / credit.** The lever catalog below is adapted from
+> [`benhuang2025/ecdsafail-challenge` → `ecdsafail-agent/toffoli_reduction_skill.md`](https://github.com/benhuang2025/ecdsafail-challenge/blob/main/ecdsafail-agent/toffoli_reduction_skill.md),
+> by **benhuang2025**. It is a frontier-tested set of named levers, each with the exact
+> `src/point_add/mod.rs` env knob and the commit that introduced it. The commit hashes,
+> tuned values, and `461a4a3` "current frontier" numbers are from *their* fork's lineage —
+> treat them as worked examples of the method, not as our live frontier. Re-screen every value
+> against whatever base you are on. (Their operational notes — host `zan3`, "never `git push`",
+> `ecdsafail sync` — are their environment; ignore for ours.)
+
+**Two correctness regimes — tag every lever before applying:**
+- **Value-exact** (preferred): computes the SAME function on ALL inputs; only gate
+  scheduling / ancilla handling differs. Adds ZERO new hard inputs. → Levers B, C, E, F, G, H.
+- **Island-exact** (truncation): drops bits provably zero *on the hunted Fiat–Shamir island*
+  but not on all inputs. SAVES Toffoli but ADDS hard inputs → raises λ → needs a fresh
+  clean-nonce hunt. → Levers A, D.
+
+Either way, **any op-stream change re-rolls the FS island** ⇒ the baked `DIALOG_TAIL_NONCE` goes
+stale ⇒ re-hunt + re-validate `0/0/0`. Read the `avg executed Toffoli` line (a FAIL row still
+prints it) BEFORE hunting a nonce.
+
+**Lever A — truncated-suffix cleanup comparator (island-exact).** Recompute an inter-window
+boundary carry from a *high suffix* of the segment, not a full-width (~2n CCX) comparator; the
+dropped low bits don't affect the boundary carry on the island.
+- `SQUARE_ROW_WINDOW_CLEAN_COMPARE_BITS=<k>` (round84 square boundary cleanup; `1a5e620`
+  introduced, `5a783e4` cut 22→21).
+- `DIALOG_GCD_APPLY_CLEAN_COMPARE_BITS=<k>` (apply ripple cleanup).
+- `DIALOG_GCD_COMPARE_BITS=<k>` (GCD compare width).
+Their frontier `461a4a3`: `21 / 19 / 46`. Lower k = fewer Toffoli but more carry-escape hard
+inputs. Find the smallest k whose first GCD-clean candidate still hits a fully clean island.
+
+**Lever B — measurement-based uncompute instead of coherent recompute (value-exact).** A cleanup
+bit coherently *recomputed* to return it to |0⟩ costs CCX. Instead `Hmr(cout)` (measure-and-reset
+in the Hadamard basis), then replay the predicate **classically-conditioned on the measurement**
+to cancel the phase → 0 Toffoli, phase-exact, peak-flat (if it borrows an already-clean high tail).
+- `SQUARE_ROW_WINDOW_MEASURED_CARRY_CLEAR=1` (`d636d62`, ~−387 avg-Toffoli at 1218q).
+- `DIALOG_GCD_FUSED_OVFCLEAR_MEASURED=1` (`bde4caa`, GCD overflow-clear → 0 Toffoli).
+The cleanest class: value-exact AND Toffoli-negative. Hunt every place a scratch bit is coherently
+recomputed purely to clear it.
+
+**Lever C — exact-adder swap (removing a truncation can REDUCE Toffoli) (value-exact).** A
+*top-clean'd* adder can cost MORE Toffoli than an EXACT full-carry adder, because the truncation
+needs carry-escape correction. Swapping back is value-exact AND recovers Toffoli AND drops hard
+inputs (easier hunt).
+- `DIALOG_GCD_APPLY_FINAL_TOPCLEAN=0` (`98e1322`, ~−2,597 avg-Toffoli, value-exact).
+Audit every truncated adder/comparator: if its correction overhead exceeds the bits it saves, the
+exact variant is a free Toffoli win + a λ reduction.
+
+**Lever D — carry-truncation notches (island-exact).** Drop one more high carry bit from a modular
+fold/reduction ripple. Saves Toffoli, peak-flat, adds carry-escape hard inputs → re-hunt.
+- `KAL_FOLD_CARRY_TRUNC_W` (in-place fold; trajectory 21→20→19→18→17, `00fb66d`).
+- `KAL_DOUBLE_CARRY_TRUNC_W` (double_y fold).
+- `ROUND84_INPLACE_QUOTIENT_CARRY_TRUNC_W` (`f4404de`=20).
+- `DIALOG_GCD_FOLD_CARRY_TRUNC_W` (fused fold; `461a4a3` cut 19→18).
+At/near the **cliff** on a mature base — each dropped bit raises λ steeply. Cheap to *try* (flip
+env, read avg-Toffoli on a FAIL row), low-odds for a net win once the base is tuned. Don't grind
+here if λ is already high.
+
+**Lever E — data-dependent gate eliding (value-exact, executed-Toffoli only).** Skip gates whose
+control is *known zero on this shot*. The binary-GCD / Kaliski path has conditional double/halve
+shifts gated by an edge bit; on shots where that bit is 0 the shift is a no-op, so eliding it
+removes its EXECUTED Toffoli while staying exact on every shot (emitted count unchanged, average
+drops by the fire fraction). `zero-edge conditional-shift skip` (`7822c37`/`b8ce940`). Hunt any
+conditional sub-circuit whose control is frequently 0 across the island.
+
+**Lever F — measured-fast adders on NON-peak-setting adders (value-exact).** A coherent ripple
+adder costs ~2 CCX/bit; a **measured-fast** adder (measurement-based carry, Hadamard+CZ) costs ~1
+Toffoli/bit. Converting is value-exact and peak-flat ONLY if that adder isn't the one setting the
+peak — convert the *small / non-binding* adders, LEAVE the wide peak-setting adder coherent.
+- `c27e8a5`: round84 fold's three small adders → measured-fast, −1,434 exec-T, peak flat.
+- `b7515d5`: big-fold split adder → asymmetric 2-block windowed measured-fast (small low block +
+  wide fast high block), −2,124 exec-T; plus measured control-ride uncompute, −528 exec-T.
+General rule: every coherent adder/uncompute that is NOT peak-binding is a measured-fast candidate
+(Lever B is the cleanup-bit special case).
+
+**Lever G — cheaper exact primitives & constant recoding (value-exact).**
+- **Majority folding identity**: `maj(a,k,c) = c ⊕ ((a⊕c) & (k⊕c))` — controlled-const add/sub
+  carry with fewer Toffoli than a literal 3-input majority, same carry (`2a87f33`).
+- **NAF / signed-digit recoding** of a constant: `977 = 2^10 − 2^5 − 2^4 + 1` (4 signed terms) vs
+  `1 + 2^4 + 2^6 + 2^7 + 2^8 + 2^9` (6 unsigned) → fewer add/sub passes in the reversible
+  product/unproduct (`ed94ad2`, `R84_QPROD_NAF=1`). Audit every constant multiply (secp256k1's
+  `c = 2^32 + 977`, the Solinas folds) for a shorter signed-digit expansion.
+
+**Lever H — phase-conditioned comparator replay (value-exact, executed-Toffoli only).** Lever B
+extended to whole **comparator paths**: (1) HMR the comparison flag, (2) replay the predicate
+classically (CZ/CX tree conditioned on the measurement), (3) the comparison's Toffoli collapses to
+near 0 on most shots, peak flat. Committed in `98dd2ad`/`bfd3fa6`; ON in their baseline:
+`MOD_FAST_FLAG_CONDITIONAL_REPLAY`, `DIALOG_GCD_REVERSE_BRANCH_CONDITIONAL_REPLAY`,
+`DIALOG_GCD_SPECIAL_CLEAN_CONDITIONAL_REPLAY`, `DIALOG_GCD_APPLY_BOUNDARY_CONDITIONAL_REPLAY`. The
+key primitive to study before writing a new variant is `cmp_lt_phase_conditioned()` /
+`cmp_lt_phase_conditioned_borrowed_carries()` in `compare.rs`. Apply to any comparator (or
+`cmod_add`/`cmod_sub`) still coherent: find it with `TRACE_PEAK`, write a `_phase_conditioned`
+variant behind an env flag.
+
+**GCD iteration / body tuning knobs (mixed peak/Toffoli).** Tune together with `TRACE_PEAK`; each
+raises λ independently — screen with a FAIL row and check hard-input count before a re-hunt.
+- `DIALOG_GCD_ACTIVE_ITERATIONS=<n>` — fewer reduction iterations, exact if the dropped ones are
+  provably redundant on the support (`f6f9536`=258, `2a87f33`=260).
+- `DIALOG_GCD_BINDER_NOTCH_MAP=11:1,12:1,...` — per-binder-iteration notch map; extend one step at
+  a time (`ab5469b`, `2dcf00d`).
+- `DIALOG_GCD_BINDER_NOTCH_EXTRA=<n>` — global extra-notch count (`a4db9a5`: 2→3).
+- `DIALOG_GCD_BINDER_NOTCH_STEPS="8,9,10,11"` — which GCD steps get fallback notches (`73f4f48`,
+  `f3820d0`).
+- `DIALOG_GCD_BODY_CARRY_BAND_TRIMS="0,2,2,2,..."` — per-step carry-band trim vector (`bde4caa`,
+  `8983da8`); `"0,3,3,..."` = step 0 untrimmed, steps 1+ trimmed by 3 bits.
+- `DIALOG_GCD_BODY_STEP_GIVEBACKS=10:6` + step-stream top-clean — the **carry-relief exchange**:
+  spend top-clean coherent uncompute to avoid extra live carry lanes (peak-neutral), then spend the
+  recovered Toffoli on one more GCD iteration / a fuller body (`2a87f33`). A peak↔Toffoli rebalance.
+
+Tuning order: `ACTIVE_ITERATIONS` (global budget) → `BINDER_NOTCH_MAP` (per-step fallback) →
+`BODY_CARRY_BAND_TRIMS` (per-step fine-grain).
+
+> Note: several of these knobs (`SQUARE_ROW_WINDOW_MEASURED_CARRY_CLEAR`,
+> `DIALOG_GCD_APPLY_FINAL_TOPCLEAN`, `KAL_FOLD_CARRY_TRUNC_W`, `DIALOG_GCD_FOLD_CARRY_TRUNC_W`, the
+> majority-fold identity, `ROUND84_FOLD_FAST_ADD`) also appear in our own
+> **ecdsafail-circuit-optimization** notes — the benhuang catalog is an independent,
+> commit-attributed cross-check of the same lever families. Where a knob name differs, both forks
+> are exploring the same underlying mechanism.
