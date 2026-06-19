@@ -454,6 +454,136 @@ value-exact cuts at *fixed* peak (verified from `ecdsafail submissions --all` + 
   the avg-Toffoli rounding lottery — so prioritize the persistent-transcript floor (codec) and
   square co-bind over more comparator nonce-hunting.
 
+### The 1168 Wall Broke — `trailmix_ludicrous` Is the New Base (2026-06-19)
+
+The structural sub-1170 cut the bullet above called for **arrived as a circuit-family change, not a
+knob.** On 2026-06-19 tob-joe (Trail of Bits) submitted `bdb1d22` — a complete revamp porting
+trailmix's **product-min "ludicrous"** point onto `B` (new module
+`src/point_add/trailmix_ludicrous/`, `build()` now calls `build_trailmix_ludicrous_ops()`). It landed
+**1167q × 1,422,591 = 1,660,163,697**, and a swarm drove it to **1163q × 1,412,402 = 1,642,623,526**
+(current SOTA, `b310de9`/`175749f`, BitWonka) in ~15h. **This supersedes the dialog-GCD 1168/1170 route
+as the base to fork from.** Full analysis: `references/REPORT_1168_wall_revamp.md`.
+
+**Module map (`src/point_add/trailmix_ludicrous/`, fork from here).** `mod.rs` =
+`build_trailmix_ludicrous_ops()` (register alloc order pins fuzzer IO ids), `load_schedule()` (copies
+the baked tables into a thread-local `Sched` with per-call cursors), and the `BExt` trait that adds
+`z`/`ccz`/`neg`/`cswap`/`x_if_bit`/`z_if_bit`/`cz_if_bit` to the `B` builder. `ec_add.rs` = the affine
+point-add formula. `gcd.rs` = the jump-GCD inversion engine (the heart). `codec.rs` = the dialog-tape
+codec. `gidney.rs` = the vented-adder zoo. `arith.rs` = Cuccaro add/sub + pseudo-Mersenne reduction +
+the truncation constants (`f`, `PAD`, `LSBS`, `MSBS`, `CEILING`). `comparator.rs` = truncated top-window
+swap comparator. `square.rs` = symmetric schoolbook square. `fused.rs` = fused double+cdouble and the
+`(e+2d)·f` fold. `mcx.rs` = Khattar–Gidney log\*-ancilla MCX. `schedule.rs` = the baked per-call tables.
+
+**Register layout (`mod.rs`).** Four 256-bit IO regs, alloc order fixes the ids: reg0 `x2` (quantum
+`P.x`→`R.x`), reg1 `y2` (quantum `P.y`→`R.y`), reg2 `ox` (**classical `BitId`** `Q.x`), reg3 `oy`
+(**classical `BitId`** `Q.y`). After `ec_add`, `route_swaps` restores the scattered `R.x` qubits to the
+reg0 ids; `DIALOG_TAIL_NONCE` appends 48 identity `X;X` pairs for island grinding (score-neutral).
+
+Why it fits under 1168 — three structural decisions:
+1. **Classical `Q` (−512q, the decisive lever).** `ox`/`oy` are classical `BitId`s, materialized into
+   a transient quantum temp only at off-peak coord steps — never resident across the GCD peak. A naive
+   design holding both as quantum registers adds 512 live qubits at the peak. The coord steps
+   (`coord_addsub`/`coord_add3x`/`coord_rsub` in `ec_add.rs`) alloc a 256-bit temp, `x_if_bit`-load the
+   classical coord (**0 Toffoli**), run an *uncontrolled* pseudo-Mersenne `mod_add`/`mod_sub`,
+   `x_if_bit`-unload (clean — temp was never modified), and free. The GCD apply's own 256-bit scratch is
+   alloc'd/freed *inside* `mod_mul_inverse_in_place`, so it's never resident across the square either.
+2. **Two GCD passes share one inversion primitive.** The full affine law (`ec_add::ec_add`):
+   `x2-=ox` (dx) → `y2-=oy` (dy) → `y2 *= x2⁻¹` (**GCD pass #1, `Direction::Inverse`** → `y2=λ`, `x2`
+   restored to dx) → `x2 += 3·ox` (`coord_add3x` does it as `coord+2·coord`, one fewer mod-add) →
+   `x2 -= λ²` (fused square-subtract) → `y2 *= x2` (**GCD pass #2, `Direction::Forward`** → `y2=λ·x2`) →
+   `y2 -= oy` → `x2 := ox − x2` (**zero-Toffoli negate** `ox−x2 = −(x2−ox)`: load, subtract, free, then
+   `mod_neg` = const-add of `f−1`). λ is produced *by the inversion itself* — no separate field-inverse
+   then multiply. Both passes call the *same* `mod_mul_inverse_in_place` (jump=2, 258 steps).
+3. **Live-compressed dialog tape.** A SAT-synthesized **all-triple base-5 codec** packs each 3-symbol
+   `(subtracted, swap, s_2)` window into a **7-bit code** (5/8 patterns reachable, log2(5³)≈6.97),
+   streamed inline → **resident tape 603q vs 772 raw**. Peak owner = the forward-multiply apply (≈512
+   coord + 603 tape + early-width GCD state + vent ancilla); `CEILING=1167` is baked and every adder
+   vents to exactly `CEILING − active` via 0-Toffoli MBU (`hmr` + `cz_if`).
+
+**The inversion engine (`gcd.rs`) — read this before forking.** `mod_mul_inverse_in_place` = two passes
+sharing one tape: `forward_gcd_jump` (records) + `reverse_gcd_jump` (replays, restores `x`). Registers:
+`u` init `q = 2^256 − f` (`q_secp256k1_le`), `v` init the input `x`; classical jump-before-swap divstep
+on `(u=q, v=x)`. Per step it records the **3-bit symbol `(subtracted, swap, s_2)`** + one global `t1`
+first-shift bit: shift-first (step 0 gates on `v` even, records `t1`; steps ≥1 shift unconditionally;
+`s_2` = second jump shift), `subtracted = v[0]` post-shift, `swap` from the narrow comparator
+(`controlled_swap_decision_lt_truncated`), then `cswap(swap,u,v)` + active-width `v −= subtracted·u`
+(`controlled_add_active`). **Kaliski odd-u bit-0 shortcut:** `u[0]==1` by invariant ⇒ bit-0 carry-out
+is provably 0 ⇒ emit `cx(ctrl,y[0])` directly, run the capped adder on bits 1.. with carry-in 0
+(~1000+ Toffoli saved over both passes). The forward pass swaps the live symbol bits into fresh `|0>`
+slots and compresses each window inline; the reverse pass decompresses one window at a time from the
+tape end, **frees the 3 symbol slots before the apply** (so they don't inflate the peak), does the
+fused forward apply, then exactly inverts the divstep — using the **vented** swap-flag uncompute
+(`swap_decision_uncompute_vented`, ~half the comparator Toffoli). The apply step:
+`if sub: y+=x`, `if swap: cswap(x,y)`, then `y := 2(1+s_2)·y` (step 0 = two gated `mod_double`s; step
+>0 = the **fused** `fused_double_cdouble` with one combined `(e+2d)·f` reduction). `f = 2^32+977`, bits
+{0,4,6,7,8,9,32}.
+
+**The qubit floor = the GCD shrink/regrow width schedule** (`SCHED_J2`, len 258: holds at 256 for ~11
+steps then ramps to 13 by step 257). Each step `zero_and_free`s `u`/`v` qubits above the schedule width;
+the reverse pass re-allocs them. The whole body (comparator, cswap, subtract) runs on
+`current_n = SCHED_J2[i]` bits, so the adders run in the freed headroom. `GAP_J2[i]` (len 258) is the
+per-step comparator window. A `dx` whose bitlength exceeds the schedule width makes `zero_and_free`
+panic (it's rejected) — which is why the route needs a `DIALOG_TAIL_NONCE` grind to land all 9024
+verifier draws in the schedule-supported set.
+
+**The codec (`codec.rs`).** `DialogCodec` variants `Step0`(2b)/`Triple`(7b)/`Pair`(5b)/`Raw`(3b); tiling
+= 1 Step0 + 85 Triples + 1 Pair tail + 1 `t1` = **603 resident** vs `1+3·257=772` raw. `compress_2sym_fast`
+is the SAT-synthesized straight-line `x/cx/ccx` pairs core (25 valid 2-symbol inputs → 25 distinct 5-bit
+codes, frees a wire; terminal AND-uncompute vented via `clear_and` = 0 Toffoli). Triple = `pair →
+affine normalizer → fold-in s_2`. ~18 executed Toffoli per Triple forward after vents.
+
+**The vented-adder zoo + baked schedule tables (`gidney.rs`/`schedule.rs`) — this is the knob surface.**
+Every adder vents carry-uncompute via Gidney MBU (`hmr(carry,bit); cz_if_bit(a,b,bit)` = **0 Toffoli**,
++1 transient qubit held only between fwd/rev carry chains; **each vent = −1 Toffoli, +1 peak qubit**).
+Adder family, dispatched per-call by `GCD_BRANCH` (0=plain `controlled_hybrid_add_refs_impl` /
+1=`varchunk` / 2=`adaptive`→`chunked_then_cuccaro`). Baked tables, consumed in emission order — these
+are *the* per-site levers (the design reads NO live `live_qubits`; everything is the table + the
+`TRAILMIX_*_DELTA` overlays): `GCD_SUB_K` (GCD-subtract carry-cap), `GCD_BRANCH` (adder dispatch),
+`APPLY_COUT_K` (apply cofactor-add cap), `FOLD_SCHED` (fold vent: +=clean@nv / −=chunked), `CMP_K`
+(swap-comparator held carries), `FFG_G` (`+f`-fold clean-vent count), `HYB_V` (hybrid-adder exact vent
+count, verbatim), `SQ_ROW_K` (square row-add headroom). The `b310de9` overlay deltas
+(`TLM_HYB_V_DELTA`/`TLM_COUT_K_DELTA`/`TLM_FFG_DELTA`/`TLM_FOLD_DELTA`) subtract from these per-call to
+trade vents↔qubits at the peak; `TLM_GCD_K_ADJUST{,_AFTER,_BEFORE}` window-trims `GCD_SUB_K` in a
+divstep range.
+
+**The deliberate truncations (`arith.rs`).** `f=2^32+977`, `PAD` (was 21, now 19/`arith`, 20/`schedule`).
+Low-`LSBS=PAD+F_BITLEN`-bit `+f` fold drops carry beyond bit `LSBS−1` (~`2^-PAD`/fire miss);
+narrow-`MSBS=PAD`-bit overflow/swap comparators recompute the top predicate as a deferred-Z only where
+the HMR bit fired, tolerating a ~`2^-PAD`/fire mis-decide. Safe because each is an independent rare
+divergence and the common path is exact; `DIALOG_TAIL_NONCE` grinds inputs so all 9024 draws stay
+clean. **`PAD` is a live lever in both directions** (smaller = fewer live bits *and* fewer Toffoli, but
+higher miss rate to absorb in the nonce hunt).
+
+**The 1167→1164 cascade splits into three reusable lever families** (the rest is LF↔CRLF churn + pure
+nonce-grind commits — see report):
+
+- **3 *free* −1q peak drops** (`ab1b2d6`, `cea9f5f`, `f8d23a9`; 1167→1164), all the *same idea*:
+  **don't hold provably-constant divstep low bits live — park/loan them back to the free pool across
+  the adder that needs the headroom** (Toffoli ≈ neutral). odd-u0=1 (`TLM_PARK_ODD_U0`/`TLM_LOAN_ODD_U0`),
+  even-v0=0 (`TLM_PARK_EVEN_V0`), known gcd-y0 (`TLM_LOAN_GCD_Y0`, with `GcdBit0Mode` delaying the
+  bit-0 CNOT), and the redundant step-0 swap_flag (fold `t1` in via `ccx(t1,s2,sub)`). One open qubit
+  lever: **mine the divstep for more provably-constant lanes to park.**
+- **1 *paid* −1q drop** (`b310de9`; 1164→1163, current SOTA): **the qubit↔Toffoli exchange rate run in
+  reverse.** It does NOT find a new constant lane — it **surrenders vents at the binding apply phase**
+  (`TLM_HYB_V_DELTA=2`, `TLM_COUT_K_DELTA=1`, `TLM_FFG_DELTA=2`), freeing the transient vent qubits that
+  own the peak, for **+419 Toffoli / −1 peak** (net score −924,686, because each peak qubit ≈1.41M). The
+  companion lever is tightening `PAD` 21→19/20 (narrower `+f`-fold/comparator windows = fewer live bits
+  *and* fewer Toffoli, ~`2^-19`/fire miss) plus a fresh `DIALOG_TAIL_NONCE` clean under the tighter
+  budget. This is the **live SOTA lever**: as free constant lanes run out, spend a few hundred Toffoli
+  to buy each further peak qubit. See `references/REPORT_1168_wall_revamp.md` §2.5.
+- **Big Toffoli wins:** `bc2334a` −5.9M (exhaustive carry-chunk **layout search** minimizing
+  carry-ancilla cost per controlled add); `497cc20`+`b02b354` **constprop post-pass** (drop CCX with
+  provably-0 control, fold const-1 → CX, plus affine/XOR/inverse-pair tracking) — **model-agnostic,
+  would shave Toffoli on *any* of our routes**; `b1dec1e` the `d & !e = d ^ (e & d)` 2-CX identity;
+  `a47dc6e` skip-j0 cswap (a one-liner *enabled* by the parking commits making `u[0]`/`v[0]` constant).
+- **Deliberate budgeted truncation:** low-54-bit `+f` fold + narrow-21-bit comparators accept a
+  ~`2^-21`-per-fire miss; `PAD` (21→19/20) is a live Toffoli lever traded against the 9024-shot
+  verifier tolerance.
+
+**Corollary — shrunken-PZ stays a witness, not a contender.** teddyjfpender's 1019q PZ submission
+(`55892ec`) scored 32.1B (+283%) and was **rejected**. The action is entirely at the 1163–1167q
+ludicrous operating point; do not chase the sub-1050q PZ class for *score*.
+
 ### Compare-Bit Narrowing
 
 Several low-qubit routes reduce the number of clean compare bits kept live.
@@ -652,6 +782,14 @@ For Shrunken-PZ q980 follow-ups, also read the sibling skill references:
 
 - `../peak-qubit-reduction/references/Q980_SHRUNKEN_PZ_85D5DAE_HANDOFF.md`
 - `../toffoli-reduction/references/Q980_TOFFOLI_CUT_4352CFB_HANDOFF.md`
+
+For the **current base circuit** (the post-2026-06-19 frontier), read
+`references/REPORT_1168_wall_revamp.md` when the task involves `trailmix_ludicrous`, the
+classical-`Q` product-min lever, the two-shared-GCD-passes affine add, the all-triple base-5
+603q dialog tape, the provably-constant-lane parking (−1q) drops, the constprop/affine
+post-pass, or anything forking from the 1163–1167q ludicrous operating point. It maps every
+commit in the 1167→1164 cascade to its mechanism and file/function. See also the short
+"The 1168 Wall Broke" subsection above for the operating summary.
 
 ### Verified provenance (read directly from the sources)
 
