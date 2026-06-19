@@ -438,3 +438,121 @@ the move that fit it, and the win always came from the phase that was currently 
 This skill is the domain-agnostic method. For the concrete knob names, peak-owner traces, island
 validation, and exchange-rate numbers of the ECDSA-fail / quantum-ECC point-addition circuit, use
 the companion **ecdsafail-circuit-optimization** skill, which applies this loop to that codebase.
+
+---
+
+## Appendix — Concrete lever catalog (credit: benhuang2025)
+
+> **Source / credit.** The lever catalog below is adapted from
+> [`benhuang2025/ecdsafail-challenge` → `ecdsafail-agent/peak_reduction_skill.md`](https://github.com/benhuang2025/ecdsafail-challenge/blob/main/ecdsafail-agent/peak_reduction_skill.md),
+> by **benhuang2025**. It is a frontier-tested set of named peak-shaving levers, each with the
+> exact `src/point_add/` env knob / primitive and the commit that introduced it. The commit hashes,
+> tuned values, and `461a4a3` "current frontier" numbers are from *their* fork's lineage
+> (1221→1220→1218→1215 dialog-GCD route) — treat them as worked examples of the method, not our
+> live frontier. Re-screen every value against whatever base you are on. (Their operational notes —
+> host `zan3`, "never `git push`", `ecdsafail sync` — are their environment; ignore for ours.)
+
+**The peak model (their harness, `src/point_add/mod.rs`).** `peak_qubits` = the **max simultaneously
+live qubits** over the whole circuit, set by the single *widest* region (a persistent floor +
+transient ancillae held live across it). So peak drops NOT by making a phase cheaper, but by
+**shortening how long ancillae stay allocated across the widest region**. Primitives:
+`b.alloc_qubit()`/`alloc_qubits(n)` (pulls from the free pool if non-empty — reusing a freed slot
+without raising peak — else extends), `b.free(q)`/`free_vec` (returns to free pool; the qubit MUST
+hold |0⟩ first), `b.reacquire(q)`/`reacquire_vec` (pull a specific freed qubit back). Between
+`free(q)` and `reacquire(q)`, slot `q` is available to the wide region. On a mature base the peak is
+a **multi-binder floor** — several phases all at the same N; a single-phase cut does nothing, you
+must lower the **shared** floor (free a persistent ancilla, or free an idle one in *every* co-peak
+phase). Find binders with `TRACE_PEAK=1 build_circuit | grep -i peak`.
+
+**Lever A — free-and-recompute idle ancillae (the 1220→1218 win).** Free an ancilla that is *idle
+across the wide region* before that region, let the region reuse the slot (peak −1), then
+`reacquire` + re-derive it value-exact from still-live regs (aim for 0 net Toffoli: CX-only, or a
+single self-uncomputed CCX). Recompute base controls first, then dependents. Worked example
+(`arith/const_arith.rs`, the freed-tail fold): the secp256k1 fused fold keeps 8 fold ancillae live
+across the wide high tail.
+- `DIALOG_GCD_FOLD_FREED_TAIL=1` (`fold_freed_tail_enabled`): the 4 controls derived from `e,d`
+  (`h=e&d, xed=e^d, eord=e|d, n10=¬e&d`) are dead in the tail (fold positions ≤ `hi_delta=33`) —
+  free before the tail, recompute only for the carry-uncompute pass → tail high-water `+8→+4`.
+- `DIALOG_GCD_FOLD_FREED_TAIL_ED=1` (`fold_freed_tail_ed_enabled`): ALSO free the base controls
+  `e,d`, recomputable from the live overflow lanes (`d=ovf1&s2`, `e=ovf1^d^ovf2`) → `+4→+2` →
+  **1220→1218** (at `W=DIALOG_GCD_FOLD_CARRY_TRUNC_W=19`). Cost = a few CX + 1 CCX/call. Recompute
+  order (`const_arith.rs` ~1086–1108): reacquire+derive `d` first, then `e`, then `h,xed,eord,n10`.
+
+**Lever B — range-bound a register to drop a guard qubit.** A top **guard bit** (sign/overflow
+holder) exists only because an *intermediate* could transiently leave `[0,2^k)`. Prove the running
+value never leaves range — usually by **operation reordering** (apply additive terms before
+subtractive so partial sums never dip negative; the final result is identical) — then delete the
+guard bit; every phase holding it live drops by 1. Worked example (`arith/multiply.rs`,
+`round84_fold_hi_into_lo_aggregate`): the fold quotient `alloc_qubits(34)` with Solinas terms
+`[(0,+),(4,−),(5,−),(10,+),(32,+)]` dips negative (bit 33 = sign guard); reorder adds-first to
+`[(0,+),(10,+),(32,+),(4,−),(5,−)]` keeps it in `[0,2^33)` → `alloc_qubits(33)`, value-exact
+1221→1220. **Caveat:** SUBSUMED on their current frontier (`9191f81` borrows `quotient[33]` as
+scratch via `ROUND84_CORRECTION_WRAP_BORROW_QUOTIENT_TOP`) — the *method* reuses on other registers,
+don't re-apply to this quotient on a base that already borrows the top.
+
+**Lever C — peak-bounded segmentation + land-exactly + co-descend (Teddy Pender 1226q route,
+`08c5068`).** Segment a wide op (the round84 Solinas square) so its peak is a tunable segment width,
+making it a *bounded* binder you can dial. Recipe: (1) make ONE phase the single global binder, (2)
+co-descend every other co-binder strictly below it, (3) tighten the bound so the peak lands exactly
+at the binder. Knobs:
+- `SQUARE_ROW_MAX_SEG=<n>` — square segment width (primary peak dial once the square is the binder);
+  lower = lower peak until value-correctness breaks. Trail 199→194→193→191→188 (`420e0c2`)→**186
+  (`461a4a3`)**; try 184 next.
+- `DIALOG_GCD_APPLY_CHUNKED_F_BLOCKS=<n>` — apply-ripple chunk count; raise to push apply peak below
+  the square binder. Trail 11→12 (`420e0c2`)→**16 (`461a4a3`)**.
+- `ROUND84_QPROD_VENT_PAD=1` — pad the round84 quotient×c product so it vents below peak.
+`TRACE_PEAK` first: if multiple co-binders are tied, decrementing one knob doesn't move the global peak.
+
+**Lever D — keep-alive instead of uncompute-recompute (the dual of Lever A).** If the
+uncompute+recompute round-trip *transiently allocates a WIDER intermediate* than just holding the
+value, do the opposite — **keep the wide intermediate LIVE** across the middle op, skip the
+round-trip. `ROUND84_KEEP_QUOTIENT_PRODUCT=1` (`997dbd6`, 1221→1220): keep the 66-bit quotient×c
+product live across the middle subtraction; the recompute would re-expand it to full width (above
+peak), so holding it is −1 peak. **Pick A vs D by comparing two transient widths**: recompute peak
+transient < holding footprint → free+recompute (A); holding footprint < recompute transient → keep
+alive (D). Both value-exact — flip the flag and `TRACE_PEAK` both.
+
+**Lever E — buy peak-relief more cheaply (top-clean carry split).** Peak relief bought by streaming
+high bits through controlled suffix adders costs Toffoli. The same live-scratch reduction can be a
+**top-clean carry split**: keep only ~2 streamed suffix bits, replace the removed stream bits with
+coherent top-clean MAJ/UMA carry positions in the materialized prefix — live scratch flat (peak
+unchanged), emitted Toffoli drops (`2a87f33`). A peak-neutral Toffoli win (see the carry-relief
+exchange in the toffoli-reduction skill).
+
+**Lever F — in-place decode to free a persistent block (the 1218→1215 win).** Keep a register block
+alive **compressed** and decode it **in place** only for the phase that needs it, freeing the
+persistent full-width block exactly across the peak. `DIALOG_GCD_K2_APPLY_INPLACE_RAW_BLOCK=1`
+(`420e0c2`): decode the K2 pair block in place from its 5 compressed cells + one zero lane, freeing
+the persistent 6-lane raw block during apply (clean scratch only around the chunked add/sub) → −1 at
+peak (with `SQUARE_ROW_MAX_SEG` 191→188 + `APPLY_CHUNKED_F_BLOCKS` 11→12, net −3 → 1215). The
+persistent-qubit version of Lever A: carry any persistent multi-lane block (raw GCD blocks, K2 pairs,
+materialized operands) compressed, reconstruct transiently in place at its single use site.
+
+**Lever G — borrowed-carry fusion (in-place scratch reuse, value-exact).** A truncated-carry
+`cadd`/`csub` normally allocates a fresh carry/borrow vector then frees it. If an adjacent
+`inner_scratch` is live with enough width, the carry vector **borrows from that scratch** — no fresh
+alloc, peak −k for k borrowed slots; only the *owned* fresh suffix is freed afterward (the borrowed
+prefix was never yours). Mechanism (`const_arith.rs`, `461a4a3`): helper
+`borrowed_const_fold_carries(b, need, borrowed) -> (full_vec, owned_vec)`; callers
+`cadd/csub_nbit_const_direct_trunc_fast_borrowed_carries(…, borrowed_carries)`.
+- `DIALOG_GCD_SPECIAL_FOLD_BORROW_CARRIES=1` (`461a4a3`): GCD special `cadd`/`csub` borrow from
+  `inner_scratch`.
+- Comparator paths (`98dd2ad`, `bfd3fa6`): `cmp_lt_phase_conditioned_borrowed_carries()` recycles
+  existing scratch carries AND uses HMR replay (toffoli-reduction Lever H) — saves Toffoli AND avoids
+  fresh carry alloc. Hunt any `cmp_lt`/`cmod_add/sub` allocating a fresh carry vector.
+**Key property:** value-exact ONLY if the borrowed qubits are genuinely |0⟩ at that point (else it's
+data corruption — verify carefully).
+
+**Verification (every lever).** Value/phase-exact lifetime changes must not alter the op-stream
+*function*. After each: `eval_circuit` must show `qubits = N-1, 0/0/0`, and `TRACE_PEAK` must show
+the floor moved to N-1. If the op bytes change, the baked `DIALOG_TAIL_NONCE` goes stale (expected) →
+re-hunt a clean nonce. Env-gate every lever default-OFF with a byte-identical base path; only
+`set_default_env(...)` it ON once verified. `free` requires |0⟩; only `reacquire` what you freed.
+
+> Note: several of these knobs (`DIALOG_GCD_FOLD_FREED_TAIL{,_ED}`, `SQUARE_ROW_MAX_SEG`,
+> `DIALOG_GCD_APPLY_CHUNKED_F_BLOCKS`, `ROUND84_KEEP_QUOTIENT_PRODUCT`,
+> `DIALOG_GCD_K2_APPLY_INPLACE_RAW_BLOCK`, `DIALOG_GCD_SPECIAL_FOLD_BORROW_CARRIES`) also appear in
+> our own **ecdsafail-circuit-optimization** notes — the benhuang catalog is an independent,
+> commit-attributed cross-check of the same lever families on the dialog-GCD route. (Note this route
+> is the pre-`trailmix_ludicrous` base; see the circuit-opt skill's "1168 Wall Broke" section for
+> how the current SOTA family relates.)
