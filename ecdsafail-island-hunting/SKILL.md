@@ -584,6 +584,244 @@ a large backlog — and validate FULL only (no fast-reject): the near-miss `cls 
 distribution and the per-channel-zero check (loop step 5.2) both need exact counts, which the
 fast path's early-out cannot give.**
 
+### Distributed own-host validation
+
+For high-density hunts, scanning and validation should be distributed together. The default
+ownership rule is:
+
+```text
+Each GPU machine validates the GCD-clean candidates found by its own scanner logs.
+```
+
+Do not centralize all candidates onto one validator except as a temporary recovery step. Central
+sharding creates avoidable delay, duplicate work, stale backlogs, and unclear ownership. The
+machine that produces a local `CLEAN nonce=...` prefilter line should immediately feed that nonce
+to a local full-validator loop on the same host.
+
+Before launching distributed validation for a route, pin and record these artifacts:
+
+- circuit source commit and local diff summary
+- exact circuit CFG / env
+- GPU state file path and sha256
+- GPU toolkit branch and commit
+- remote validator source archive sha256, if source is copied to remotes
+- `build_circuit` and `eval_circuit` hashes per remote toolchain
+- accepted local/remote anchor nonce triples
+
+Use a consistent remote layout on every host, parameterized by the route name:
+
+```text
+/root/.ecdsafail_island_<route>/logs/*.log      scan logs
+/root/<route>_remote_validate.sh                full validator wrapper
+/root/<route>_validate_own_loop.sh              per-host validation loop
+/root/<route>_own_validation/results.log        own-host full-validation output
+/root/<route>_own_validation/done.txt           validated nonce skip-list
+/root/<route>_own_validation/batch_<ts>.txt      nonce batch currently being validated
+/root/<route>_own_validation/loop.out           loop diagnostics
+```
+
+Older shard logs may be retained for audit, but new validation should flow through the own-host
+loop unless recovering from a broken node.
+
+#### Remote result ledger and local mirror
+
+Every remote validator must write durable results on the remote machine first. Do not rely on
+terminal scrollback, stdout from an SSH session, or local-only validation output as the record of
+truth. Each full-validation worker should append one parseable line per nonce to:
+
+```text
+/root/<route>_own_validation/results.log
+```
+
+Append results before adding that nonce to `done.txt`; if validation returns `ERROR`, write the
+`ERROR` line but leave the nonce out of the final validated skip-list so it can be retried. When
+multiple validator workers are active, use an append-safe pattern such as a per-worker temp file
+followed by a locked append, or `flock` around writes to `results.log` and `done.txt`. Avoid any
+loop that marks a nonce done before its result line is durably written.
+
+Every heartbeat should mirror remote result ledgers into a local audit directory, preserving both
+raw per-host logs and a combined parsed view. Use a predictable local layout such as:
+
+```text
+outputs/<route>_validation_results/raw/<host>.results.log
+outputs/<route>_validation_results/combined.tsv
+outputs/<route>_validation_results/near_misses.tsv
+outputs/<route>_validation_results/clean_hits.tsv
+outputs/<route>_validation_results/sync.log
+```
+
+The raw per-host files should be exact mirrors of remote `results.log` files. The combined TSV
+should add at least `host`, `nonce`, `verdict`, `cls`, `pha`, `anc`, `tof`, and `qubits`, then
+deduplicate by nonce so the user can inspect one local file without SSHing into every node. Keep
+`clean_hits.tsv` and `near_misses.tsv` regenerated from `combined.tsv`; do not hand-maintain them.
+
+For periodic mirroring, prefer idempotent pulls that overwrite each host mirror atomically, then
+rebuild combined files locally:
+
+```bash
+ssh <host> "cat /root/<route>_own_validation/results.log" > raw/<host>.results.log.tmp
+mv raw/<host>.results.log.tmp raw/<host>.results.log
+# then parse all raw/*.results.log into combined.tsv, near_misses.tsv, and clean_hits.tsv
+```
+
+If live streaming is useful, run a `tail -F` stream per host into host-specific raw files, but still
+rebuild `combined.tsv` by parsing and deduplicating the raw logs. Streaming is an accelerator, not a
+replacement for the remote ledger.
+
+#### Skip-list discipline
+
+Before starting or restarting distributed validation:
+
+1. Collect all previously validated nonces from every remote validator log.
+2. Merge them into one sorted unique global skip-list.
+3. Copy that list to every host.
+4. Seed each host's `<route>_own_validation/done.txt` from the global list.
+
+Every validation loop should also re-scan prior local validator logs and merge their nonce IDs into
+`done.txt`. This protects against restarts, old shard logs, and partially completed batches.
+
+Avoid `comm` for filtering unless both inputs are guaranteed to use the same lexical sort. Prefer a
+hash-set filter:
+
+```bash
+awk 'NR==FNR { done[$1]=1; next } !($1 in done)' done.txt all_candidates.txt
+```
+
+Before launching a large validation batch, sanity-check that no batch nonce is already in
+`done.txt` and that the batch has no duplicates:
+
+```bash
+awk 'NR==FNR { d[$1]=1; next } ($1 in d) { c++ } END { print c+0 }' done.txt batch.txt
+sort -n batch.txt | uniq -d | wc -l
+```
+
+Both numbers should be `0`.
+
+#### Per-host validation loop
+
+The loop should:
+
+1. Read only that host's local scanner logs.
+2. Extract GCD-clean candidate nonces from `CLEAN nonce=<n>`.
+3. Remove nonces already present in `done.txt` or previous validation logs.
+4. Validate the remaining nonces in parallel with full validation.
+5. Append parseable output to `results.log`.
+6. Add only successfully validated `dirty` / `CLEAN` nonce IDs to `done.txt`; keep `ERROR`
+   nonces retryable.
+7. Repeat.
+
+Parallelism is part of the correctness of the operational procedure: a GPU host that scans
+quickly but validates candidates with one serial process will build a stale backlog and hide clean
+hits. Run a **multi-process validator pool on every scanning host**, sized to that host's CPU/GPU
+capacity, and keep increasing it until validation throughput stops improving or the machine becomes
+unstable.
+
+Starting parallelism:
+
+```text
+single RTX5090 host: Q_VALIDATE_PAR=4,  Q_VALIDATE_BATCH=512
+4x L40S host:       Q_VALIDATE_PAR=8,  Q_VALIDATE_BATCH=1024
+4x RTX5090 host:    Q_VALIDATE_PAR=12, Q_VALIDATE_BATCH=1536
+```
+
+These are conservative starting points, not ceilings. On a large remote node, inspect `nproc`,
+current load, memory pressure, and scanner contention, then ramp upward in steps:
+
+```text
+single-GPU host: try 4 -> 6 -> 8 workers
+4-GPU host:      try 8 -> 12 -> 16 -> 24+ workers
+```
+
+If the validator is CPU-only, the worker cap is usually host CPU cores minus a small reserve for
+scanner/logging processes. If a future validator uses GPU kernels, shard workers so every GPU has
+active validation work and avoid putting all validation on GPU0. In either case, the heartbeat
+should show **both** active scanner processes and multiple active validation children per host.
+
+Tune only after checking that the machine remains responsive and validation latency is acceptable.
+If validation results are not keeping up with GCD-clean candidate production, increase
+`Q_VALIDATE_PAR`, increase batch size, or add more validator hosts before assigning more scan range.
+
+The remote validator must use full validation:
+
+```bash
+EVAL_FAST_REJECT=0
+```
+
+Each nonce must produce exactly one parseable result line:
+
+```text
+dirty nonce=<n> cls=<c> pha=<p> anc=<a> tof=<avgT> qubits=<q>
+CLEAN nonce=<n> cls=0 pha=0 anc=0 tof=<avgT> qubits=<q>
+ERROR nonce=<n> rc=<code>
+```
+
+Treat `ERROR` as unvalidated. Do not add it to final clean/dirty statistics until it is rerun
+successfully.
+
+Monitor both scanner and validator activity per host:
+
+```bash
+ps -eo pid,etime,cmd | grep -E '<route>_validate_own_loop|<route>_remote_validate|search_driver|gpu_island' | grep -v grep
+pgrep -fc '<route>_remote_validate'
+wc -l /root/<route>_own_validation/done.txt
+wc -l /root/<route>_own_validation/results.log
+tail -10 /root/<route>_own_validation/results.log
+```
+
+Useful heartbeat fields include active scanner ranges, validator loop PID, active full-validator
+children, configured `Q_VALIDATE_PAR`, observed validator throughput, `done.txt` count,
+`results.log` count, remote-to-local mirror status, local `combined.tsv` row count, local
+`clean_hits.tsv` row count, duplicate sanity status for the latest batch, and best near misses from
+newly validated results.
+
+#### Local cross-checks are trust checks only
+
+Local validation is for remote-validator trust, not throughput.
+
+Use this policy:
+
+- After a new validator build, new GPU host, changed source, changed CFG, or changed state:
+  cross-check several anchors locally and remotely.
+- During steady-state hunting after anchors agree: cross-check the active hunt's requested sample
+  size, often one recent candidate per heartbeat for high-density hunts. If no sample size is
+  specified, use five.
+- If any remote/local mismatch appears: quarantine that host, stop trusting its validator output,
+  rebuild or redeploy, then re-anchor.
+
+The cross-check must compare exact `nonce`, verdict, `cls`, `pha`, and `anc`. Do not accept
+approximate agreement. Do not report anchor nonce results as new hunt results.
+
+#### Clean hit handling
+
+If any remote log contains:
+
+```text
+CLEAN nonce=<n> cls=0 pha=0 anc=0
+```
+
+immediately:
+
+1. Locally full-validate the same nonce with the exact CFG and state.
+2. If local validation agrees, bake the CFG and nonce into the challenge worktree.
+3. Run `ecdsafail run`.
+4. If the run is clean and score policy allows it, run `ecdsafail submit`.
+5. Preserve the solution on a branch with a detailed commit message.
+
+Do not wait for the rest of the backlog to drain once a local-confirmed clean hit exists.
+
+Anti-patterns:
+
+- Validating all hosts' candidates on only one machine.
+- Letting 5090s scan while only L40S hosts validate, or vice versa.
+- Running only one validation process on a multi-core or multi-GPU host.
+- Assigning more scan ranges while validation backlog is growing.
+- Revalidating old nonces because each host has only a local skip-list.
+- Reporting anchor nonce results as if they were new hunt results.
+- Trusting a remote validator before anchor agreement.
+- Using fast validation for final clean/dirty accounting.
+- Losing the exact CFG/state/toolkit hashes that produced a candidate.
+- Killing scanner processes while trying to restart validator loops.
+
 During an active island hunt, **candidate validation is part of every heartbeat**, and it has
 **TWO distinct jobs that must not be conflated**:
 
@@ -592,19 +830,20 @@ During an active island hunt, **candidate validation is part of every heartbeat*
    backlog every beat.** Do not let the GPU scan frontier advance while GCD-clean candidates pile
    up unvalidated. The remote validators exist precisely so you can validate *all* of them in
    parallel, not a handful.
-2. **Cross-check exactly 5 of those candidates against local validation** — this is a **trust gate
-   on the remote validator, NOT the validation itself.** Re-run 5 of the just-validated candidates
-   on the local CPU and require exact `cls / pha / anc` agreement before trusting the node's
-   verdicts for the rest.
+2. **Cross-check a small requested sample against local validation** — this is a **trust gate on
+   the remote validator, NOT the validation itself.** If the hunt instructions specify a sample
+   size, use that exact size; otherwise use 5. Re-run those just-validated candidates on the local
+   CPU and require exact `cls / pha / anc` agreement before trusting the node's verdicts for the
+   rest.
 
-> **The single most common failure here:** treating the 5-sample cross-check *as* the validation
-> and only validating 5 candidates per heartbeat. That is WRONG. Validate **all** newly-discovered
-> GCD-clean candidates remotely; the 5 local re-runs are *only* to confirm the remote validator
-> agrees with local. If you ever find yourself validating just 5 and leaving the rest of the new
+> **The single most common failure here:** treating the local cross-check sample *as* the validation
+> and only validating that small sample per heartbeat. That is WRONG. Validate **all** newly-discovered
+> GCD-clean candidates remotely; the local re-runs are *only* to confirm the remote validator
+> agrees with local. If you ever find yourself validating just the cross-check sample and leaving the rest of the new
 > candidates unchecked, stop — you are doing it wrong.
 
 Each heartbeat, report: how many new candidates were remote-validated (backlog drained to zero or
-the remaining count), which shards/nodes did the validating, the 5-sample cross-check result, and
+the remaining count), which shards/nodes did the validating, the local cross-check result, and
 any clean `0/0/0`. If remote validation is blocked, stale, or not yet trusted, say so explicitly
 and keep a local validation sample moving so the route's `cls / pha / anc` distribution stays
 current — but the goal is still to validate *every* new candidate, just locally until the remote
@@ -671,10 +910,13 @@ The heartbeat prompt should be self-contained. Include:
 - GPU node inventory and SSH commands
 - current assigned ranges, highest frontier, and already completed windows
 - known candidate totals, density, and best validated `cls / pha / anc` near misses
+- per-host validator loop status, active validator child count, configured parallelism, and whether
+  validation throughput is keeping up with scan throughput
 - a validation mandate: every heartbeat must **remote-validate ALL newly-discovered GCD-clean
   candidates** (distributed, full mode — drain the backlog, not just a sample), and **separately
-  cross-check 5 of them against local validation** as the remote-validator trust gate (exact
-  `cls / pha / anc` agreement). The 5 are the trust check, NOT the validation — validate them all.
+  cross-check the requested local sample size** as the remote-validator trust gate (default 5 when
+  unspecified; exact `cls / pha / anc` agreement). The local sample is the trust check, NOT the
+  validation — validate them all.
 - submission policy: submit to ecdsafail only if measured score beats SOTA, unless the user explicitly says otherwise
 - branch policy for clean-but-worse low-qubit results, if requested
 - a reminder not to commit temp configs, scan logs, helper binaries, `ops.bin`, GPU states, or generated artifacts
@@ -687,9 +929,10 @@ Heartbeat work order:
 2. Extract newly flushed GCD-clean candidates and update the backlog.
 3. **Remote-validate every newly-discovered GCD-clean candidate** this beat — distributed across the
    GPU boxes, full mode. The aim is to drain the *entire* new-candidate backlog, not to spot-check.
-4. **Additionally** cross-check **5** of those candidates with a local re-run; require exact
-   `cls / pha / anc` agreement before trusting the remote node's verdicts for the rest. (This is a
-   trust gate *on top of* step 3 — it does not replace remote-validating all the others.)
+4. **Additionally** cross-check the requested sample size of those candidates with a local re-run
+   (default 5 when unspecified); require exact `cls / pha / anc` agreement before trusting the
+   remote node's verdicts for the rest. This is a trust gate *on top of* step 3 — it does not
+   replace remote-validating all the others.
 5. Report validation progress, backlog remaining, validator trust status, best near misses, and any
    clean `0 / 0 / 0` immediately.
 
