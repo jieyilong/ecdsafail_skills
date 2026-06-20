@@ -615,6 +615,7 @@ Use a consistent remote layout on every host, parameterized by the route name:
 /root/<route>_remote_validate.sh                full validator wrapper
 /root/<route>_validate_own_loop.sh              per-host validation loop
 /root/<route>_own_validation/results.log        own-host full-validation output
+/root/<route>_own_validation/errors.log         retryable build/eval failures, not verdicts
 /root/<route>_own_validation/done.txt           validated nonce skip-list
 /root/<route>_own_validation/batch_<ts>.txt      nonce batch currently being validated
 /root/<route>_own_validation/loop.out           loop diagnostics
@@ -627,23 +628,41 @@ loop unless recovering from a broken node.
 
 Every remote validator must write durable results on the remote machine first. Do not rely on
 terminal scrollback, stdout from an SSH session, or local-only validation output as the record of
-truth. Each full-validation worker should append one parseable line per nonce to:
+truth. Each full-validation worker should append one parseable verdict line per successfully
+evaluated nonce to:
 
 ```text
 /root/<route>_own_validation/results.log
 ```
 
-Append results before adding that nonce to `done.txt`; if validation returns `ERROR`, write the
-`ERROR` line but leave the nonce out of the final validated skip-list so it can be retried. When
-multiple validator workers are active, use an append-safe pattern such as a per-worker temp file
-followed by a locked append, or `flock` around writes to `results.log` and `done.txt`. Avoid any
-loop that marks a nonce done before its result line is durably written.
+`results.log` is a verdict ledger, not a diagnostics stream. It should contain only completed
+`dirty` / `CLEAN` full-validation verdicts. Route retryable operational failures to:
+
+```text
+/root/<route>_own_validation/errors.log
+```
+
+Append the verdict line before adding that nonce to `done.txt`. If validation returns `ERROR`,
+append the error to `errors.log`, leave the nonce out of `done.txt`, and rerun it later. When
+multiple validator workers are active, use an append-safe pattern such as `flock`, or set toolkit
+ledger variables:
+
+```bash
+VALIDATE_RESULTS_LOG=/root/<route>_own_validation/results.log
+VALIDATE_ERRORS_LOG=/root/<route>_own_validation/errors.log
+VALIDATE_LOCK_FILE=/root/<route>_own_validation/validate.lock
+```
+
+Avoid any loop that marks a nonce done before its result line is durably written. If an old or
+interrupted loop pollutes `results.log` with `ERROR` rows, take the same lock, move those rows to
+`errors.log`, rebuild local mirrors, and treat the affected nonces as retryable.
 
 Every heartbeat should mirror remote result ledgers into a local audit directory, preserving both
 raw per-host logs and a combined parsed view. Use a predictable local layout such as:
 
 ```text
 outputs/<route>_validation_results/raw/<host>.results.log
+outputs/<route>_validation_results/raw/<host>.errors.log
 outputs/<route>_validation_results/combined.tsv
 outputs/<route>_validation_results/near_misses.tsv
 outputs/<route>_validation_results/clean_hits.tsv
@@ -654,6 +673,7 @@ The raw per-host files should be exact mirrors of remote `results.log` files. Th
 should add at least `host`, `nonce`, `verdict`, `cls`, `pha`, `anc`, `tof`, and `qubits`, then
 deduplicate by nonce so the user can inspect one local file without SSHing into every node. Keep
 `clean_hits.tsv` and `near_misses.tsv` regenerated from `combined.tsv`; do not hand-maintain them.
+Mirror `errors.log` separately for retry audits, but do not parse error rows into `combined.tsv`.
 
 For periodic mirroring, prefer idempotent pulls that overwrite each host mirror atomically, then
 rebuild combined files locally:
@@ -705,7 +725,8 @@ The loop should:
 2. Extract GCD-clean candidate nonces from `CLEAN nonce=<n>`.
 3. Remove nonces already present in `done.txt` or previous validation logs.
 4. Validate the remaining nonces in parallel with full validation.
-5. Append parseable output to `results.log`.
+5. Append parseable `dirty` / `CLEAN` verdict output to `results.log`; route `ERROR` output to
+   `errors.log`.
 6. Add only successfully validated `dirty` / `CLEAN` nonce IDs to `done.txt`; keep `ERROR`
    nonces retryable.
 7. Repeat.
@@ -747,12 +768,18 @@ The remote validator must use full validation:
 EVAL_FAST_REJECT=0
 ```
 
-Each nonce must produce exactly one parseable result line:
+Each successfully evaluated nonce must produce exactly one parseable verdict line in
+`results.log`:
 
 ```text
 dirty nonce=<n> cls=<c> pha=<p> anc=<a> tof=<avgT> qubits=<q>
 CLEAN nonce=<n> cls=0 pha=0 anc=0 tof=<avgT> qubits=<q>
-ERROR nonce=<n> rc=<code>
+```
+
+Build/eval failures must go to `errors.log`:
+
+```text
+ERROR nonce=<n> stage=<build|eval> rc=<code> ...
 ```
 
 Treat `ERROR` as unvalidated. Do not add it to final clean/dirty statistics until it is rerun
@@ -765,12 +792,13 @@ ps -eo pid,etime,cmd | grep -E '<route>_validate_own_loop|<route>_remote_validat
 pgrep -fc '<route>_remote_validate'
 wc -l /root/<route>_own_validation/done.txt
 wc -l /root/<route>_own_validation/results.log
+wc -l /root/<route>_own_validation/errors.log
 tail -10 /root/<route>_own_validation/results.log
 ```
 
 Useful heartbeat fields include active scanner ranges, validator loop PID, active full-validator
 children, configured `Q_VALIDATE_PAR`, observed validator throughput, `done.txt` count,
-`results.log` count, remote-to-local mirror status, local `combined.tsv` row count, local
+`results.log` count, `errors.log` count, remote-to-local mirror status, local `combined.tsv` row count, local
 `clean_hits.tsv` row count, duplicate sanity status for the latest batch, and best near misses from
 newly validated results.
 
@@ -801,13 +829,15 @@ CLEAN nonce=<n> cls=0 pha=0 anc=0
 
 immediately:
 
-1. Locally full-validate the same nonce with the exact CFG and state.
-2. If local validation agrees, bake the CFG and nonce into the challenge worktree.
-3. Run `ecdsafail run`.
-4. If the run is clean and score policy allows it, run `ecdsafail submit`.
-5. Preserve the solution on a branch with a detailed commit message.
+1. Follow the current user policy for the hunt. Default policy is local full-validation first; if
+   the user explicitly requested submit-first during a race, submit immediately on the remote full
+   validator hit and run local verification afterward.
+2. Bake the CFG and nonce into the challenge worktree.
+3. Run `ecdsafail run` when policy requires local confirmation or after submit-first completion.
+4. Preserve the solution on a branch with a detailed commit message.
 
-Do not wait for the rest of the backlog to drain once a local-confirmed clean hit exists.
+Do not wait for the rest of the backlog to drain once a clean hit has satisfied the active
+submission policy.
 
 Anti-patterns:
 
