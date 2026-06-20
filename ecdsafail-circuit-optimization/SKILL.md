@@ -462,10 +462,10 @@ trailmix's **product-min "ludicrous"** point onto `B` (new module
 `src/point_add/trailmix_ludicrous/`, `build()` now calls `build_trailmix_ludicrous_ops()`). It landed
 **1167q × 1,422,591 = 1,660,163,697**, and a swarm drove it to **1163q × 1,412,402** (`b310de9`) in ~15h,
 then a second burst (Karatsuba square + NAF recoding + a qubit↔Toffoli bifurcation that then *resolved
-into best-of-both*) to the **current SOTA 1159q × 1,380,711 = 1,600,244,049** (`d11bdbb`/`88ed0f5`,
-BitWonka, 6/20) — cheap Karatsuba arithmetic with the 1159q headroom clamp re-stacked on top.
-**This supersedes the dialog-GCD 1168/1170 route as the base to fork from.** Full analysis:
-`references/REPORT_1168_wall_revamp.md` (the burst is §2.6).
+into best-of-both*, `d11bdbb` 1159q × 1,380,711), and a third Toffoli-grind wave to the **current SOTA
+1159q × 1,378,242 = 1,597,382,478** (`f8e215b`/`4966254`, gopikannappan, 6/20). **This supersedes the
+dialog-GCD 1168/1170 route as the base to fork from.** Full analysis:
+`references/REPORT_1168_wall_revamp.md` (the bursts are §2.6–§2.7).
 
 **Module map (`src/point_add/trailmix_ludicrous/`, fork from here).** `mod.rs` =
 `build_trailmix_ludicrous_ops()` (register alloc order pins fuzzer IO ids), `load_schedule()` (copies
@@ -576,8 +576,11 @@ nonce-grind commits — see report):
   `target_qubit_headroom = TLM_TARGET_Q − active_qubits` clamps EVERY transient adder's carry/chunk to
   `min(scheduled_k, headroom)` so no local peak exceeds the target — a circuit-wide "do not exceed N
   qubits" governor (`TLM_TARGET_Q`, `TLM_TARGET_FFG_RESERVE`, `TLM_TARGET_FOLD_RESERVE`,
-  `TLM_GCD_RESELECT_LAYOUT`, `TLM_DIRECT_VARCHUNK`). **⚠ These only win if they clear the break-even
-  below.**
+  `TLM_GCD_RESELECT_LAYOUT`, `TLM_DIRECT_VARCHUNK`). **Dropping the ceiling is a one-line lever**: `6ba606a`
+  went 1159→1157 by just `TLM_TARGET_Q` 1159→1157 (clamp body unchanged), paid for with new per-call FFG
+  reserve overrides (`TLM_TARGET_FFG_CALL_RESERVE_DELTAS/OVERRIDES`), a **lazy-cin0 fold**
+  (`TLM_FOLD_CHUNK_LAZY_CIN0` — alloc the chunk carry only inside the boundary-erase, deferring one
+  carry's liveness), and vent deltas. **⚠ These only win if they clear the break-even below.**
 - **⭐ The break-even rule (the meta-lever) — and its cost is PER-BASE, not fixed.** A peak qubit is
   worth `avg_Toffoli / peak_qubits` Toffoli (**≈1,190 at the 1159q floor**). A width-narrowing lever is
   net-positive **only if it removes a qubit for < that many Toffoli**. But the realized cost *moves with
@@ -588,7 +591,12 @@ nonce-grind commits — see report):
   (1159q vs 1164q) then *resolved* — the qubit and Toffoli levers **compose**; they're rarely truly
   opposed. **⇒ After any structural arithmetic change, RE-TEST every shelved qubit lever — the
   break-even moved. Always divide a candidate's realized Toffoli-delta by its qubit-delta vs the
-  *current* `T_avg/q`.** See `references/REPORT_1168_wall_revamp.md` §2.6.
+  *current* `T_avg/q`.** Newest data point: `6ba606a`'s 1159→1157 drop cost ~1,127 Toffoli/qubit (just
+  *under* the ~1,189 break-even, so it won −148k *at landing*) — but it was then overtaken because the
+  parallel **1159q Toffoli-grind** independently reached 1,378,242, and `1159×1,378,242 < 1157×1,380,890`.
+  **Lesson: a width drop that clears break-even can still lose the product race to a cheaper-Toffoli
+  wider base. Run both tracks; the lower product wins, not the lower qubit count.** See
+  `references/REPORT_1168_wall_revamp.md` §2.6–§2.7.
 - **⭐ Biggest Toffoli wins = better arithmetic at the dominant cost-center (huge leverage from tiny
   diffs).** `28fe2f2` **Karatsuba modular square** (−22.4M, the single biggest win in the saga, +175/−47
   diff): split `λ = hi·2^128 + lo`, compute `lo²`, `hi²`, `(lo+hi)²`, recombine — 3 n=128 squares
@@ -599,21 +607,51 @@ nonce-grind commits — see report):
   (`TLM_SQUARE_F_SHIFTED_LOW`). **Lesson: audit any O(n²) or ×258×2 primitive (the square, the
   reduction) for a structural improvement before touching schedule knobs — open follow-up: recurse
   Karatsuba on the n=128 halves.**
+- **⭐ Comparator-width (`GAP_J2`) narrowing — the highest-leverage Toffoli lever per line of diff.**
+  `f0c1c42` (bket7) cut **−1.33M from a 22-line schedule-table edit.** `GAP_J2[i]` (`schedule.rs`, len
+  258) is the per-step swap-decision comparator **window width** for the jump=2 GCD; `gcd.rs` sets
+  `cmp_eff = GAP_J2[i].min(current_n)` and the held Gidney carries / compared MSBs in
+  `compare_geq_chunked_middle` scale with it. Shaving 1 bit/step **×258 steps ×2 GCD passes** is the
+  −1.33M. Cost: mis-decides the u↔v swap with prob ~`2^-k` when the top differing bit falls just below
+  the window — an island-exact truncation recovered by the tail-nonce hunt. *This is the
+  `DIALOG_GCD_FOLD_CARRY_TRUNC_W`-style lever native to the ludicrous GCD; sweep it one notch at a time.*
+- **⭐ Converged-tail cswap elision (`TLM_APPLY_CSWAP_SKIP_LASTK`).** On the last K GCD iters the apply
+  `cswap`'s swap-decision is deterministically 0 for all-but-rare inputs (the GCD has converged), so it's
+  a no-op — skip it (`apply_cswap_skip_dir` in `gcd.rs`, `5c34dd1`→`9d524b7`, −151k+). Island-exact
+  (huntable). A *structural* instance of "elide a data-dependent gate known-0 on the island."
+- **Classical-constant folding (Q is classical → do constant arithmetic for free).** `662e267` rewrote
+  `coord_add3x` (`dst += 3·ox mod q`) to derive `3·ox mod q` entirely in the **classical `BitId`
+  domain** (`classical_times3_mod_q`, all `BitStore/BitInvert`, 0 Toffoli) then one `mod_add_exact` —
+  removing the doubling + 2nd mod-add + 257-bit temp (~−400 Tof/call). Audit every coord step touching
+  the classical `ox`/`oy` for constant-folding into the bit domain. *(Note: this oscillated in/out vs a
+  peak concern — it trades Toffoli for a transient; check peak before keeping.)*
+- **Doubling-ramp elimination in the reduction (the SOTA lever, `f8e215b`).** The `f·value mod q` NAF
+  reduction inside the Karatsuba square no longer builds a 257-bit `ext` and walks a `mod_double` ramp
+  to each NAF shift offset; a new default branch in `square.rs::apply_f_times_value_tagged` applies each
+  term `±(value≪shift) mod q` **directly** via `apply_shifted_hi_term` (`mod_add/sub_shifted_low` +
+  per-wrapped-bit `add/sub_f_window_shifted` pseudo-Mersenne folds). Value-exact, −156k. *Extends the
+  shifted-low idea (`4ea8b74`) to the Karatsuba reduce; audit any `mod_double`-ramp shift for the same.*
+- **Carry-drop-cout + MBU vent (`TLM_GRAD_FINAL_NO_COUT`).** Drop the unneeded final carry-out of the
+  top constant-add chunk and uncompute the chunk's carries with `hmr`+`cz_if_bit` (0-Toffoli MBU)
+  instead of a CCX (`const_chunk_add_clean_drop_cout`, `arith.rs`, `5c34dd1`).
 - **Schedule-level Toffoli wins:** `bc2334a` −5.9M (exhaustive carry-chunk **layout search**);
   `497cc20`+`b02b354` **constprop post-pass** (drop CCX with const-0 control, fold const-1→CX, +
   affine/XOR/inverse-pair; **`CONSTPROP_MAX_ITERS` controls fixpoint depth** — `d2643bc` 16→256 = −377k)
   — model-agnostic; `b1dec1e` `d & !e = d ^ (e & d)` 2-CX identity; `a47dc6e` skip-j0 cswap;
-  `LUD_EXTRA_FOLD_VENTS` (more Gidney vents in GCD fold rounds, `3df690f`).
+  `LUD_EXTRA_FOLD_VENTS` (more Gidney vents in GCD fold rounds, `3df690f`); the `*_DELTA` knobs
+  (`TLM_HYB_V_DELTA`/`TLM_COUT_K_DELTA`/`TLM_FOLD_DELTA`) narrow scheduled vent/cap values one more step.
 - **Deliberate budgeted truncation:** low-`(PAD+33)`-bit `+f` fold + narrow-`PAD`-bit comparators accept
   a ~`2^-PAD`-per-fire miss; `PAD` (21↔19/20) is a live two-direction lever (smaller = fewer Toffoli +
-  fewer live bits, more miss to absorb in the nonce hunt).
+  fewer live bits, more miss to absorb in the nonce hunt). `GAP_J2` (above) is the same idea on the
+  swap comparator.
 
 **Corollary — neither extreme is score-competitive; stay in the 1159–1164q band.** teddyjfpender's
 sub-1020q PZ submissions (`55892ec`/`a77c9da`/`12e483f`) all scored ~31–32B (+~280%) and were
 **rejected** (qubit-lower-bound witnesses, not contenders); so are high-qubit experiments (abipalli's
-2045q, +46%). The product is minimized in the **1159–1164q** ludicrous band — and the SOTA is now the
-**1159q best-of-both** point (`d11bdbb`: cheap Karatsuba arithmetic **+** the 1159q headroom clamp,
-fold-vents off), which beat both the pure low-qubit and pure low-Toffoli branches.
+2045q, +46%). The product is minimized in the **1159–1164q** ludicrous band — the SOTA is the **1159q
+best-of-both** point (cheap Karatsuba arithmetic **+** the 1159q headroom clamp), now Toffoli-ground to
+**1,378,242** (`f8e215b`) via `GAP_J2` comparator narrowing + converged-tail cswap elision + the square
+doubling-ramp removal. A 1157q point exists (`6ba606a`) but loses the product race to the 1159q grind.
 
 ### Compare-Bit Narrowing
 

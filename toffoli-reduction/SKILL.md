@@ -258,6 +258,58 @@ point-addition circuit, use the companion **ecdsafail-circuit-optimization** ski
 
 ---
 
+## Live-frontier Toffoli levers (trailmix_ludicrous family, 2026-06)
+
+These are the Toffoli levers that drove the current `trailmix_ludicrous` SOTA (1159q × 1,378,242).
+They are instances of the moves above, but the *named knobs* and *leverage points* are worth knowing
+verbatim. Source: per-commit analysis in `ecdsafail-circuit-optimization/references/REPORT_1168_wall_revamp.md`
+§2.6–§2.7. Every change re-rolls the FS island → re-hunt `DIALOG_TAIL_NONCE` and re-validate 0/0/0.
+
+- **⭐ Better arithmetic at the dominant cost-center (the biggest wins by far).** The modular *square*
+  runs every GCD divstep round, so an O(n²) improvement there has enormous leverage. **Karatsuba**
+  the square (`λ = hi·2¹²⁸ + lo` → `lo²`, `hi²`, `(lo+hi)²`) cut **−22.4M Toffoli** from a +175/−47
+  diff (~25% off the schoolbook cross-products). **NAF-recode** the modulus constant (`f = 2³²+977` →
+  5 signed terms `2³²+2¹⁰−2⁶+2⁴+1`) to cut reduction terms. **Remove the `mod_double` ramp** in the
+  reduction: apply each NAF term `±(value≪shift) mod q` *directly* (`mod_add_shifted_low` +
+  `add_f_window_shifted` pseudo-Mersenne overflow folds) instead of building a 257-bit register and
+  doubling up to each offset — value-exact, the SOTA lever. **Rule: before touching schedule knobs,
+  audit any O(n²) or ×(iterations) primitive (the square, the reduction) for a structural rewrite;
+  open follow-up — recurse Karatsuba on the n=128 halves.**
+
+- **⭐ Comparator-window narrowing (`GAP_J2`) — highest leverage per line of diff.** In the jump-GCD,
+  `GAP_J2[i]` (a 258-long `schedule.rs` table) is the per-step swap-decision comparator **window
+  width**; the held Gidney carries / compared MSBs scale with it. Shaving ~1 bit/step across **258
+  steps × 2 GCD passes** cut **−1.33M Toffoli from a 22-line table edit** (`f0c1c42`). Island-exact:
+  mis-decides the swap with prob ~`2^-k` when the top differing bit falls below the window (recovered
+  by the nonce hunt). This is the swap-comparator analogue of `PAD` truncation — sweep one notch at a
+  time. *(Generic lesson: a per-iteration width that multiplies across a long loop is the fattest
+  truncation target.)*
+
+- **⭐ Converged-tail gate elision (`TLM_APPLY_CSWAP_SKIP_LASTK`).** On the last K GCD iterations the
+  apply-phase `cswap`'s control is deterministically 0 for all-but-rare inputs (the GCD has
+  converged), so the swap is a no-op — skip it. Island-exact, huntable; a structural instance of
+  "elide a data-dependent gate that is provably 0 on the island" (the average-executed metric makes
+  this free on the common shots).
+
+- **Classical-constant folding (when an operand is classical, do constant arithmetic for free).** In
+  this circuit `Q` is classical, so `coord_add3x` (`dst += 3·ox mod q`) folds `3·ox mod q` entirely
+  into the classical `BitId` domain (`BitStore/BitInvert`, **0 Toffoli**) and emits one exact
+  mod-add — removing the doubling + second mod-add + temp register (`662e267`). Audit every step that
+  combines a quantum register with a classical operand by a constant. *(Caveat: trades Toffoli for a
+  transient register — check it doesn't raise peak before keeping; this one oscillated in/out.)*
+
+- **Carry-drop + MBU vent on the final chunk (`TLM_GRAD_FINAL_NO_COUT`).** Drop the unneeded final
+  carry-out of the top constant-add chunk and uncompute the chunk's carries with `hmr`+`cz_if_bit`
+  (Gidney measurement-based uncompute, **0 Toffoli**) instead of a CCX.
+
+- **Deeper post-pass + schedule-value narrowing.** `CONSTPROP_MAX_ITERS` (16→256) runs the sound
+  constprop/affine post-pass to a deeper fixpoint (drops/folds more provably-constant CCX, −377k); the
+  `TLM_HYB_V_DELTA`/`TLM_COUT_K_DELTA`/`TLM_FOLD_DELTA`/`LUD_EXTRA_FOLD_VENTS` knobs narrow scheduled
+  vent/carry-cap values or add fold-round measurement vents. These are peak-coupled — see the
+  break-even rule in the peak-qubit-reduction skill before trading either way.
+
+---
+
 ## Appendix — Concrete lever catalog (credit: benhuang2025)
 
 > **Source / credit.** The lever catalog below is adapted from

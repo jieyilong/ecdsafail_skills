@@ -441,6 +441,44 @@ the companion **ecdsafail-circuit-optimization** skill, which applies this loop 
 
 ---
 
+## Live-frontier peak levers (trailmix_ludicrous family, 2026-06)
+
+The current `trailmix_ludicrous` SOTA sits at **1159q**. Its qubit levers, beyond the classic
+free/recompute and range-bound moves above, are worth knowing verbatim. Source: per-commit analysis
+in `ecdsafail-circuit-optimization/references/REPORT_1168_wall_revamp.md` §2.6–§2.7.
+
+- **The dynamic live-headroom clamp — a circuit-wide "do not exceed N qubits" governor.** Instead of
+  shaving one ancilla at a time, define `target_qubit_headroom(circ) = TLM_TARGET_Q − circ.active_qubits`
+  and have **every transient-allocating arithmetic primitive clamp its carry/chunk width to
+  `min(scheduled_k, headroom)`** — so no local peak can exceed the target ceiling. The peak owner
+  (here the forward-multiply GCD apply) is auto-narrowed whenever the live count nears the ceiling. The
+  governor is the structural generalization of a static per-step carry-cap (`TLM_GCD_K_ADJUST` over a
+  window) into a dynamic per-call clamp. Knob surface: `TLM_TARGET_Q` (the ceiling — **lower it by 1 to
+  drop the peak by 1**, the clamp body is unchanged), plus per-call reserve tables that pay for the
+  tighter fit (`TLM_TARGET_FFG_RESERVE`, `TLM_TARGET_FOLD_RESERVE`,
+  `TLM_TARGET_FFG_CALL_RESERVE_DELTAS`/`_OVERRIDES`, `TLM_GCD_RESELECT_LAYOUT` reselects a narrower
+  adder layout, `TLM_DIRECT_VARCHUNK` forces direct var-chunk carries). Reusable beyond this circuit:
+  any width-tunable arithmetic can host a headroom governor that trades Toffoli for a hard peak cap.
+
+- **Lazy carry-liveness (`TLM_FOLD_CHUNK_LAZY_CIN0`).** Make a chunk's carry-in an `Option` allocated
+  **only inside the boundary-erase** (`alloc_qubit()` … `zero_and_free`) instead of held live across the
+  whole chunk loop — deferring one carry qubit's liveness off the peak. A targeted instance of the
+  live-range-shortening move; look for any carry/scratch held live across a loop it's only used at the
+  edges of.
+
+- **⭐ The break-even gate — and the product-race caveat (read before shipping ANY peak drop).** A peak
+  qubit is worth `avg_Toffoli / peak_qubits` Toffoli (~1,190 at the 1159q floor). A clamp/narrowing
+  lever is net-positive only if it removes a qubit for **fewer** Toffoli than that — and that cost is
+  **per-base**: the same 1159 clamp cost ~1,514 Toffoli/qubit on the old schoolbook-square base (and
+  lost) but only ~20 Toffoli/qubit once Karatsuba made the square cheap (and won the SOTA). **So
+  re-test a shelved peak lever after every arithmetic win.** Sharper still: even a drop that *clears*
+  break-even can lose the **product** race — the 1159→1157 drop (`6ba606a`) cost ~1,127 Toffoli/qubit
+  (< break-even, won at landing) but was overtaken because the 1159q Toffoli-grind reached 1,378,242 and
+  `1159 × 1,378,242 < 1157 × 1,380,890`. **Always run the qubit and Toffoli tracks together and compare
+  *products* — never minimize qubit count in isolation.** Full math: circuit-opt report §2.6–§2.7.
+
+---
+
 ## Appendix — Concrete lever catalog (credit: benhuang2025)
 
 > **Source / credit.** The lever catalog below is adapted from
