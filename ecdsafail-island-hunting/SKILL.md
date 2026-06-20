@@ -618,6 +618,7 @@ Use a consistent remote layout on every host, parameterized by the route name:
 /root/<route>_own_validation/errors.log         retryable build/eval failures, not verdicts
 /root/<route>_own_validation/done.txt           validated nonce skip-list
 /root/<route>_own_validation/batch_<ts>.txt      nonce batch currently being validated
+/root/<route>_own_validation/shared_ops/ops.bin  optional read-only host-level ops cache
 /root/<route>_own_validation/loop.out           loop diagnostics
 ```
 
@@ -701,10 +702,11 @@ Every validation loop should also re-scan prior local validator logs and merge t
 `done.txt`. This protects against restarts, old shard logs, and partially completed batches.
 
 Avoid `comm` for filtering unless both inputs are guaranteed to use the same lexical sort. Prefer a
-hash-set filter:
+hash-set filter. Use `FILENAME == ARGV[1]`, not `NR == FNR`, so an empty `done.txt` does not make
+the candidate file look like the first input:
 
 ```bash
-awk 'NR==FNR { done[$1]=1; next } !($1 in done)' done.txt all_candidates.txt
+awk 'FILENAME == ARGV[1] { done[$1]=1; next } !($1 in done)' done.txt all_candidates.txt
 ```
 
 Before launching a large validation batch, sanity-check that no batch nonce is already in
@@ -719,12 +721,28 @@ Both numbers should be `0`.
 
 #### Per-host validation loop
 
+For routes that validate many candidates on one host, build the circuit body **once per host**.
+The nonce tail is an identity tail: `DIALOG_TAIL_NONCE=0` and `DIALOG_TAIL_NONCE=<n>` have the
+same simulated op stream; the candidate nonce only changes the Fiat-Shamir hash. Therefore:
+
+1. Build one shared validation directory such as `/root/<route>_own_validation/shared_ops`.
+2. Run `build_circuit` there once with the active CFG and `DIALOG_TAIL_NONCE=0`.
+3. Mark `shared_ops/ops.bin` read-only.
+4. Launch many parallel `eval_circuit` processes from that same directory with
+   `EVAL_TAIL_NONCE=<nonce>` and the requested `EVAL_FAST_REJECT` setting.
+
+Do **not** run one `VALIDATE_REUSE_OPS=1 ./island.sh validate ...` process per worker for large
+remote batches. That still builds one temp `ops.bin` per process, wasting disk and capping
+parallelism. `VALIDATE_REUSE_OPS=1` is fine for small local batches or one serial validator
+process; distributed/high-parallel validation should share one read-only `ops.bin` per host.
+
 The loop should:
 
 1. Read only that host's local scanner logs.
 2. Extract GCD-clean candidate nonces from `CLEAN nonce=<n>`.
 3. Remove nonces already present in `done.txt` or previous validation logs.
-4. Validate the remaining nonces in parallel with full validation.
+4. Validate the remaining nonces in parallel with the host-level shared `ops.bin` cache when the
+   evaluator supports `EVAL_TAIL_NONCE`; otherwise fall back to per-batch rebuilds.
 5. Append parseable `dirty` / `CLEAN` verdict output to `results.log`; route `ERROR` output to
    `errors.log`.
 6. Add only successfully validated `dirty` / `CLEAN` nonce IDs to `done.txt`; keep `ERROR`
@@ -740,17 +758,28 @@ unstable.
 Starting parallelism:
 
 ```text
-single RTX5090 host: Q_VALIDATE_PAR=4,  Q_VALIDATE_BATCH=512
-4x L40S host:       Q_VALIDATE_PAR=8,  Q_VALIDATE_BATCH=1024
-4x RTX5090 host:    Q_VALIDATE_PAR=12, Q_VALIDATE_BATCH=1536
+with per-process ops builds:
+  single RTX5090 host: Q_VALIDATE_PAR=4,  Q_VALIDATE_BATCH=512
+  4x L40S host:       Q_VALIDATE_PAR=8,  Q_VALIDATE_BATCH=1024
+  4x RTX5090 host:    Q_VALIDATE_PAR=12, Q_VALIDATE_BATCH=1536
+
+with one shared read-only ops.bin per host:
+  single RTX5090 host: Q_VALIDATE_PAR=8..16
+  4x L40S host:       Q_VALIDATE_PAR=32..64 first, then 96+ if CPU/disk stay stable
+  4x RTX5090 host:    Q_VALIDATE_PAR=48..96 depending on CPU cores
 ```
 
 These are conservative starting points, not ceilings. On a large remote node, inspect `nproc`,
 current load, memory pressure, and scanner contention, then ramp upward in steps:
 
 ```text
-single-GPU host: try 4 -> 6 -> 8 workers
-4-GPU host:      try 8 -> 12 -> 16 -> 24+ workers
+per-process ops builds:
+  single-GPU host: try 4 -> 6 -> 8 workers
+  4-GPU host:      try 8 -> 12 -> 16 -> 24+ workers
+
+shared ops.bin:
+  single-GPU host: try 8 -> 16 -> 24 workers
+  4-GPU host:      try 32 -> 64 -> 96 -> 120 workers
 ```
 
 If the validator is CPU-only, the worker cap is usually host CPU cores minus a small reserve for
