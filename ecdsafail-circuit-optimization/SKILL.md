@@ -461,9 +461,10 @@ knob.** On 2026-06-19 tob-joe (Trail of Bits) submitted `bdb1d22` — a complete
 trailmix's **product-min "ludicrous"** point onto `B` (new module
 `src/point_add/trailmix_ludicrous/`, `build()` now calls `build_trailmix_ludicrous_ops()`). It landed
 **1167q × 1,422,591 = 1,660,163,697**, and a swarm drove it to **1163q × 1,412,402** (`b310de9`) in ~15h,
-then a second burst (Karatsuba square + NAF recoding + a qubit↔Toffoli bifurcation) to the **current
-SOTA 1164q × 1,380,610 = 1,607,030,040** (`3df690f`/`fe4999b`, gopikannappan, 6/20). **This supersedes
-the dialog-GCD 1168/1170 route as the base to fork from.** Full analysis:
+then a second burst (Karatsuba square + NAF recoding + a qubit↔Toffoli bifurcation that then *resolved
+into best-of-both*) to the **current SOTA 1159q × 1,380,711 = 1,600,244,049** (`d11bdbb`/`88ed0f5`,
+BitWonka, 6/20) — cheap Karatsuba arithmetic with the 1159q headroom clamp re-stacked on top.
+**This supersedes the dialog-GCD 1168/1170 route as the base to fork from.** Full analysis:
 `references/REPORT_1168_wall_revamp.md` (the burst is §2.6).
 
 **Module map (`src/point_add/trailmix_ludicrous/`, fork from here).** `mod.rs` =
@@ -577,15 +578,17 @@ nonce-grind commits — see report):
   qubits" governor (`TLM_TARGET_Q`, `TLM_TARGET_FFG_RESERVE`, `TLM_TARGET_FOLD_RESERVE`,
   `TLM_GCD_RESELECT_LAYOUT`, `TLM_DIRECT_VARCHUNK`). **⚠ These only win if they clear the break-even
   below.**
-- **⭐ The break-even rule (the meta-lever — compute it before shipping ANY width change).** A peak
-  qubit is worth exactly `avg_Toffoli / peak_qubits` Toffoli (**≈1,200 at the ludicrous floor**). A
-  width-narrowing lever is net-positive **only if it removes a qubit for < that many Toffoli**; past
-  that, the *qubit-spending* direction (float the peak up, run adders wide) wins. Both directions are
-  live: `b310de9` bought a qubit cheaply (good), but `fed64cf`'s clamp-to-1159 bought qubits at ~1,514
-  Toffoli each (> break-even) and **LOST** to the SOTA `3df690f`, which spent 5 qubits back (1159→1164)
-  to win the product. The frontier literally **bifurcated** into a 1159q low-qubit branch and a 1164q
-  low-Toffoli branch at this line. **Always divide a candidate lever's realized Toffoli-delta by its
-  qubit-delta and compare to `T_avg/q`.** See `references/REPORT_1168_wall_revamp.md` §2.6.
+- **⭐ The break-even rule (the meta-lever) — and its cost is PER-BASE, not fixed.** A peak qubit is
+  worth `avg_Toffoli / peak_qubits` Toffoli (**≈1,190 at the 1159q floor**). A width-narrowing lever is
+  net-positive **only if it removes a qubit for < that many Toffoli**. But the realized cost *moves with
+  the base*: `fed64cf`'s clamp-to-1159 cost ~1,514 Toffoli/qubit on the expensive schoolbook-square base
+  (> break-even) and **LOST** to `3df690f` (which floated to 1164q) — yet once `28fe2f2`'s Karatsuba
+  removed the wide square adds the clamp was fighting, **the same clamp cost only ~20 Toffoli/qubit** and
+  `d11bdbb` re-stacked it to **WIN at 1159q × 1,380,711 (SOTA, best-of-both)**. The frontier *bifurcated*
+  (1159q vs 1164q) then *resolved* — the qubit and Toffoli levers **compose**; they're rarely truly
+  opposed. **⇒ After any structural arithmetic change, RE-TEST every shelved qubit lever — the
+  break-even moved. Always divide a candidate's realized Toffoli-delta by its qubit-delta vs the
+  *current* `T_avg/q`.** See `references/REPORT_1168_wall_revamp.md` §2.6.
 - **⭐ Biggest Toffoli wins = better arithmetic at the dominant cost-center (huge leverage from tiny
   diffs).** `28fe2f2` **Karatsuba modular square** (−22.4M, the single biggest win in the saga, +175/−47
   diff): split `λ = hi·2^128 + lo`, compute `lo²`, `hi²`, `(lo+hi)²`, recombine — 3 n=128 squares
@@ -608,8 +611,9 @@ nonce-grind commits — see report):
 **Corollary — neither extreme is score-competitive; stay in the 1159–1164q band.** teddyjfpender's
 sub-1020q PZ submissions (`55892ec`/`a77c9da`/`12e483f`) all scored ~31–32B (+~280%) and were
 **rejected** (qubit-lower-bound witnesses, not contenders); so are high-qubit experiments (abipalli's
-2045q, +46%). The product is minimized in the **1159–1164q** ludicrous band — and currently the **1164q
-low-Toffoli** point wins (Karatsuba + full-width adders beat clamping to 1159).
+2045q, +46%). The product is minimized in the **1159–1164q** ludicrous band — and the SOTA is now the
+**1159q best-of-both** point (`d11bdbb`: cheap Karatsuba arithmetic **+** the 1159q headroom clamp,
+fold-vents off), which beat both the pure low-qubit and pure low-Toffoli branches.
 
 ### Compare-Bit Narrowing
 
