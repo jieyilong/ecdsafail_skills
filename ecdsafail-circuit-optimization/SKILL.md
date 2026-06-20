@@ -460,9 +460,11 @@ The structural sub-1170 cut the bullet above called for **arrived as a circuit-f
 knob.** On 2026-06-19 tob-joe (Trail of Bits) submitted `bdb1d22` — a complete revamp porting
 trailmix's **product-min "ludicrous"** point onto `B` (new module
 `src/point_add/trailmix_ludicrous/`, `build()` now calls `build_trailmix_ludicrous_ops()`). It landed
-**1167q × 1,422,591 = 1,660,163,697**, and a swarm drove it to **1163q × 1,412,402 = 1,642,623,526**
-(current SOTA, `b310de9`/`175749f`, BitWonka) in ~15h. **This supersedes the dialog-GCD 1168/1170 route
-as the base to fork from.** Full analysis: `references/REPORT_1168_wall_revamp.md`.
+**1167q × 1,422,591 = 1,660,163,697**, and a swarm drove it to **1163q × 1,412,402** (`b310de9`) in ~15h,
+then a second burst (Karatsuba square + NAF recoding + a qubit↔Toffoli bifurcation) to the **current
+SOTA 1164q × 1,380,610 = 1,607,030,040** (`3df690f`/`fe4999b`, gopikannappan, 6/20). **This supersedes
+the dialog-GCD 1168/1170 route as the base to fork from.** Full analysis:
+`references/REPORT_1168_wall_revamp.md` (the burst is §2.6).
 
 **Module map (`src/point_add/trailmix_ludicrous/`, fork from here).** `mod.rs` =
 `build_trailmix_ludicrous_ops()` (register alloc order pins fuzzer IO ids), `load_schedule()` (copies
@@ -554,7 +556,7 @@ divergence and the common path is exact; `DIALOG_TAIL_NONCE` grinds inputs so al
 clean. **`PAD` is a live lever in both directions** (smaller = fewer live bits *and* fewer Toffoli, but
 higher miss rate to absorb in the nonce hunt).
 
-**The 1167→1164 cascade splits into three reusable lever families** (the rest is LF↔CRLF churn + pure
+**The 1167→SOTA cascade splits into these reusable lever families** (the rest is LF↔CRLF churn + pure
 nonce-grind commits — see report):
 
 - **3 *free* −1q peak drops** (`ab1b2d6`, `cea9f5f`, `f8d23a9`; 1167→1164), all the *same idea*:
@@ -563,26 +565,51 @@ nonce-grind commits — see report):
   even-v0=0 (`TLM_PARK_EVEN_V0`), known gcd-y0 (`TLM_LOAN_GCD_Y0`, with `GcdBit0Mode` delaying the
   bit-0 CNOT), and the redundant step-0 swap_flag (fold `t1` in via `ccx(t1,s2,sub)`). One open qubit
   lever: **mine the divstep for more provably-constant lanes to park.**
-- **1 *paid* −1q drop** (`b310de9`; 1164→1163, current SOTA): **the qubit↔Toffoli exchange rate run in
-  reverse.** It does NOT find a new constant lane — it **surrenders vents at the binding apply phase**
-  (`TLM_HYB_V_DELTA=2`, `TLM_COUT_K_DELTA=1`, `TLM_FFG_DELTA=2`), freeing the transient vent qubits that
-  own the peak, for **+419 Toffoli / −1 peak** (net score −924,686, because each peak qubit ≈1.41M). The
-  companion lever is tightening `PAD` 21→19/20 (narrower `+f`-fold/comparator windows = fewer live bits
-  *and* fewer Toffoli, ~`2^-19`/fire miss) plus a fresh `DIALOG_TAIL_NONCE` clean under the tighter
-  budget. This is the **live SOTA lever**: as free constant lanes run out, spend a few hundred Toffoli
-  to buy each further peak qubit. See `references/REPORT_1168_wall_revamp.md` §2.5.
-- **Big Toffoli wins:** `bc2334a` −5.9M (exhaustive carry-chunk **layout search** minimizing
-  carry-ancilla cost per controlled add); `497cc20`+`b02b354` **constprop post-pass** (drop CCX with
-  provably-0 control, fold const-1 → CX, plus affine/XOR/inverse-pair tracking) — **model-agnostic,
-  would shave Toffoli on *any* of our routes**; `b1dec1e` the `d & !e = d ^ (e & d)` 2-CX identity;
-  `a47dc6e` skip-j0 cswap (a one-liner *enabled* by the parking commits making `u[0]`/`v[0]` constant).
-- **Deliberate budgeted truncation:** low-54-bit `+f` fold + narrow-21-bit comparators accept a
-  ~`2^-21`-per-fire miss; `PAD` (21→19/20) is a live Toffoli lever traded against the 9024-shot
-  verifier tolerance.
+- **Paid −1q drops (`b310de9` 1164→1163; `31421df` 1164→1162; `fed64cf` 1162→1159): the qubit↔Toffoli
+  exchange rate run in reverse.** These do NOT find new constant lanes — they **buy** peak qubits by
+  spending Toffoli. Three mechanisms: (a) **surrender apply-phase vents** (`TLM_HYB_V_DELTA`,
+  `TLM_COUT_K_DELTA`, `TLM_FFG_DELTA`, `TLM_FOLD_DELTA` — each removed vent reverts a 0-Toffoli MBU to a
+  real CCX); (b) **tighten `PAD`** 21→20/19 (narrower `+f`-fold/comparator windows = fewer live bits
+  *and* fewer Toffoli, higher `2^-PAD`/fire miss) + `maybe_adjust_gcd_k` (`TLM_GCD_K_ADJUST=-1` over a
+  divstep window narrows the GCD carry-chunk); (c) **the dynamic live-headroom clamp** (`fed64cf`):
+  `target_qubit_headroom = TLM_TARGET_Q − active_qubits` clamps EVERY transient adder's carry/chunk to
+  `min(scheduled_k, headroom)` so no local peak exceeds the target — a circuit-wide "do not exceed N
+  qubits" governor (`TLM_TARGET_Q`, `TLM_TARGET_FFG_RESERVE`, `TLM_TARGET_FOLD_RESERVE`,
+  `TLM_GCD_RESELECT_LAYOUT`, `TLM_DIRECT_VARCHUNK`). **⚠ These only win if they clear the break-even
+  below.**
+- **⭐ The break-even rule (the meta-lever — compute it before shipping ANY width change).** A peak
+  qubit is worth exactly `avg_Toffoli / peak_qubits` Toffoli (**≈1,200 at the ludicrous floor**). A
+  width-narrowing lever is net-positive **only if it removes a qubit for < that many Toffoli**; past
+  that, the *qubit-spending* direction (float the peak up, run adders wide) wins. Both directions are
+  live: `b310de9` bought a qubit cheaply (good), but `fed64cf`'s clamp-to-1159 bought qubits at ~1,514
+  Toffoli each (> break-even) and **LOST** to the SOTA `3df690f`, which spent 5 qubits back (1159→1164)
+  to win the product. The frontier literally **bifurcated** into a 1159q low-qubit branch and a 1164q
+  low-Toffoli branch at this line. **Always divide a candidate lever's realized Toffoli-delta by its
+  qubit-delta and compare to `T_avg/q`.** See `references/REPORT_1168_wall_revamp.md` §2.6.
+- **⭐ Biggest Toffoli wins = better arithmetic at the dominant cost-center (huge leverage from tiny
+  diffs).** `28fe2f2` **Karatsuba modular square** (−22.4M, the single biggest win in the saga, +175/−47
+  diff): split `λ = hi·2^128 + lo`, compute `lo²`, `hi²`, `(lo+hi)²`, recombine — 3 n=128 squares
+  (~24.4k CCX) vs 1 n=256 schoolbook (~32.6k CCX), ~25% off the O(n²) cross-products that run **every
+  divstep round**. `4ea8b74` **NAF recoding** of `f=2^32+977` (`F_NAF_TERMS`: 7→5 terms
+  `2^32+2^10−2^6+2^4+1`) + doubling-ramp elimination (`mod_add_shifted_low`/`mod_sub_shifted_low`, no
+  pad qubits). `e25c7d8`/`3df690f` hoist `<<32`/all NAF terms to direct shifted adds
+  (`TLM_SQUARE_F_SHIFTED_LOW`). **Lesson: audit any O(n²) or ×258×2 primitive (the square, the
+  reduction) for a structural improvement before touching schedule knobs — open follow-up: recurse
+  Karatsuba on the n=128 halves.**
+- **Schedule-level Toffoli wins:** `bc2334a` −5.9M (exhaustive carry-chunk **layout search**);
+  `497cc20`+`b02b354` **constprop post-pass** (drop CCX with const-0 control, fold const-1→CX, +
+  affine/XOR/inverse-pair; **`CONSTPROP_MAX_ITERS` controls fixpoint depth** — `d2643bc` 16→256 = −377k)
+  — model-agnostic; `b1dec1e` `d & !e = d ^ (e & d)` 2-CX identity; `a47dc6e` skip-j0 cswap;
+  `LUD_EXTRA_FOLD_VENTS` (more Gidney vents in GCD fold rounds, `3df690f`).
+- **Deliberate budgeted truncation:** low-`(PAD+33)`-bit `+f` fold + narrow-`PAD`-bit comparators accept
+  a ~`2^-PAD`-per-fire miss; `PAD` (21↔19/20) is a live two-direction lever (smaller = fewer Toffoli +
+  fewer live bits, more miss to absorb in the nonce hunt).
 
-**Corollary — shrunken-PZ stays a witness, not a contender.** teddyjfpender's 1019q PZ submission
-(`55892ec`) scored 32.1B (+283%) and was **rejected**. The action is entirely at the 1163–1167q
-ludicrous operating point; do not chase the sub-1050q PZ class for *score*.
+**Corollary — neither extreme is score-competitive; stay in the 1159–1164q band.** teddyjfpender's
+sub-1020q PZ submissions (`55892ec`/`a77c9da`/`12e483f`) all scored ~31–32B (+~280%) and were
+**rejected** (qubit-lower-bound witnesses, not contenders); so are high-qubit experiments (abipalli's
+2045q, +46%). The product is minimized in the **1159–1164q** ludicrous band — and currently the **1164q
+low-Toffoli** point wins (Karatsuba + full-width adders beat clamping to 1159).
 
 ### Compare-Bit Narrowing
 
@@ -786,10 +813,12 @@ For Shrunken-PZ q980 follow-ups, also read the sibling skill references:
 For the **current base circuit** (the post-2026-06-19 frontier), read
 `references/REPORT_1168_wall_revamp.md` when the task involves `trailmix_ludicrous`, the
 classical-`Q` product-min lever, the two-shared-GCD-passes affine add, the all-triple base-5
-603q dialog tape, the provably-constant-lane parking (−1q) drops, the constprop/affine
-post-pass, or anything forking from the 1163–1167q ludicrous operating point. It maps every
-commit in the 1167→1164 cascade to its mechanism and file/function. See also the short
-"The 1168 Wall Broke" subsection above for the operating summary.
+603q dialog tape, the Karatsuba modular square / NAF recoding, the constant-lane parking and
+dynamic-headroom-clamp qubit levers, the qubit↔Toffoli break-even/bifurcation rule, the
+constprop/affine post-pass, or anything forking from the 1159–1164q ludicrous operating band.
+It maps every commit in the 1167→SOTA cascade (incl. the 6/19–6/20 Karatsuba/bifurcation burst,
+§2.6) to its mechanism and file/function. See also the short "The 1168 Wall Broke" subsection
+above for the operating summary.
 
 ### Verified provenance (read directly from the sources)
 
