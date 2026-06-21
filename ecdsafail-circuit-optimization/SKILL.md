@@ -607,11 +607,22 @@ nonce-grind commits — see report):
   `2^32+2^10−2^6+2^4+1`) + doubling-ramp elimination (`mod_add_shifted_low`/`mod_sub_shifted_low`, no
   pad qubits). `e25c7d8`/`3df690f` hoist `<<32`/all NAF terms to direct shifted adds
   (`TLM_SQUARE_F_SHIFTED_LOW`). **Lesson: audit any O(n²) or ×258×2 primitive (the square, the
-  reduction) for a structural improvement before touching schedule knobs.** *Open follow-up:
-  recurse Karatsuba on the n=128 halves — `4a90d04` (zuiris) **added** the scaffolding
-  (`kara_square_into_prod`, identity `x²=A+M·2^h+B·2^2h`, `M=C−A−B`) but it is **gated OFF**
-  (`TLM_SQUARE_KARA2` is never set, threshold 96), so the n=128 halves still use schoolbook. Wiring
-  it on is unclaimed.*
+  reduction) for a structural improvement before touching schedule knobs — BUT only if the new ops are
+  as cheap as the ones removed (see the next bullet).**
+- **❌ Recursive Karatsuba / Toom-3 on the square: TESTED, net Toffoli LOSS — do NOT re-attempt
+  (measured 2026-06-21, §2.9).** `4a90d04`'s `kara_square_into_prod` scaffolding (`TLM_SQUARE_KARA2`,
+  identity `x²=A+M·2^h+B·2^2h`) had a width bug (`unbuild_kara_sum` panicked); after fixing it and
+  enabling recursion, the square's CCX went **UP** 117,016→177,180 (**+60,164 from one split**), worse
+  at every depth (th96 +66.8k → th32 +277k total), and it leaked the three-product live set raising
+  peak 1159→1612. **Root cause — the win does NOT transfer to this reversible cost model:** the
+  schoolbook *symmetric* square's cross-products are already ~1 vented CCX each (MBU), while Karatsuba
+  trades them for *un-vented* wide recombination adds (`hybrid_add_adaptive`, ~3 CCX/bit) that cost far
+  more than the multiplies they remove. Toom-3 is strictly worse (5 eval points + `/3` interpolation,
+  all un-vented). The square is only 8.14% of CCX with 647q off-peak slack, so the *qubit* room exists —
+  but the arithmetic is already near-optimal; the live levers (dead-CCX, vents, comparator narrowing)
+  win precisely because there's no cheap arithmetic left to restructure. (To ever make Karatsuba pay
+  here you'd have to re-engineer the recombination adds to be MBU-vented AND recurse to deep leaves AND
+  fix the leak — high effort, sub-2% ceiling. Not worth it.)
 - **⭐⭐ Empirical / dynamic dead-CCX elimination — the current top lever (`20b9a1d` SOTA, `4a90d04`).**
   Beyond the static `constprop.rs`: **simulate the full (post-fanout) circuit over ~9.2M random valid
   EC-point inputs and record, per CCX, whether its TARGET ever flips.** A CCX whose control-AND is
