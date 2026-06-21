@@ -678,10 +678,15 @@ nonce-grind commits — see report):
   fewer live bits, more miss to absorb in the nonce hunt). `GAP_J2` (above) is the same idea on the
   swap comparator.
 
-**Corollary — neither extreme is score-competitive; stay in the 1159–1164q band.** teddyjfpender's
-sub-1020q PZ submissions (`55892ec`/`a77c9da`/`12e483f`) all scored ~31–32B (+~280%) and were
-**rejected** (qubit-lower-bound witnesses, not contenders); so are high-qubit experiments (abipalli's
-2045q, +46%). The product is minimized in the **1159–1164q** ludicrous band — the SOTA is the **1159q
+**Corollary — neither extreme is score-competitive; stay in the 1159–1164q band.** The **Shrunken-PZ
+low-qubit track keeps setting qubit records that are all score-rejected**: teddyjfpender's 1019q
+(`55892ec`/`a77c9da`/`12e483f`, +~280%) and now **nasqret's 948q** (`a203fac`, 948q × 54,781,961 =
+51.9B, +468%) — a fresh low-qubit witness (a `trailmix_port` PZ-divstep port with a "q949 robust
+envelope" variable-width packing, `ec/inversion/shrunken_pz_state_machine.rs`), but its **~54.8M
+Toffoli is ~40× the ludicrous SOTA's 1.36M**, so the product is ~33× over the 948q break-even
+(`1,581,316,420 / 948 ≈ 1.67M`). The PZ class is a **qubit-lower-bound witness, not a product
+contender** — it would need a ~33× Toffoli reduction to compete; do not chase it for *score*. High-qubit
+experiments (abipalli's 2045q, +46%) lose the other way. The product is minimized in the **1159–1164q** ludicrous band — the SOTA is the **1159q
 best-of-both** point (cheap Karatsuba arithmetic **+** the 1159q headroom clamp), now Toffoli-ground to
 **1,364,380** (`20b9a1d`) via `GAP_J2` comparator narrowing + converged-tail cswap elision + the square
 doubling-ramp removal + **empirical dead-CCX elimination** (the current biggest lever). The 1157q
