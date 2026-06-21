@@ -614,6 +614,8 @@ Use a consistent remote layout on every host, parameterized by the route name:
 /root/.ecdsafail_island_<route>/logs/*.log      scan logs
 /root/<route>_remote_validate.sh                full validator wrapper
 /root/<route>_validate_own_loop.sh              per-host validation loop
+/root/<route>_own_validation/candidates.txt     sorted unique GCD-clean nonces from scanner logs
+/root/<route>_own_validation/pending.txt        unvalidated backlog after done/log skip-list filtering
 /root/<route>_own_validation/results.log        own-host full-validation output
 /root/<route>_own_validation/errors.log         retryable build/eval failures, not verdicts
 /root/<route>_own_validation/done.txt           validated nonce skip-list
@@ -637,13 +639,23 @@ evaluated nonce to:
 ```
 
 `results.log` is a verdict ledger, not a diagnostics stream. It should contain only completed
-`dirty` / `CLEAN` full-validation verdicts. Route retryable operational failures to:
+`dirty` / `CLEAN` full-validation verdicts, and every row must start with an ISO-8601 timestamp
+for the verdict completion time:
+
+```text
+ts=2026-06-21T18:13:58+00:00 dirty nonce=<n> shots=<shots> cls=<c> pha=<p> anc=<a> tof=<avgT> qubits=<q>
+ts=2026-06-21T18:14:02+00:00 CLEAN nonce=<n> shots=<shots> cls=0 pha=0 anc=0 tof=<avgT> qubits=<q>
+```
+
+If old untimestamped rows are imported, preserve them in a raw backup and write a migration note in
+`loop.out` or `sync.log`; do not silently mix ambiguous rows into the live ledger. Route retryable
+operational failures to:
 
 ```text
 /root/<route>_own_validation/errors.log
 ```
 
-Append the verdict line before adding that nonce to `done.txt`. If validation returns `ERROR`,
+Append the timestamped verdict line before adding that nonce to `done.txt`. If validation returns `ERROR`,
 append the error to `errors.log`, leave the nonce out of `done.txt`, and rerun it later. When
 multiple validator workers are active, use an append-safe pattern such as `flock`, or set toolkit
 ledger variables:
@@ -658,12 +670,19 @@ Avoid any loop that marks a nonce done before its result line is durably written
 interrupted loop pollutes `results.log` with `ERROR` rows, take the same lock, move those rows to
 `errors.log`, rebuild local mirrors, and treat the affected nonces as retryable.
 
+Keep the live remote `results.log` append-only after validation starts. Do not periodically rewrite
+or atomically replace it with `mv results.tmp results.log`; plain `tail -f results.log` follows the
+old inode and appears stuck after a replacement. If deduping or parsing is needed, write derived
+files such as `combined.tsv`; if a live mirror must survive file replacement, use `tail -F`, but the
+remote ledger itself should be safe for ordinary `tail -f`.
+
 Every heartbeat should mirror remote result ledgers into a local audit directory, preserving both
 raw per-host logs and a combined parsed view. Use a predictable local layout such as:
 
 ```text
 outputs/<route>_validation_results/raw/<host>.results.log
 outputs/<route>_validation_results/raw/<host>.errors.log
+outputs/<route>_validation_results/raw/<host>.candidates.txt
 outputs/<route>_validation_results/combined.tsv
 outputs/<route>_validation_results/near_misses.tsv
 outputs/<route>_validation_results/clean_hits.tsv
@@ -671,10 +690,11 @@ outputs/<route>_validation_results/sync.log
 ```
 
 The raw per-host files should be exact mirrors of remote `results.log` files. The combined TSV
-should add at least `host`, `nonce`, `verdict`, `cls`, `pha`, `anc`, `tof`, and `qubits`, then
+should add at least `host`, `ts`, `nonce`, `verdict`, `cls`, `pha`, `anc`, `tof`, and `qubits`, then
 deduplicate by nonce so the user can inspect one local file without SSHing into every node. Keep
 `clean_hits.tsv` and `near_misses.tsv` regenerated from `combined.tsv`; do not hand-maintain them.
-Mirror `errors.log` separately for retry audits, but do not parse error rows into `combined.tsv`.
+Mirror `errors.log` and `candidates.txt` separately for retry and density audits, but do not parse
+error rows into `combined.tsv`.
 
 For periodic mirroring, prefer idempotent pulls that overwrite each host mirror atomically, then
 rebuild combined files locally:
@@ -687,7 +707,9 @@ mv raw/<host>.results.log.tmp raw/<host>.results.log
 
 If live streaming is useful, run a `tail -F` stream per host into host-specific raw files, but still
 rebuild `combined.tsv` by parsing and deduplicating the raw logs. Streaming is an accelerator, not a
-replacement for the remote ledger.
+replacement for the remote ledger. Heartbeats must say whether remote verdicts are being streamed or
+periodically mirrored, and must print the remote workdir, `candidates.txt`, `results.log`, and local
+mirror directory so the user does not have to ask where the data lives.
 
 #### Skip-list discipline
 
@@ -739,12 +761,14 @@ process; distributed/high-parallel validation should share one read-only `ops.bi
 The loop should:
 
 1. Read only that host's local scanner logs.
-2. Extract GCD-clean candidate nonces from `CLEAN nonce=<n>`.
-3. Remove nonces already present in `done.txt` or previous validation logs.
+2. Extract GCD-clean candidate nonces from `CLEAN nonce=<n>` into sorted unique
+   `candidates.txt`.
+3. Remove nonces already present in `done.txt` or previous validation logs, and write the current
+   not-yet-validated list to `pending.txt`.
 4. Validate the remaining nonces in parallel with the host-level shared `ops.bin` cache when the
    evaluator supports `EVAL_TAIL_NONCE`; otherwise fall back to per-batch rebuilds.
-5. Append parseable `dirty` / `CLEAN` verdict output to `results.log`; route `ERROR` output to
-   `errors.log`.
+5. Append timestamped parseable `dirty` / `CLEAN` verdict output to `results.log` without replacing
+   the file inode; route `ERROR` output to `errors.log`.
 6. Add only successfully validated `dirty` / `CLEAN` nonce IDs to `done.txt`; keep `ERROR`
    nonces retryable.
 7. Repeat.
@@ -801,8 +825,8 @@ Each successfully evaluated nonce must produce exactly one parseable verdict lin
 `results.log`:
 
 ```text
-dirty nonce=<n> cls=<c> pha=<p> anc=<a> tof=<avgT> qubits=<q>
-CLEAN nonce=<n> cls=0 pha=0 anc=0 tof=<avgT> qubits=<q>
+ts=<iso8601> dirty nonce=<n> shots=<shots> cls=<c> pha=<p> anc=<a> tof=<avgT> qubits=<q>
+ts=<iso8601> CLEAN nonce=<n> shots=<shots> cls=0 pha=0 anc=0 tof=<avgT> qubits=<q>
 ```
 
 Build/eval failures must go to `errors.log`:
@@ -817,19 +841,23 @@ successfully.
 Monitor both scanner and validator activity per host:
 
 ```bash
+printf 'remote workdir: %s\n' /root/<route>_own_validation
 ps -eo pid,etime,cmd | grep -E '<route>_validate_own_loop|<route>_remote_validate|search_driver|gpu_island' | grep -v grep
 pgrep -fc '<route>_remote_validate'
+wc -l /root/<route>_own_validation/candidates.txt
+wc -l /root/<route>_own_validation/pending.txt
 wc -l /root/<route>_own_validation/done.txt
 wc -l /root/<route>_own_validation/results.log
 wc -l /root/<route>_own_validation/errors.log
 tail -10 /root/<route>_own_validation/results.log
 ```
 
-Useful heartbeat fields include active scanner ranges, validator loop PID, active full-validator
-children, configured `Q_VALIDATE_PAR`, observed validator throughput, `done.txt` count,
-`results.log` count, `errors.log` count, remote-to-local mirror status, local `combined.tsv` row count, local
-`clean_hits.tsv` row count, duplicate sanity status for the latest batch, and best near misses from
-newly validated results.
+Useful heartbeat fields include remote workdir and file paths, active scanner ranges, validator
+loop PID, active full-validator children, configured `Q_VALIDATE_PAR`, observed validator
+throughput, `candidates.txt` count, `pending.txt` count, `done.txt` count, `results.log` count,
+`errors.log` count, remote-to-local mirror status, local mirror directory, local `combined.tsv` row
+count, local `clean_hits.tsv` row count, duplicate sanity status for the latest batch, and best near
+misses from newly validated results.
 
 #### Local cross-checks are trust checks only
 
@@ -968,6 +996,8 @@ The heartbeat prompt should be self-contained. Include:
 - state file path and trusted validator/build paths
 - GPU node inventory and SSH commands
 - current assigned ranges, highest frontier, and already completed windows
+- remote working directory, scanner log path, candidate file path, result ledger path, error log
+  path, and local mirror directory for every active host
 - known candidate totals, density, and best validated `cls / pha / anc` near misses
 - per-host validator loop status, active validator child count, configured parallelism, and whether
   validation throughput is keeping up with scan throughput
@@ -993,7 +1023,9 @@ Heartbeat work order:
    remote node's verdicts for the rest. This is a trust gate *on top of* step 3 — it does not
    replace remote-validating all the others.
 5. Report validation progress, backlog remaining, validator trust status, best near misses, and any
-   clean `0 / 0 / 0` immediately.
+   clean `0 / 0 / 0` immediately. Always include where the remote workdir is, where GCD-clean
+   candidates are stored, whether `results.log` is being streamed or mirrored, and the local mirror
+   path.
 
 Do not treat GPU utilization as the whole heartbeat. A healthy hunt has both scanners and validators
 moving.
@@ -1032,6 +1064,9 @@ Reporting rules:
 - Report aggregate and per-GPU rates when estimable. If a direct GPU command flushes output only at the end, use the last completed range's observed rate.
 - Include completed/scanned nonces, estimated in-flight nonces, remaining assigned window, highest assigned frontier, total GCD-clean candidates, density, ETA, and expected time to next candidate.
 - Include validator cross-check status when remote validation is used.
+- Include the remote scan/validation workdir, `candidates.txt`, `results.log`, `errors.log`, and
+  local mirror path for every active remote hunt. Report how many GCD-clean candidates were found,
+  how many are pending, how many are done, and whether verdict rows are streamed in real time.
 - Include a compact near-miss table sorted by usefulness: clean `pha=0, anc=0` first, then low severity, then lower phase/anc.
 - If a GPU is idle and policy allows extension, report the new range/session. If policy says not to extend, report that decision.
 - If no scans are currently active, set active GPUs to `0/N`, mark ranges as completed, and use historical/completed-window density and rate for the expected-next-candidate estimate.
