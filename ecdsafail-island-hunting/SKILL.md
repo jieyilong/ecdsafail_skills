@@ -157,6 +157,51 @@ Before scanning, compare the estimated score against current promoted SOTA.
 
 Use measured benchmark output for final score decisions. Estimated score is only a pre-scan gate.
 
+## Scan Configuration Manifest And Submission Readiness
+
+Before starting any nonce scan, write a small, durable manifest in both the local output directory
+and the remote scan workdir. The manifest is the thing you will use when a clean nonce appears and
+the race is on; do not rely on memory, terminal scrollback, or a one-off shell command.
+
+The manifest must include:
+
+- route name and local challenge worktree path
+- source base commit/submission id and a concise diff summary
+- exact source-level tweaks, including constants such as `PAD`, `LSBS`, `MSBS`, widths, schedules,
+  or local tool patches that affect the circuit
+- exact CFG/env used for scan, build, and validation
+- GPU toolkit branch/commit and filter mode
+- remote workdir, scanner log path, `candidates.txt`, `results.log`, `errors.log`, and local mirror
+  path
+- measured local full-eval anchor: nonce, `q`, `cls / pha / anc`, avg Toffoli, emitted ops, and
+  projected score
+- known clean or anchor nonces used for local/remote validator trust
+- explicit submission recipe: which source files or baked defaults must be present before
+  `ecdsafail submit`
+
+If the route depends on environment variables for correctness, do not treat those env vars as
+submitted state. The challenge grader and `ecdsafail submit` validate the submitted source, not the
+agent's shell session. Before submitting a clean nonce, bake every correctness-affecting env knob
+into the circuit source through deterministic defaults or equivalent source constants. This includes
+nonce knobs such as `DIALOG_TAIL_NONCE` and structural knobs such as target qubit caps, folding
+flags, width caps, carry/vent schedules, and filter-calibration knobs.
+
+Submission readiness requires a no-env rehearsal:
+
+```bash
+env -u <KNOB1> -u <KNOB2> -u <KNOB3> ecdsafail run
+```
+
+The no-env run must reproduce the clean `0 / 0 / 0`, measured qubit count, avg Toffoli, and score
+expected from the scan. If the no-env run differs from the scan validation, stop and fix the bake
+before submitting. A clean remote validator hit is not enough when the active CFG only exists in a
+remote script.
+
+For env-heavy routes, prefer adding a single clearly named source function such as
+`install_<route>_submission_defaults()` at the beginning of the circuit build path. Keep it small,
+list every baked knob explicitly, and document it in the manifest. After submission, preserve the
+manifest beside the output artifacts so the exact route can be recovered quickly.
+
 ## Route Bake-Off: Rank Structural Changes Before Committing GPUs
 
 **Start by generating a slate of candidate routes, not a single bet.** Before any scanning, use the
@@ -1075,12 +1120,16 @@ Reporting rules:
 
 If any full validation returns `0 / 0 / 0`:
 
-1. Bake the CFG and nonce into the challenge repo.
-2. Run the normal benchmark/check.
-3. Pull latest SOTA again.
-4. Compute measured score from benchmark output.
-5. Submit to the ecdsafail site only if measured score beats current promoted SOTA, unless the user explicitly instructs otherwise.
-6. If the user wants clean-but-worse low-qubit results preserved, create a new branch in the requested challenge repo and push the validated circuit even when the score is higher than SOTA.
+1. Open the scan manifest and identify the exact source tweaks, CFG/env knobs, toolkit branch, and
+   nonce that produced the hit.
+2. Bake the CFG and nonce into the challenge repo. Do not submit a solution that only works because
+   the current shell exports the scan env vars.
+3. Run the no-env submission rehearsal by unsetting every correctness-affecting scan env var and
+   running `ecdsafail run`. The result must match the remote clean hit and expected `q`/avgT.
+4. Pull latest SOTA again.
+5. Compute measured score from benchmark output.
+6. Submit to the ecdsafail site only if measured score beats current promoted SOTA, unless the user explicitly instructs otherwise.
+7. If the user wants clean-but-worse low-qubit results preserved, create a new branch in the requested challenge repo and push the validated circuit even when the score is higher than SOTA.
 
 Do not commit temporary scan configs, logs, helper binaries, remote scripts, `ops.bin`, or generated artifacts unless they are explicitly part of the validated challenge solution.
 
