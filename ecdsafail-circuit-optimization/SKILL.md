@@ -462,10 +462,11 @@ trailmix's **product-min "ludicrous"** point onto `B` (new module
 `src/point_add/trailmix_ludicrous/`, `build()` now calls `build_trailmix_ludicrous_ops()`). It landed
 **1167q × 1,422,591 = 1,660,163,697**, and a swarm drove it to **1163q × 1,412,402** (`b310de9`) in ~15h,
 then a second burst (Karatsuba square + NAF recoding + a qubit↔Toffoli bifurcation that then *resolved
-into best-of-both*, `d11bdbb` 1159q × 1,380,711), and a third Toffoli-grind wave to the **current SOTA
-1159q × 1,378,242 = 1,597,382,478** (`f8e215b`/`4966254`, gopikannappan, 6/20). **This supersedes the
+into best-of-both*, `d11bdbb` 1159q × 1,380,711), a third Toffoli-grind wave (`f8e215b` 1159q ×
+1,378,242), and a fourth wave headlined by **empirical dead-CCX elimination** to the **current SOTA
+1159q × 1,364,380 = 1,581,316,420** (`20b9a1d`/`19cf407`, mpjunior92, 6/21). **This supersedes the
 dialog-GCD 1168/1170 route as the base to fork from.** Full analysis:
-`references/REPORT_1168_wall_revamp.md` (the bursts are §2.6–§2.7).
+`references/REPORT_1168_wall_revamp.md` (the bursts are §2.6–§2.8).
 
 **Module map (`src/point_add/trailmix_ludicrous/`, fork from here).** `mod.rs` =
 `build_trailmix_ludicrous_ops()` (register alloc order pins fuzzer IO ids), `load_schedule()` (copies
@@ -591,12 +592,13 @@ nonce-grind commits — see report):
   (1159q vs 1164q) then *resolved* — the qubit and Toffoli levers **compose**; they're rarely truly
   opposed. **⇒ After any structural arithmetic change, RE-TEST every shelved qubit lever — the
   break-even moved. Always divide a candidate's realized Toffoli-delta by its qubit-delta vs the
-  *current* `T_avg/q`.** Newest data point: `6ba606a`'s 1159→1157 drop cost ~1,127 Toffoli/qubit (just
-  *under* the ~1,189 break-even, so it won −148k *at landing*) — but it was then overtaken because the
-  parallel **1159q Toffoli-grind** independently reached 1,378,242, and `1159×1,378,242 < 1157×1,380,890`.
-  **Lesson: a width drop that clears break-even can still lose the product race to a cheaper-Toffoli
-  wider base. Run both tracks; the lower product wins, not the lower qubit count.** See
-  `references/REPORT_1168_wall_revamp.md` §2.6–§2.7.
+  *current* `T_avg/q`.** **The product-race trap has now happened TWICE:** `6ba606a` (1159→1157, ~1,127
+  Toffoli/qubit) and `cde752d` (1159→1156, ~1,091 Toffoli/qubit) BOTH cleared per-base break-even and
+  BOTH lost the SOTA, because the parallel **1159q Toffoli-grind** fell faster (`1159×1,364,380 <
+  1156×1,381,234` and `< 1157×1,380,890`). **Lesson: a width drop that clears break-even can still lose
+  the product race to a cheaper-Toffoli wider base. Run both tracks; the lower PRODUCT wins, not the
+  lower qubit count — and at present the Toffoli track is winning.** See
+  `references/REPORT_1168_wall_revamp.md` §2.6–§2.8.
 - **⭐ Biggest Toffoli wins = better arithmetic at the dominant cost-center (huge leverage from tiny
   diffs).** `28fe2f2` **Karatsuba modular square** (−22.4M, the single biggest win in the saga, +175/−47
   diff): split `λ = hi·2^128 + lo`, compute `lo²`, `hi²`, `(lo+hi)²`, recombine — 3 n=128 squares
@@ -605,9 +607,25 @@ nonce-grind commits — see report):
   `2^32+2^10−2^6+2^4+1`) + doubling-ramp elimination (`mod_add_shifted_low`/`mod_sub_shifted_low`, no
   pad qubits). `e25c7d8`/`3df690f` hoist `<<32`/all NAF terms to direct shifted adds
   (`TLM_SQUARE_F_SHIFTED_LOW`). **Lesson: audit any O(n²) or ×258×2 primitive (the square, the
-  reduction) for a structural improvement before touching schedule knobs — open follow-up: recurse
-  Karatsuba on the n=128 halves.**
-- **⭐ Comparator-width (`GAP_J2`) narrowing — the highest-leverage Toffoli lever per line of diff.**
+  reduction) for a structural improvement before touching schedule knobs.** *Open follow-up:
+  recurse Karatsuba on the n=128 halves — `4a90d04` (zuiris) **added** the scaffolding
+  (`kara_square_into_prod`, identity `x²=A+M·2^h+B·2^2h`, `M=C−A−B`) but it is **gated OFF**
+  (`TLM_SQUARE_KARA2` is never set, threshold 96), so the n=128 halves still use schoolbook. Wiring
+  it on is unclaimed.*
+- **⭐⭐ Empirical / dynamic dead-CCX elimination — the current top lever (`20b9a1d` SOTA, `4a90d04`).**
+  Beyond the static `constprop.rs`: **simulate the full (post-fanout) circuit over ~9.2M random valid
+  EC-point inputs and record, per CCX, whether its TARGET ever flips.** A CCX whose control-AND is
+  *always 0 on the reachable EC-point distribution* (the two controls are **dynamically
+  mutually-exclusive** — something static constprop cannot prove from the graph) never flips its target:
+  it is **inert-but-charged** (costs avg-executed Toffoli, produces nothing). Drop those by **post-fanout
+  op-index** via a baked list — `mod.rs` `build()` does `include_str!("drop_dead_robust_15221.idx")` →
+  `HashSet<usize>` → `ops.filter(|(i,_)| !drop.contains(i))`, run *after* constprop + the
+  `single_ccx_fanout` peephole. `4a90d04` dropped 13,873 (−13,015 avg-T); `20b9a1d` extended to 15,221
+  (incl. the dynamically-dead extras) → SOTA. **Correctness = distribution/island-exact, NOT all-inputs
+  value-exact** (it removes ops that could fire on *unreachable* inputs) → it re-rolls the FS island and
+  **needs a fresh nonce hunt** (peak-neutral; only avg-executed Toffoli drops). This is additive on top
+  of constprop/fanout and **open-ended — a bigger/fresher screen finds more.**
+- **⭐ Comparator-width (`GAP_J2`) narrowing — the highest-leverage *static* Toffoli lever per line of diff.**
   `f0c1c42` (bket7) cut **−1.33M from a 22-line schedule-table edit.** `GAP_J2[i]` (`schedule.rs`, len
   258) is the per-step swap-decision comparator **window width** for the jump=2 GCD; `gcd.rs` sets
   `cmp_eff = GAP_J2[i].min(current_n)` and the held Gidney carries / compared MSBs in
@@ -615,10 +633,14 @@ nonce-grind commits — see report):
   −1.33M. Cost: mis-decides the u↔v swap with prob ~`2^-k` when the top differing bit falls just below
   the window — an island-exact truncation recovered by the tail-nonce hunt. *This is the
   `DIALOG_GCD_FOLD_CARRY_TRUNC_W`-style lever native to the ludicrous GCD; sweep it one notch at a time.*
-- **⭐ Converged-tail cswap elision (`TLM_APPLY_CSWAP_SKIP_LASTK`).** On the last K GCD iters the apply
-  `cswap`'s swap-decision is deterministically 0 for all-but-rare inputs (the GCD has converged), so it's
-  a no-op — skip it (`apply_cswap_skip_dir` in `gcd.rs`, `5c34dd1`→`9d524b7`, −151k+). Island-exact
-  (huntable). A *structural* instance of "elide a data-dependent gate known-0 on the island."
+- **⭐ Converged-tail cswap elision (`TLM_APPLY_CSWAP_SKIP_LASTK` + the FWD/INV × FIRST/LAST family).**
+  On the first/last K GCD iters the apply `cswap`'s swap-decision is deterministically 0 for
+  all-but-rare inputs (the GCD has converged), so it's a no-op — skip it (`apply_cswap_skip_dir` in
+  `gcd.rs`, `5c34dd1`→`9d524b7`). `9af02f7` extended it to the **inverse pass + first iter**
+  (`TLM_APPLY_INV_FIRST_CSWAP_SKIP`, also `..._FWD_LAST`/`..._INV_LAST`/`..._INV_FIRST_SUB_SKIP`,
+  −283k), and there are companion `..._S2_ZERO_LAST` skips routing known-zero steps through
+  `fused_double_only`. Island-exact (huntable). A *structural* instance of "elide a data-dependent gate
+  known-0 on the island" — enumerate every FWD/INV × FIRST/LAST corner of the converged GCD.
 - **Classical-constant folding (Q is classical → do constant arithmetic for free).** `662e267` rewrote
   `coord_add3x` (`dst += 3·ox mod q`) to derive `3·ox mod q` entirely in the **classical `BitId`
   domain** (`classical_times3_mod_q`, all `BitStore/BitInvert`, 0 Toffoli) then one `mod_add_exact` —
@@ -650,8 +672,9 @@ sub-1020q PZ submissions (`55892ec`/`a77c9da`/`12e483f`) all scored ~31–32B (+
 **rejected** (qubit-lower-bound witnesses, not contenders); so are high-qubit experiments (abipalli's
 2045q, +46%). The product is minimized in the **1159–1164q** ludicrous band — the SOTA is the **1159q
 best-of-both** point (cheap Karatsuba arithmetic **+** the 1159q headroom clamp), now Toffoli-ground to
-**1,378,242** (`f8e215b`) via `GAP_J2` comparator narrowing + converged-tail cswap elision + the square
-doubling-ramp removal. A 1157q point exists (`6ba606a`) but loses the product race to the 1159q grind.
+**1,364,380** (`20b9a1d`) via `GAP_J2` comparator narrowing + converged-tail cswap elision + the square
+doubling-ramp removal + **empirical dead-CCX elimination** (the current biggest lever). The 1157q
+(`6ba606a`) and 1156q (`cde752d`) points both lose the product race to the 1159q grind.
 
 ### Compare-Bit Narrowing
 
