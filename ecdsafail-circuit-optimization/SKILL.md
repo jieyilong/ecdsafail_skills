@@ -644,7 +644,9 @@ nonce-grind commits — see report):
   (`dead_k1_coord3x.idx` vs `dead_k1_nocoord3x.idx`); (3) it does **not** improve the construction (a
   better circuit wouldn't emit these gates) and a clean-room build gains nothing from the `.idx`.
   Peak-neutral, open-ended (bigger screen finds more) — but treat it like a sophisticated nonce grind:
-  it's why SOTA avg-T looks ~1.36M, but the *durable* wins are the structural levers.
+  it's why SOTA avg-T looks ~1.36M, but the *durable* wins are the structural levers. **Operational
+  how-to (the BitWonka `find_dead_ccx` screener + the distributed multi-host scan helper): see the
+  "Dead-CCX / Dead-CXX Screening" section below.**
 - **⭐ Comparator-width (`GAP_J2`) narrowing — the highest-leverage *static* Toffoli lever per line of diff.**
   `f0c1c42` (bket7) cut **−1.33M from a 22-line schedule-table edit.** `GAP_J2[i]` (`schedule.rs`, len
   258) is the per-step swap-decision comparator **window width** for the jump=2 GCD; `gcd.rs` sets
@@ -787,6 +789,17 @@ distribution-level dead-gate candidate list before applying any `DROP_DEAD_ROBUS
 or similar post-build cut. Do not fit dead gates to one Fiat-Shamir draw. Screen a
 large random input population, then treat the resulting list as a candidate reservoir
 that still needs full eval and island triage.
+
+> **This section is the operational how-to. For the *strategic* framing — read it first —
+> see the ⭐⭐ "Empirical / dynamic dead-CCX elimination" bullet under "The 1168 Wall Broke."
+> The key points it makes: this is a SCORE lever, NOT a DESIGN lever (it does not improve the
+> construction; a clean-room build gains nothing from the `.idx`); the indices are
+> **absolute-position fragile**, so *any* structural change (a clamp, knob, or fold toggle —
+> not just an FS re-hash) shifts them onto live gates and forces a full re-screen. The lists
+> are literally per-variant (`dead_k1_coord3x.idx` vs `dead_k1_nocoord3x.idx`). Treat the
+> whole technique like a sophisticated nonce grind: worth running to squeeze a frozen artifact,
+> but the durable wins are the structural levers. (Heading note: "Dead-CXX" only appears here
+> because the bundled script/outputs are named `*_cxx_*`; the gate is a CCX.)**
 
 ### Preferred Screener: BitWonka `dead-ccx-finder`
 
