@@ -463,10 +463,11 @@ trailmix's **product-min "ludicrous"** point onto `B` (new module
 **1167q × 1,422,591 = 1,660,163,697**, and a swarm drove it to **1163q × 1,412,402** (`b310de9`) in ~15h,
 then a second burst (Karatsuba square + NAF recoding + a qubit↔Toffoli bifurcation that then *resolved
 into best-of-both*, `d11bdbb` 1159q × 1,380,711), a third Toffoli-grind wave (`f8e215b` 1159q ×
-1,378,242), and a fourth wave headlined by **empirical dead-CCX elimination** to the **current SOTA
-1159q × 1,364,380 = 1,581,316,420** (`20b9a1d`/`19cf407`, mpjunior92, 6/21). **This supersedes the
-dialog-GCD 1168/1170 route as the base to fork from.** Full analysis:
-`references/REPORT_1168_wall_revamp.md` (the bursts are §2.6–§2.8).
+1,378,242), a fourth wave headlined by **empirical dead-CCX elimination** (`20b9a1d` 1159q × 1,364,380),
+and a fifth step re-applying the **1156q clamp** on the matured base → **current SOTA 1156q × 1,365,960
+= 1,579,049,760** (`27d4627`/`19995b2`, BitWonka, 6/22). **This supersedes the dialog-GCD 1168/1170
+route as the base to fork from.** Full analysis: `references/REPORT_1168_wall_revamp.md` (the bursts are
+§2.6–§2.10).
 
 **Module map (`src/point_add/trailmix_ludicrous/`, fork from here).** `mod.rs` =
 `build_trailmix_ludicrous_ops()` (register alloc order pins fuzzer IO ids), `load_schedule()` (copies
@@ -592,13 +593,14 @@ nonce-grind commits — see report):
   (1159q vs 1164q) then *resolved* — the qubit and Toffoli levers **compose**; they're rarely truly
   opposed. **⇒ After any structural arithmetic change, RE-TEST every shelved qubit lever — the
   break-even moved. Always divide a candidate's realized Toffoli-delta by its qubit-delta vs the
-  *current* `T_avg/q`.** **The product-race trap has now happened TWICE:** `6ba606a` (1159→1157, ~1,127
-  Toffoli/qubit) and `cde752d` (1159→1156, ~1,091 Toffoli/qubit) BOTH cleared per-base break-even and
-  BOTH lost the SOTA, because the parallel **1159q Toffoli-grind** fell faster (`1159×1,364,380 <
-  1156×1,381,234` and `< 1157×1,380,890`). **Lesson: a width drop that clears break-even can still lose
-  the product race to a cheaper-Toffoli wider base. Run both tracks; the lower PRODUCT wins, not the
-  lower qubit count — and at present the Toffoli track is winning.** See
-  `references/REPORT_1168_wall_revamp.md` §2.6–§2.8.
+  *current* `T_avg/q`.** **The product-race trap is real but NOT permanent — "lost" means "early," not
+  "wrong."** `6ba606a` (1157q) and `cde752d` (1156q) both cleared per-base break-even yet *lost* the SOTA
+  at the time, because the 1159q Toffoli-grind was falling faster. **But once the Toffoli base matured to
+  the dead-CCX 1,364,380 floor, the very same 1156q clamp returned as SOTA** (`27d4627`, ~527
+  Toffoli/qubit — `1156×1,365,960 < 1159×1,364,380`). **Lesson: run both tracks, compare *products*, and
+  RE-TEST every shelved width drop after each Toffoli win — the break-even keeps moving in their favor.
+  The qubit floor and Toffoli floor descend in lock-step, each unlocking the other.** See
+  `references/REPORT_1168_wall_revamp.md` §2.6–§2.10.
 - **⭐ Biggest Toffoli wins = better arithmetic at the dominant cost-center (huge leverage from tiny
   diffs).** `28fe2f2` **Karatsuba modular square** (−22.4M, the single biggest win in the saga, +175/−47
   diff): split `λ = hi·2^128 + lo`, compute `lo²`, `hi²`, `(lo+hi)²`, recombine — 3 n=128 squares
@@ -623,19 +625,26 @@ nonce-grind commits — see report):
   win precisely because there's no cheap arithmetic left to restructure. (To ever make Karatsuba pay
   here you'd have to re-engineer the recombination adds to be MBU-vented AND recurse to deep leaves AND
   fix the leak — high effort, sub-2% ceiling. Not worth it.)
-- **⭐⭐ Empirical / dynamic dead-CCX elimination — the current top lever (`20b9a1d` SOTA, `4a90d04`).**
-  Beyond the static `constprop.rs`: **simulate the full (post-fanout) circuit over ~9.2M random valid
-  EC-point inputs and record, per CCX, whether its TARGET ever flips.** A CCX whose control-AND is
-  *always 0 on the reachable EC-point distribution* (the two controls are **dynamically
-  mutually-exclusive** — something static constprop cannot prove from the graph) never flips its target:
-  it is **inert-but-charged** (costs avg-executed Toffoli, produces nothing). Drop those by **post-fanout
-  op-index** via a baked list — `mod.rs` `build()` does `include_str!("drop_dead_robust_15221.idx")` →
-  `HashSet<usize>` → `ops.filter(|(i,_)| !drop.contains(i))`, run *after* constprop + the
-  `single_ccx_fanout` peephole. `4a90d04` dropped 13,873 (−13,015 avg-T); `20b9a1d` extended to 15,221
-  (incl. the dynamically-dead extras) → SOTA. **Correctness = distribution/island-exact, NOT all-inputs
-  value-exact** (it removes ops that could fire on *unreachable* inputs) → it re-rolls the FS island and
-  **needs a fresh nonce hunt** (peak-neutral; only avg-executed Toffoli drops). This is additive on top
-  of constprop/fanout and **open-ended — a bigger/fresher screen finds more.**
+- **⭐⭐ Empirical / dynamic dead-CCX elimination — biggest avg-T lever, but a SCORE lever, not a DESIGN
+  lever (`4a90d04`/`20b9a1d`).** Beyond static `constprop.rs`: a **bit-sliced finder** reproduces the
+  Simulator's per-shot eval and records, per CCX, the OR of its *fired* mask. A CCX whose target never
+  flips on the reachable EC-point distribution (its two controls are **dynamically mutually-exclusive** —
+  static constprop can't prove it) is **inert-but-charged** (costs avg-executed Toffoli, does nothing).
+  Drop those by **post-fanout op-index** via a baked `.idx` → `build()` does
+  `include_str!(...idx)` → `HashSet` → `ops.filter`, *after* constprop + `single_ccx_fanout`.
+  **The false-positive defense is the heart of it:** a single 9024-shot pass over-flags ~49k (most only
+  *coincidentally* idle on one draw); **intersect "never-fired" across 1024 independent random shot sets
+  (~9.2M inputs)** → the set shrinks monotone-nested (`V1024 ⊆ V512 ⊆ …`) to a robust core. Sizing the
+  screen ≫ the 9024 verifier draw pushes the residual false-positive firing-rate below the verifier's
+  resolution. Then **hunt `DIALOG_TAIL_NONCE` WITH the drop applied** (self-consistent fixed point) and
+  check action-neutrality across many nonces. **Caveats that matter:** (1) **distribution/island-exact,
+  NOT all-inputs value-exact** — "clean on its island," not correct off-island; (2) **absolute-position
+  fragile / circuit-specific** — *any* structural change shifts the indices onto live gates (→ the
+  `9024/141/141` all-shots break) and forces a **full re-screen**; the lists are literally per-variant
+  (`dead_k1_coord3x.idx` vs `dead_k1_nocoord3x.idx`); (3) it does **not** improve the construction (a
+  better circuit wouldn't emit these gates) and a clean-room build gains nothing from the `.idx`.
+  Peak-neutral, open-ended (bigger screen finds more) — but treat it like a sophisticated nonce grind:
+  it's why SOTA avg-T looks ~1.36M, but the *durable* wins are the structural levers.
 - **⭐ Comparator-width (`GAP_J2`) narrowing — the highest-leverage *static* Toffoli lever per line of diff.**
   `f0c1c42` (bket7) cut **−1.33M from a 22-line schedule-table edit.** `GAP_J2[i]` (`schedule.rs`, len
   258) is the per-step swap-decision comparator **window width** for the jump=2 GCD; `gcd.rs` sets
@@ -686,11 +695,13 @@ not the jump-GCD+Karatsuba arithmetic) keeps setting qubit records that are all 
 1.36M (~33× over the 948q break-even `1,581,316,420 / 948 ≈ 1.67M`), so it's a **qubit-lower-bound
 witness, not a product contender** — would need a ~33× Toffoli reduction (a different inversion, not a
 packing tweak) to compete. High-qubit experiments (abipalli's 2045q, +46%) lose the other way. **The PZ
-route is its own thing — full mechanism + the 952→948 break in `references/SHRUNKEN_PZ_q948_track.md`.** The product is minimized in the **1159–1164q** ludicrous band — the SOTA is the **1159q
-best-of-both** point (cheap Karatsuba arithmetic **+** the 1159q headroom clamp), now Toffoli-ground to
-**1,364,380** (`20b9a1d`) via `GAP_J2` comparator narrowing + converged-tail cswap elision + the square
-doubling-ramp removal + **empirical dead-CCX elimination** (the current biggest lever). The 1157q
-(`6ba606a`) and 1156q (`cde752d`) points both lose the product race to the 1159q grind.
+route is its own thing — full mechanism + the 952→948 break in `references/SHRUNKEN_PZ_q948_track.md`.** The product is minimized in the **1156–1164q** ludicrous band — the SOTA is now the **1156q
+best-of-both** point (`27d4627`, **1156q × 1,365,960**): the dead-CCX-grade low-Toffoli base (`GAP_J2`
+narrowing + converged-tail cswap elision + doubling-ramp removal + empirical dead-CCX elimination) **+**
+the 1156q headroom clamp re-applied + `coord_add3x` on. The 1157q (`6ba606a`) and 1156q (`cde752d`)
+drops *lost* the product race when they landed — but the 1156q clamp **returned as SOTA** (§2.10) once
+the Toffoli base got cheap enough; "lost" meant "early," not "wrong" (re-test shelved width drops after
+each Toffoli win).
 
 ### Compare-Bit Narrowing
 
@@ -769,7 +780,7 @@ Observed behavior:
 - Vent padding can make shorter product paths safe enough to validate.
 - These often trade qubits for Toffoli and need score gating.
 
-## Distributed Dead-CXX Screening
+## Dead-CCX / Dead-CXX Screening
 
 Use this step when a q-target route is nearly score-competitive and needs a robust,
 distribution-level dead-gate candidate list before applying any `DROP_DEAD_ROBUST`
@@ -777,15 +788,75 @@ or similar post-build cut. Do not fit dead gates to one Fiat-Shamir draw. Screen
 large random input population, then treat the resulting list as a candidate reservoir
 that still needs full eval and island triage.
 
+### Preferred Screener: BitWonka `dead-ccx-finder`
+
+Prefer BitWonka's public tool when the objective is dead-CCX filtering for the
+current ludicrous route:
+
+```text
+https://github.com/BitWonka/ecdsafail-tools/tree/master/dead-ccx-finder
+```
+
+It provides `find_dead_ccx.rs`, a drop-in `src/bin/` binary for an otherwise
+unmodified challenge checkout. It calls `point_add::build()` once, screens the
+exact post-fanout op stream, and ORs each charged CCX/CCZ fire mask across many
+Fiat-Shamir seeds. A gate emitted to `.idx` is one whose scored condition
+`cond & c1 & c2` never fired over the screened population.
+
+Key properties from the tool README:
+
+- self-contained bit-sliced simulator; builds against the public `Simulator`
+  fields and does not require trusted simulator patches
+- `DEAD_REAL_RNG=1` exact mode uses the real measured-gate RNG; about 9M screened
+  inputs in roughly 13 minutes on a 16-core box
+- `DEAD_REAL_RNG=0` fast mode forces measurement outcomes to 0; useful for quick
+  conservative iteration, but use exact mode for final ship screens
+- knobs: `DEAD_SCREEN_NONCES`, `DEAD_REAL_RNG`, `DEAD_THREADS`,
+  `PREDICT_SHOTS`, `DEAD_IDX_OUT`, plus the route's baked or exported `TLM_*`
+
+Canonical single-host run:
+
+```bash
+cp dead-ccx-finder/find_dead_ccx.rs <challenge-repo>/src/bin/find_dead_ccx.rs
+cd <challenge-repo>
+cargo build --release --bin find_dead_ccx
+NONCES=$(python3 -c "print(' '.join(str(700000000001+i*999999937) for i in range(1000)))")
+DEAD_REAL_RNG=1 DEAD_SCREEN_NONCES="$NONCES" DEAD_IDX_OUT=dead.idx \
+  ./target/release/find_dead_ccx
+```
+
+Use fast mode only as a triage pre-pass:
+
+```bash
+DEAD_REAL_RNG=0 DEAD_SCREEN_NONCES="$NONCES" DEAD_IDX_OUT=dead.fast.idx \
+  ./target/release/find_dead_ccx
+```
+
+Add the drop loader after the single-CCX-fanout pass and before returning `ops`.
+For local tuning, point `DROP_DEAD_IDX_FILE` at the generated `.idx`. For ship,
+commit the `.idx` and switch the loader to `include_str!(...)` so the env-less
+grader build reproduces the exact final artifact. Always keep
+`DROP_DEAD_ROBUST_DISABLE=1` as a debugging escape hatch.
+
+Important: BitWonka's tool is not a drop-in replacement for the older bundled
+distributed helper's current `screen_dead_ccx` CLI. The finder uses environment
+variables (`DEAD_SCREEN_NONCES`, `DEAD_IDX_OUT`, etc.), while the bundled helper
+expects `target/release/screen_dead_ccx --shots ... --seed ... --out ...`.
+Use BitWonka's `find_dead_ccx` directly for final single-host screens, or adapt
+the distributed helper/backend script before mixing the two.
+
+### Distributed Orchestration Helper
+
 Bundled helper:
 
 ```text
 scripts/distributed_dead_cxx_scan.py
 ```
 
-It runs `target/release/screen_dead_ccx` over `N` random inputs across `M` SSH
-hosts with `K` worker processes per host, launching all hosts concurrently after
-staging, then collects every shard's `.idx` list and emits merged support files:
+It currently runs `target/release/screen_dead_ccx` over `N` random inputs across
+`M` SSH hosts with `K` worker processes per host, launching all hosts concurrently
+after staging, then collects every shard's `.idx` list and emits merged support
+files:
 
 - `dead_cxx_support.tsv` — every op index and the number of shards where it stayed dead
 - `dead_cxx_intersection.idx` — indices dead in all shards
@@ -819,9 +890,14 @@ scripts locally without running them.
 
 Operational rules:
 
-1. Build `screen_dead_ccx` from source on each remote host; do not upload `ops.bin`.
+1. Build the screener from source on each remote host; do not upload `ops.bin`.
+   If using BitWonka's tool, copy `find_dead_ccx.rs` into `src/bin/` and build
+   `find_dead_ccx`; if using the bundled script as-is, provide a compatible
+   `screen_dead_ccx` binary.
 2. Choose `N` large enough that each shard has meaningful coverage. For fragile dead-drop
    work, prefer tens of millions of random samples over a single 9024-shot draw.
+   A practical final minimum is the BitWonka/field scale of about 9M inputs; use
+   larger distributed populations when trying to relax support thresholds.
 3. Use `K` near the CPU parallelism the host can sustain without memory pressure. If
    workers are killed or logs show rc=137, lower `K` and restart cleanly.
 4. Start with strict support lists (`all`, `all-1`, `all-2`) and measure
@@ -829,8 +905,8 @@ Operational rules:
 5. If a threshold shell worsens `pha` or creates a repeated classical floor, split it
    into op-index/support shells and test recombinations instead of scanning nonces.
 6. Record the source commit, CFG/env, tail nonce used for eval, exact support threshold,
-   input population size, host list, `K`, and local/remote artifact paths before any
-   nonce scan or submission attempt.
+   input population size, host list, `K`, screener mode (`DEAD_REAL_RNG=1/0` if using
+   BitWonka), and local/remote artifact paths before any nonce scan or submission attempt.
 
 Interpretation:
 
@@ -838,6 +914,8 @@ Interpretation:
   not proof that deleting it is correct after the op stream re-hashes.
 - Every applied list reseeds the Fiat-Shamir island. Re-run full `eval_circuit` on the
   post-drop stream and then do a short triage scan before large GPU hunting.
+- Dead-CCX screening must be done with the drop disabled. Then bake/apply the `.idx`,
+  re-hunt the nonce on the drop-enabled circuit, and validate that final artifact.
 - Favor robust all-shard intersections for repair baselines; use lower support shells
   as a Toffoli reservoir only after slicing/attribution shows they do not introduce
   structural phase or classical dirt.
