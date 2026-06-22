@@ -769,6 +769,79 @@ Observed behavior:
 - Vent padding can make shorter product paths safe enough to validate.
 - These often trade qubits for Toffoli and need score gating.
 
+## Distributed Dead-CXX Screening
+
+Use this step when a q-target route is nearly score-competitive and needs a robust,
+distribution-level dead-gate candidate list before applying any `DROP_DEAD_ROBUST`
+or similar post-build cut. Do not fit dead gates to one Fiat-Shamir draw. Screen a
+large random input population, then treat the resulting list as a candidate reservoir
+that still needs full eval and island triage.
+
+Bundled helper:
+
+```text
+scripts/distributed_dead_cxx_scan.py
+```
+
+It runs `target/release/screen_dead_ccx` over `N` random inputs across `M` SSH
+hosts with `K` worker processes per host, launching all hosts concurrently after
+staging, then collects every shard's `.idx` list and emits merged support files:
+
+- `dead_cxx_support.tsv` — every op index and the number of shards where it stayed dead
+- `dead_cxx_intersection.idx` — indices dead in all shards
+- `dead_cxx_support_ge<N>.idx` — threshold lists, including all-minus-one / all-minus-two when requested
+- per-host `shards/`, `logs/`, `manifest.tsv`, plus local `manifest.json` and `summary.json`
+
+Example:
+
+```bash
+python scripts/distributed_dead_cxx_scan.py \
+  --total-shots 20000000 \
+  --host l40a=root@202.181.159.211:11152 \
+  --host l40b=root@103.67.42.150:10606 \
+  --threads-per-host 24 \
+  --challenge-dir /root/q1153_work/challenge \
+  --remote-workdir /root/q1153_dead_cxx_20m \
+  --out-dir outputs/q1153_dead_cxx_20m \
+  --mode random \
+  --support-threshold 48 \
+  --support-threshold -1 \
+  --support-threshold -2 \
+  --ssh-option=-o \
+  --ssh-option StrictHostKeyChecking=accept-new \
+  --build
+```
+
+Host format is `[name=]user@host[:port][,identity=/path/to/key]`. If no
+`--support-threshold` is given, the helper writes `all`, `all-1`, and `all-2`
+support lists by default. Use `--dry-run` first to write the generated remote
+scripts locally without running them.
+
+Operational rules:
+
+1. Build `screen_dead_ccx` from source on each remote host; do not upload `ops.bin`.
+2. Choose `N` large enough that each shard has meaningful coverage. For fragile dead-drop
+   work, prefer tens of millions of random samples over a single 9024-shot draw.
+3. Use `K` near the CPU parallelism the host can sustain without memory pressure. If
+   workers are killed or logs show rc=137, lower `K` and restart cleanly.
+4. Start with strict support lists (`all`, `all-1`, `all-2`) and measure
+   `q / avgT / cls / pha / anc` on each before relaxing thresholds.
+5. If a threshold shell worsens `pha` or creates a repeated classical floor, split it
+   into op-index/support shells and test recombinations instead of scanning nonces.
+6. Record the source commit, CFG/env, tail nonce used for eval, exact support threshold,
+   input population size, host list, `K`, and local/remote artifact paths before any
+   nonce scan or submission attempt.
+
+Interpretation:
+
+- A high-support dead-CXX index is evidence that a charged gate is distribution-inert,
+  not proof that deleting it is correct after the op stream re-hashes.
+- Every applied list reseeds the Fiat-Shamir island. Re-run full `eval_circuit` on the
+  post-drop stream and then do a short triage scan before large GPU hunting.
+- Favor robust all-shard intersections for repair baselines; use lower support shells
+  as a Toffoli reservoir only after slicing/attribution shows they do not introduce
+  structural phase or classical dirt.
+
 ## Toffoli Reduction Patterns
 
 ### Fused Folds and Fast Adds
