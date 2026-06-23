@@ -627,17 +627,24 @@ nonce-grind commits — see report):
   win precisely because there's no cheap arithmetic left to restructure. (To ever make Karatsuba pay
   here you'd have to re-engineer the recombination adds to be MBU-vented AND recurse to deep leaves AND
   fix the leak — high effort, sub-2% ceiling. Not worth it.)
-- **⭐ Density-neutral value-exact primitive swaps — the SAFE Toffoli lever; prefer these before dead-CCX
-  (`2f8835b`/§2.11, GPU handoff).** Replace an expensive exact primitive with a Boolean-identical cheaper
-  one: e.g. `TLM_FOLD_TAIL_CINC` swaps the clean-tail fold's **quadratic `mcx_clean_k` prefix cascade**
-  (`fused.rs`) for one **Khattar–Gidney controlled-increment** (`cinc_khattar_gidney`, log\*-ancilla),
-  −5,175 avgT. It is **value-exact** (same function on all inputs) and **density-neutral** (preserves the
-  GCD-clean near-zero-error island tail), so unlike the dead-CCX drop it does NOT degrade
-  nonce-huntability — a GPU 1M pilot confirmed the folds keep a healthy near-zero distribution while the
-  dead-CCX subset was what inflated the errors. **Rule: take every value-exact density-neutral cut first
-  (free of distribution risk); only then layer dead-CCX on top, gradually.** (Source caveat: in the
-  shipped 1153 stream `TLM_CODEC_DIAMOND_MCX` is *set but never read* — inert; `SINGLE_CCX_FANOUT_DISABLE`
-  is a stream-matching choice for the dead-CCX indices, not a Toffoli lever.)
+- **⭐ Density-neutral value-exact primitive swaps — the SAFE Toffoli lever, but the vein is EXHAUSTED
+  and the big one is already in the SOTA (`2f8835b`/§2.11–§2.12).** Replace an expensive exact primitive
+  with a Boolean-identical cheaper one: `TLM_FOLD_TAIL_CINC` ("cinc") swaps the clean-tail fold's
+  **quadratic `mcx_clean_k` prefix cascade** (`fused.rs:86`) for one **Khattar–Gidney controlled-increment**
+  (`cinc_khattar_gidney`, log\*-ancilla), measured **−5,340 avgT**. It is **value-exact** + **density-neutral**
+  (preserves the GCD-clean near-zero-error island tail — a GPU 1M pilot confirmed the folds keep a healthy
+  distribution while the *dead-CCX* subset was what inflated errors), so it does NOT degrade nonce-hunting.
+  **BUT: `TLM_FOLD_TAIL_CINC=1` is already set in the SOTA `da51a48` (`mod.rs:1092,2153`) — cinc is SPENT,
+  already inside the 1,368,487. Do NOT "stack" it again (that was a 6/23 double-counting error, §2.12).**
+  An exhaustive parallel hunt found exactly ONE un-shipped survivor — `merge25` (codec diamond → symmetric
+  clean MCX, **−170** avgT, marginal; stacking it needs a dead-CCX re-screen + re-hunt). **The density-neutral
+  vein is closed; it cannot move the SOTA further — the live levers are structural or dead-CCX (§2.8).**
+  Methodology lesson: **before crediting a lever as a stackable Δ, `grep` the *ship config* to confirm the
+  knob isn't already on there; never measure a lever on a different base than you'll ship from.** (Source
+  caveats: `TLM_CODEC_DIAMOND_MCX` is *set but never read* — inert; `SINGLE_CCX_FANOUT_DISABLE` is a
+  stream-matching choice, not a Toffoli lever. And `DIALOG_TAIL_NONCE` is **NOT** a no-op on the current
+  build — sha256-verified across configs; the prior "nonce is dead" was an old-tree `set_var`-pin bug,
+  fixed at HEAD, `mod.rs:369-371`.)
 - **⭐⭐ Empirical / dynamic dead-CCX elimination — biggest avg-T lever, but a SCORE lever, not a DESIGN
   lever (`4a90d04`/`20b9a1d`).** Beyond static `constprop.rs`: a **bit-sliced finder** reproduces the
   Simulator's per-shot eval and records, per CCX, the OR of its *fired* mask. A CCX whose target never
