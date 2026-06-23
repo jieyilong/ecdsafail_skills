@@ -580,11 +580,18 @@ nonce-grind commits — see report):
   `target_qubit_headroom = TLM_TARGET_Q − active_qubits` clamps EVERY transient adder's carry/chunk to
   `min(scheduled_k, headroom)` so no local peak exceeds the target — a circuit-wide "do not exceed N
   qubits" governor (`TLM_TARGET_Q`, `TLM_TARGET_FFG_RESERVE`, `TLM_TARGET_FOLD_RESERVE`,
-  `TLM_GCD_RESELECT_LAYOUT`, `TLM_DIRECT_VARCHUNK`). **Dropping the ceiling is a one-line lever**: `6ba606a`
-  went 1159→1157 by just `TLM_TARGET_Q` 1159→1157 (clamp body unchanged), paid for with new per-call FFG
-  reserve overrides (`TLM_TARGET_FFG_CALL_RESERVE_DELTAS/OVERRIDES`), a **lazy-cin0 fold**
-  (`TLM_FOLD_CHUNK_LAZY_CIN0` — alloc the chunk carry only inside the boundary-erase, deferring one
-  carry's liveness), and vent deltas. **⚠ These only win if they clear the break-even below.**
+  `TLM_GCD_RESELECT_LAYOUT`, `TLM_DIRECT_VARCHUNK`). **Lowering the `TLM_TARGET_Q` ceiling is the trigger,
+  but it only fits if you also FREE the lanes it needs** — the enabling lane-freeing levers are the
+  reusable part: (a) **drop the fold-chunk carry-in entirely** when chunk-0's cin is provably 0 —
+  `TLM_FOLD_CHUNK_ZERO_CIN=1` skips `cin0` allocation and erases the boundary carry via a zero-cin path
+  (`fold_boundary_erase_zero_direct` / `erase_carry_gated_zero_cin_opt`); the lazy variant
+  `TLM_FOLD_CHUNK_LAZY_CIN0` allocs it only inside the boundary-erase (defers liveness); (b) **cap the
+  FFG fold clean-vent count** `TLM_FFG_MAX_G` (fewer transient vent qubits at the peak); (c) per-call FFG
+  reserve overrides (`TLM_TARGET_FFG_CALL_RESERVE_DELTAS/OVERRIDES`). Worked examples: `6ba606a` 1159→1157
+  (`TLM_TARGET_Q`−2 + lazy-cin0 + reserves); `56c3746` **1156→1153** (`TLM_TARGET_Q` 1156→**1152** +
+  `TLM_FOLD_CHUNK_ZERO_CIN=1` + `TLM_FFG_MAX_G=47`, via `install_q1153_submission_defaults()`). **⚠ The
+  clamp+lane-freeing is qubit-only and COSTS Toffoli (tighter chunks = more carries); it only wins once
+  the break-even below is cleared by a stacked Toffoli lever.**
 - **⭐ The break-even rule (the meta-lever) — and its cost is PER-BASE, not fixed.** A peak qubit is
   worth `avg_Toffoli / peak_qubits` Toffoli (**≈1,190 at the 1159q floor**). A width-narrowing lever is
   net-positive **only if it removes a qubit for < that many Toffoli**. But the realized cost *moves with
