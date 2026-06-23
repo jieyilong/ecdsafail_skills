@@ -464,10 +464,12 @@ trailmix's **product-min "ludicrous"** point onto `B` (new module
 then a second burst (Karatsuba square + NAF recoding + a qubit↔Toffoli bifurcation that then *resolved
 into best-of-both*, `d11bdbb` 1159q × 1,380,711), a third Toffoli-grind wave (`f8e215b` 1159q ×
 1,378,242), a fourth wave headlined by **empirical dead-CCX elimination** (`20b9a1d` 1159q × 1,364,380),
-and a fifth step re-applying the **1156q clamp** on the matured base → **current SOTA 1156q × 1,365,960
-= 1,579,049,760** (`27d4627`/`19995b2`, BitWonka, 6/22). **This supersedes the dialog-GCD 1168/1170
+a fifth step re-applying the **1156q clamp** on the matured base (`27d4627` 1156q × 1,365,960), and a
+sixth adding **iterated (two-pass) dead-CCX** to reach the **current SOTA 1153q × 1,368,487 =
+1,577,865,511** (`da51a48`/`5fc2e81`, jieyilong, 6/23). **This supersedes the dialog-GCD 1168/1170
 route as the base to fork from.** Full analysis: `references/REPORT_1168_wall_revamp.md` (the bursts are
-§2.6–§2.10).
+§2.6–§2.11). (Separately, the low-qubit **Shrunken-PZ** track reached an **851q** *analysis-oracle*
+witness — 464.5M Toffoli, rejected +3659% — see `references/SHRUNKEN_PZ_q948_track.md` §8.)
 
 **Module map (`src/point_add/trailmix_ludicrous/`, fork from here).** `mod.rs` =
 `build_trailmix_ludicrous_ops()` (register alloc order pins fuzzer IO ids), `load_schedule()` (copies
@@ -644,9 +646,14 @@ nonce-grind commits — see report):
   (`dead_k1_coord3x.idx` vs `dead_k1_nocoord3x.idx`); (3) it does **not** improve the construction (a
   better circuit wouldn't emit these gates) and a clean-room build gains nothing from the `.idx`.
   Peak-neutral, open-ended (bigger screen finds more) — but treat it like a sophisticated nonce grind:
-  it's why SOTA avg-T looks ~1.36M, but the *durable* wins are the structural levers. **Operational
-  how-to (the BitWonka `find_dead_ccx` screener + the distributed multi-host scan helper): see the
-  "Dead-CCX / Dead-CXX Screening" section below.**
+  it's why SOTA avg-T looks ~1.36M, but the *durable* wins are the structural levers. **It is also
+  ITERABLE (`da51a48`, the 1153q SOTA): drop the first list, then re-screen the ALREADY-DROPPED stream
+  over fresh FS sets and drop again** — the first removal reshapes the stream so a second pass
+  (`DROP_DEAD_ROBUST_SECOND`, `drop_dead_second_fs512.idx`, 2,638 ops on top of the first 13,880) finds
+  newly-dead gates; the marginal second pass is exactly what carried the 1153 rung over break-even.
+  Each pass is subset-monotone and re-hunted. **Operational how-to (the BitWonka `find_dead_ccx`
+  screener + the distributed multi-host scan helper): see the "Dead-CCX / Dead-CXX Screening" section
+  below.**
 - **⭐ Comparator-width (`GAP_J2`) narrowing — the highest-leverage *static* Toffoli lever per line of diff.**
   `f0c1c42` (bket7) cut **−1.33M from a 22-line schedule-table edit.** `GAP_J2[i]` (`schedule.rs`, len
   258) is the per-step swap-decision comparator **window width** for the jump=2 GCD; `gcd.rs` sets
@@ -692,18 +699,20 @@ nonce-grind commits — see report):
 **Corollary — neither extreme is score-competitive; stay in the 1159–1164q band.** The **Shrunken-PZ
 low-qubit track** (a *separate* line of work from this ludicrous route — a 530-step divstep inversion,
 not the jump-GCD+Karatsuba arithmetic) keeps setting qubit records that are all **score-rejected**:
-1050q → 1019q (teddyjfpender, +~280%) → **948q** (nasqret `a203fac`, +468%, breaking the 952q wall via a
-"q949 robust envelope" CLZ-conditional width packing). Its ~54.8M Toffoli is ~40× the ludicrous SOTA's
-1.36M (~33× over the 948q break-even `1,581,316,420 / 948 ≈ 1.67M`), so it's a **qubit-lower-bound
-witness, not a product contender** — would need a ~33× Toffoli reduction (a different inversion, not a
-packing tweak) to compete. High-qubit experiments (abipalli's 2045q, +46%) lose the other way. **The PZ
-route is its own thing — full mechanism + the 952→948 break in `references/SHRUNKEN_PZ_q948_track.md`.** The product is minimized in the **1156–1164q** ludicrous band — the SOTA is now the **1156q
-best-of-both** point (`27d4627`, **1156q × 1,365,960**): the dead-CCX-grade low-Toffoli base (`GAP_J2`
-narrowing + converged-tail cswap elision + doubling-ramp removal + empirical dead-CCX elimination) **+**
-the 1156q headroom clamp re-applied + `coord_add3x` on. The 1157q (`6ba606a`) and 1156q (`cde752d`)
-drops *lost* the product race when they landed — but the 1156q clamp **returned as SOTA** (§2.10) once
-the Toffoli base got cheap enough; "lost" meant "early," not "wrong" (re-test shelved width drops after
-each Toffoli win).
+1050q → 1019q (teddyjfpender, +~280%) → 948q (nasqret `a203fac`, +468%, breaking the 952q wall via a
+"q949 robust envelope" CLZ-conditional width packing) → **851q** (`e7dd3de`, +3659%, via
+dirty-catalytic / gate-hosting / register-shared-EEA — but an explicit **analysis oracle, not a
+circuit**, 464.5M Toffoli, §8 of the PZ doc). The PZ Toffoli is ~40× the ludicrous SOTA's 1.37M, so it's
+a **qubit-lower-bound witness, not a product contender** — would need a ~33× Toffoli reduction (a
+different inversion, not a packing tweak) to compete. High-qubit experiments (abipalli's 2045q, +46%)
+lose the other way. **The PZ route is its own thing — full mechanism (952→948 break + the 851q oracle)
+in `references/SHRUNKEN_PZ_q948_track.md`.** The product is minimized in the **1153–1164q** ludicrous
+band — the SOTA is now the **1153q best-of-both** point (`da51a48`, **1153q × 1,368,487**): the dead-CCX
+low-Toffoli base (`GAP_J2` narrowing + converged-tail cswap elision + doubling-ramp removal + empirical
+**iterated** dead-CCX) **+** the 1153q headroom clamp. The 1157q (`6ba606a`), 1156q (`cde752d`), and the
+first 1153q (`2f8835b`) drops *lost* the product race when they landed — but each width rung **returns
+as SOTA** once the Toffoli base gets cheap enough (the 1156q clamp at §2.10, the 1153q at §2.11);
+"lost" meant "early," not "wrong" (re-test shelved width drops after each Toffoli win).
 
 ### Compare-Bit Narrowing
 
