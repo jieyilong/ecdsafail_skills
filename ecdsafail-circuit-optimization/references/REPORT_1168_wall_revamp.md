@@ -295,6 +295,35 @@ A 6/23 push tried to use the density-neutral `cinc` fold as a *fresh* lever to s
 
 ---
 
+### 2.13 The clean (q,T) Pareto frontier below 1153q — a value-exact *basis design* (6/23, jieyilong)
+
+**Read the goal correctly before the numbers.** The 1147→1141 ludicrous submissions are **not** score attempts and should not be judged by the product — they are a deliberate mapping of the **value-exact (qubits, Toffoli) Pareto frontier** below 1153q, published as a **clean basis circuit** others can fork. The defining choice is that they **deliberately omit input-specific CCX-dropping** (`DROP_DEAD_ROBUST_DISABLE=1` is hard-set in all of them): dead-CCX is island-overfit (distribution-exact, §2.8) and would *contaminate* a reusable basis, so it is left off on purpose. What remains is a **value-exact design** at each qubit count — a sound starting point onto which a *later* designer can layer their own (better) dead-CCX screen, arithmetic, or codec and measure the gain against a clean reference.
+
+The clean frontier (all **dead-CCX-free**, density-neutral cinc on; the 1153 anchor is the no-cinc/no-drop `56c3746`):
+
+| commit | q | T_clean | clean exchange vs prev | product-break-even T (`SOTA/q`) | gap a future lever must recover |
+|---|---|---|---|---|---|
+| `56c3746` (anchor) | 1153 | 1,392,603 | — | 1,368,487 | +24,116 |
+| `3e3966b` | 1147 | 1,396,769 | **−694 T/qubit** (−6q for +4,166 T) | 1,375,645 | +21,124 |
+| `e64cdfd` | 1146 | 1,408,582 | −11,813 T/qubit | 1,376,845 | +31,737 |
+| `48e6c23` | 1143 | 1,411,643 | −1,020 T/qubit (−3q for +3,061 T) | 1,380,459 | +31,184 |
+| `0cbc2d7` | 1142 | 1,415,790 | −4,147 T/qubit | 1,381,668 | +34,122 |
+| `370fc31` | 1141 | 1,423,723 | −7,933 T/qubit | 1,382,879 | +40,844 |
+
+**What the frontier is worth (this is the deliverable, not the score):**
+- It is the **value-exact qubit↔Toffoli exchange curve** of the ludicrous route below 1153 — the *structural* cost of each qubit with no island-overfit. The exchange rate is jagged (−694 to −11,813 T/qubit) and **steepens below ~1146**, telling a designer exactly where the route starts fighting back.
+- The last column is the **actionable target**: at each q it is `T_clean(q) − SOTA/q` = how much Toffoli a *future* lever (a dead-CCX screen re-hunted on **this** circuit, a cheaper inversion, a better codec) must recover at that qubit count to make it product-competitive. e.g. a clean 1147q basis needs ~**21,124** Toffoli recovered to tie the 1153q SOTA — a concrete, clean budget to aim a new idea at.
+
+**The value-exact levers that *define* the frontier** (all qubit↓ / Toffoli↑, none input-specific):
+- **Fold-call code override** (`TLM_FOLD_CALL_CODE_OVERRIDES`, `fused.rs:902`) — clamp the peak-defining folds to fewer measured-vent windows (`nv = min(code, headroom−reserve)`); fewer transient vent qubits, more Toffoli. The primary frontier dial.
+- **`TLM_GRAD_DISABLE`** — graduated chunked adder → borrowed-dirty carry-in (drops a carry-out ancilla; the expensive −11,813 T/qubit step at 1146).
+- **Codec-pair scratch reuse** (`TLM_TRIPLE_CODEC_REUSE_PAIR_FREED`), **direct-dirty fold controls**, **adaptive-layout-search margin** tightening (1143–1142).
+- **No-ancilla / loan family** (1141, the deepest): `TLM_LOAN_ODD_U0/EVEN_V0/GCD_Y0`, `TLM_DIRTY_BODY_*_NOANC`, `TLM_GIDNEY_ZERO_CIN0_NO_COUT`, `TLM_GCD_RECYCLE_SYMBOL_FLAGS` — each converts an ancilla into Toffoli. These are exactly the value-exact catalogue someone else can re-tune.
+
+**Status note (so the leaderboard isn't misread):** these are "rejected" on the product axis *by construction* — they neither chase the product nor include the dead-CCX lever that would lower it. That is the intent: a clean, reproducible (q,T) basis, not a SOTA bid. Judging them by the score is a yardstick error. (For the *product* objective specifically, 1153q remains the floor *until* one of these clean bases is paired with a fresh on-circuit dead-CCX hunt — the open path the frontier is built to enable.)
+
+---
+
 ## 3. Key insights / takeaways
 
 1. **The wall broke on a family change, not a knob.** The dialog-GCD route was at a local floor (1168q). tob-joe's port of the **product-min "ludicrous"** point — *classical Q + two-shared-GCD-passes + live-compressed dialog tape* — reset the floor to 1167 and opened a fresh ladder.
@@ -314,7 +343,7 @@ A 6/23 push tried to use the density-neutral `cinc` fold as a *fresh* lever to s
 ---
 
 ## 4. What this means for our own pushes
-- The `trailmix_ludicrous` module is now the **base to fork from**, not the dialog-GCD 1168 route. SOTA = `da51a48`/`5fc2e81`, **1153q × 1,368,487 = 1,577,865,511** (the dead-CCX low-Toffoli base **+** the 1153q headroom clamp **+ iterated two-pass dead-CCX**, §2.11). The open axes: **more dead-CCX iteration passes** (`drop → re-screen the dropped stream → drop again`, §2.11 — each pass diminishing but real) and a **bigger/fresher first-pass screen** (§2.8); and — since each width rung wins once the Toffoli base is cheap enough — **re-testing the next rung (1152/1151…) after every Toffoli win** (§2.10–§2.11). (**Recursive Karatsuba / Toom-3 on the square is a dead end — measured net Toffoli loss, §2.9.**) The **Shrunken-PZ low-qubit track** is a separate witness line (851q now, but an *analysis oracle* at 464.5M Toffoli, ~250× over break-even — `SHRUNKEN_PZ_q948_track.md`); not a product contender.
+- The `trailmix_ludicrous` module is now the **base to fork from**, not the dialog-GCD 1168 route. SOTA = `da51a48`/`5fc2e81`, **1153q × 1,368,487 = 1,577,865,511** (the dead-CCX low-Toffoli base **+** the 1153q headroom clamp **+ iterated two-pass dead-CCX**, §2.11). The open axes: **more dead-CCX iteration passes** (`drop → re-screen the dropped stream → drop again`, §2.11 — each pass diminishing but real) and a **bigger/fresher first-pass screen** (§2.8); and — since each width rung wins once the Toffoli base is cheap enough — **re-testing the next rung (1152/1151…) after every Toffoli win** (§2.10–§2.11). **The clean (q,T) Pareto-frontier bases at 1147–1141q (§2.13) are the staging ground for exactly this:** they are value-exact, dead-CCX-free circuits at lower qubit counts, each with a *known clean Toffoli budget to beat* (the "gap to recover" column) — pair one with a fresh **on-circuit** dead-CCX hunt (re-screened against that restructured stream, since the SOTA `.idx` doesn't transfer) and if the recovered Toffoli clears the gap, that rung becomes the new SOTA. (**Recursive Karatsuba / Toom-3 on the square is a dead end — measured net Toffoli loss, §2.9.**) The **Shrunken-PZ low-qubit track** is a separate witness line (851→829q now, but an *analysis oracle* at ~400–500M Toffoli, ~250× over break-even — `SHRUNKEN_PZ_q948_track.md`); not a product contender.
 - **Arithmetic restructuring of the square is exhausted.** `28fe2f2`'s *one-level* Karatsuba already cut −22.4M, but recursing further (or Toom-3) is a **measured net loss** (§2.9): the schoolbook symmetric square is already vented-cheap, so any restructuring that adds un-vented recombination loses. The remaining Toffoli levers are the *gate-level* ones (dead-CCX, vents, comparator narrowing), not arithmetic.
 - The open qubit lever is **three-pronged**: (1) more provably-constant-lane parking (free, easy lanes taken); (2) paid vent surrender + `PAD` tightening (`b310de9`); (3) the **dynamic live-headroom clamp** (`fed64cf`/`d11bdbb`'s `target_qubit_headroom`/`TLM_TARGET_Q`) — a circuit-wide "do not exceed N live qubits" governor that auto-narrows every adder near the ceiling. **These only win if they clear the current `T_avg/q ≈ 1,190` break-even (Insight #6) — the clamp *lost* on the expensive-square base but *won* on the Karatsuba base (~20 Toffoli/qubit), which is the SOTA. Re-test it each time the arithmetic gets cheaper.**
 - The open Toffoli lever is **extending the constprop/affine post-pass** (deeper `CONSTPROP_MAX_ITERS` fixpoints already yielded), the **carry-layout search**, and **fold-vent counts** (`LUD_EXTRA_FOLD_VENTS`).
