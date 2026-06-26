@@ -173,6 +173,11 @@ Look for:
 - compare bits that can be cleaned once their branch/control use is over
 - carry or borrow chains that can be truncated, measured, or recomputed
 - temporary GCD/fold state that can be released during a fold instead of after the whole block
+- a held carry/value that is a CHEAP FUNCTION of other still-live qubits — clear it, loan its lane to the current
+  sub-block, then recompute it before it is next read (**recompute-to-free**; this is how BitWonka's q1152 cy0-release
+  cut 1153→1152 — see "BitWonka's q1152" below). A dead-qubit liveness scan MISSES these: the qubit is not dead, its
+  value is just cheaply restorable. When a dead-qubit scan says "no idle qubit," switch to this question before
+  concluding the qubit floor is structural.
 
 Relevant knobs and ideas from our experiments:
 
@@ -465,11 +470,66 @@ then a second burst (Karatsuba square + NAF recoding + a qubit↔Toffoli bifurca
 into best-of-both*, `d11bdbb` 1159q × 1,380,711), a third Toffoli-grind wave (`f8e215b` 1159q ×
 1,378,242), a fourth wave headlined by **empirical dead-CCX elimination** (`20b9a1d` 1159q × 1,364,380),
 a fifth step re-applying the **1156q clamp** on the matured base (`27d4627` 1156q × 1,365,960), and a
-sixth adding **iterated (two-pass) dead-CCX** to reach the **current SOTA 1153q × 1,368,487 =
-1,577,865,511** (`da51a48`/`5fc2e81`, jieyilong, 6/23). **This supersedes the dialog-GCD 1168/1170
-route as the base to fork from.** Full analysis: `references/REPORT_1168_wall_revamp.md` (the bursts are
-§2.6–§2.11). (Separately, the low-qubit **Shrunken-PZ** track reached an **851q** *analysis-oracle*
-witness — 464.5M Toffoli, rejected +3659% — see `references/SHRUNKEN_PZ_q948_track.md` §8.)
+sixth adding **iterated (two-pass) dead-CCX** (`da51a48` 1153q × 1,368,487), and a seventh **breaking
+the 1153 floor value-exactly** to the **current SOTA 1152q × 1,364,230 = 1,571,592,960** (`d44cad3`/
+`71f5115`, BitWonka, 6/26, §2.14): it **pivots the base from empirical dead-CCX to structural-dead
+skipping** (provable, value-exact — `6dafa07`) then **frees the single carry qubit that owned the 1153
+peak** (the FFG `cy0` carry during the square suffix, free-and-recomputed since `f[0]=1` ⇒
+`cy0 = ctrl ∧ ¬final_a0`) + value-exact coord-path cuts. **The SOTA is now CLEAN — no island-overfit
+`.idx`.** **This supersedes the dialog-GCD 1168/1170 route as the base to fork from.** Full analysis:
+`references/REPORT_1168_wall_revamp.md` (§2.6–§2.14). (Separately, the low-qubit **Shrunken-PZ** track
+reached an **851→829q** *analysis-oracle* witness — ~400–500M Toffoli, rejected +3000–3700% — see
+`references/SHRUNKEN_PZ_q948_track.md` §8–§9.)
+
+### BitWonka's q1152 — recompute-to-free a held carry + off-peak vents (current SOTA `71f5115`/`d44cad3`, 2026-06-26)
+
+The 1153 base matured then broke 1152: jieyilong `da51a48` (1153 × 1,368,487, **empirical** dead-CCX `.idx`) →
+BitWonka **`b795827`** (= commit `6dafa07`, 1153 × 1,367,698, 6/25 — **the value-exact pivot: REMOVES the
+empirical dead-CCX entirely and replaces it with comprehensive *structural*-dead skipping** — ~15 knobs
+`TLM_{FFG,CUCCARO,COMPARE,GIDNEY,CONST_CHUNK,FUSED,ADD_CONST,GCD}_SKIP_STRUCTURAL_DEAD_*` / `_SKIP_EXACT_REMAINDER`,
+dropping CCX provably dead by the arithmetic (top `+f` carries, exact-remainder no-ops) rather than by an
+input screen; provably sound AND lower-Toffoli than the `.idx` it replaced — so the SOTA is now CLEAN, no
+island-overfit) → BitWonka **`71f5115`** (commit `d44cad3`, **1152 × 1,364,230 =
+1,571,592,960**, avg-exec Toffoli 1,364,229.770, 0/0/0 at nonce `50400005525597`, 6/26) = **current SOTA**. The diff
+(`git diff d44cad3~1 d44cad3`) is small — mod.rs +11, arith.rs +223, ec_add.rs +142 — and the mod.rs comment credits
+"codex FFG cy0-release + opus square vents" (AI-assisted multi-knob search). Pull it with `ecdsafail reset 71f5115`.
+
+**⭐ THE QUBIT LEVER (1153→1152) — recompute-to-free a held carry, NOT free a dead one.** This is the generalizable
+lesson and it *corrects* a wrong "no qubit left" conclusion that a dead-qubit liveness probe will produce. At the tight
+1152/1153 peak a probe that searches for **dead** qubits (held but never used again) finds **NONE** — every live qubit
+holds a needed value, so live-range shortening looks impossible. The win comes from a *different* question: **which held
+qubit's VALUE is a cheap function of other LIVE qubits, so it can be cleared, its lane loaned out, and recomputed
+later?** In `add_f_window_hybrid` the first prefix carry `cy0 = ctrl & a0_original`; because the pseudo-Mersenne constant
+has **`f[0]=1`**, bit-0's sum flips `a0`, so `cy0 = ctrl & !final_a0` is recoverable from the *live* final `a0`. So
+(env `TLM_FFG_RELEASE_CY0_DURING_SUFFIX=1`, ONLY for the 40 peak-binding folds `TLM_FFG_RELEASE_CY0_CALLS=178..239`):
+1. clear cy0 → 0: `x(a0); ccx(ctrl, a0, cy0); x(a0)`,
+2. `loan_zero_qubit(cy0)` — the freed lane hosts the fold's suffix carries → **peak −1**,
+3. run the suffix, then `reclaim_zero_qubit(cy0)` + recompute cy0 before the prefix-reverse consumes it.
+Cost ~+4 CCX/fold (conditional, near-free). **METHOD:** when a liveness/dead-qubit scan says "no idle qubit," do NOT
+conclude the floor is structural — re-ask "is any held value a cheap function of the live qubits?" A clear+loan+recompute
+(the standard compute-uncompute-on-a-value, applied to free a *lane* mid-block) beats the dead-qubit search. Target the
+exact phases that bind the peak (a `TRACE_ALLOC_NEAR_PEAK=<peak>` binding-alloc census names them; here it was 40 folds).
+
+**The Toffoli levers (−3,468 vs `b795827`), all approximation/fusion/vent on OFF-PEAK coord+square ops:**
+- **square-reduce `mod_sub` measurement-vent** (`add_cout_vented_skip_dead`, ~−838 avg-T): the square runs far below the
+  GCD-apply peak, so its register sub's reverse-carry Toffolis are vented to X-basis-measure + CZ (each live carry =
+  −1 Toffoli), capped to headroom by `SQUARE_PEAK_HARD_CAP=1152` / `TLM_SQUARE_VENT_MARGIN`. Also skips the dead carries
+  the cuccaro guard would (captures both savings at once).
+- **`coord_rsub` fusion** (`mod_rsub_vented_loaded`, env `TLM_COORD_RSUB_FUSED=1`, ~−248 avg-T): rewrite `ox − x` as
+  `~x + (ox+1) mod 2^256`, with `ox+1` precomputed on the **free classical `BitId` tier** (0 Toffoli). Replaces the
+  two-chain `mod_sub_vented + mod_neg`, deleting the unconditional ~254-CCX negate.
+- **`coord_add3x` MSBS-truncation** (env `TLM_COORD_ADD3X_TRUNC=1`, ~−116 avg-T): use MSBS-truncated `mod_add` (the same
+  ~2^-PAD approximation the coord-subs already ship) instead of `mod_add_exact`.
+- new reusable helpers in arith.rs: `add_cout_vented_unctrl_bounded` (headroom-capped vented add+cout) and
+  `add_cout_vented_skip_dead`. cy0-release uses `loan_zero_qubit`/`reclaim_zero_qubit`.
+
+**To push below 1,364,230 (each reseeds the FS nonce → needs a fresh 0/0/0 hunt, like merge25):** vent OTHER un-vented
+OFF-PEAK `cuccaro_carry` adds via `add_cout_vented_unctrl_bounded` (square `build_sum_hi_lo`/`unbuild_sum_hi_lo` etc. —
+verify value-exactness first; a naive drop-in broke 9024/9024 shots, so the addend-restore/cout convention must match),
+MSBS-truncate more exact adds, fuse more op-pairs, or apply the cy0 recompute-to-free trick to a SECOND held carry. Peak
+1152 is a WIDE co-bind floor (register adds `gidney.rs:1217`, the fold, the fused fold, the comparator all bind 1152),
+so qubit→1151 needs ALL dropped together — score wins here are Toffoli, not the next qubit. Score margin: avg <
+1,364,229.5 already wins (rounds to 1,364,229 → 1,571,591,808). Full pull/analysis in memory `ecdsafail-bitwonka-1152-design`.
 
 **Module map (`src/point_add/trailmix_ludicrous/`, fork from here).** `mod.rs` =
 `build_trailmix_ludicrous_ops()` (register alloc order pins fuzzer IO ids), `load_schedule()` (copies
@@ -678,7 +738,31 @@ nonce-grind commits — see report):
   newly-dead gates; the marginal second pass is exactly what carried the 1153 rung over break-even.
   Each pass is subset-monotone and re-hunted. **Operational how-to (the BitWonka `find_dead_ccx`
   screener + the distributed multi-host scan helper): see the "Dead-CCX / Dead-CXX Screening" section
-  below.**
+  below.** **⚠ SUPERSEDED at the 6/26 SOTA (§2.14): the empirical `.idx` dead-CCX was REMOVED and
+  replaced by *structural*-dead skipping (next bullet) — provable, value-exact, no re-screen, and *lower*
+  Toffoli. Prefer structural-dead; the empirical screen is now a fallback for gates structure can't prove.**
+- **⭐⭐ Structural-dead skipping — the value-exact replacement for empirical dead-CCX (`6dafa07`, the
+  6/26 SOTA base, §2.14).** Skip CCX that are dead *by the circuit's arithmetic structure*, not by an
+  input-distribution screen: the top `+f`-fold carry bits (29/30/31) that are structurally zero given the
+  pseudo-Mersenne operand widths (`TLM_FFG_SKIP_TOP_CARRY31`/`_30`, `..._INVERSE_MOD_SUB_TOP29`,
+  predicate `ffg_call_has_structurally_dead_hybrid_carry`, `arith.rs:217`), exact-remainder no-op
+  branches, and baked `(call,bit)`-keyed dead ranges (`FFG_DEAD_HYBRID_CARRY_RANGES`,
+  `TLM_{FFG,CUCCARO,COMPARE,GIDNEY}_SKIP_STRUCTURAL_DEAD_CALLS`/`_EXACT_REMAINDER`). **Value-exact (sound
+  on all inputs — keyed by structure, not by sampled inputs), so no island-overfit and no per-restructure
+  re-screen — yet it came in *lower* Toffoli than the empirical drop it replaced.** This is the cleaner
+  dominant lever: derive the dead set from the arithmetic instead of simulating for it.
+- **⭐⭐ Peak-break = free-and-recompute the EXACT carry that owns the peak (`d44cad3`, 1153→1152, §2.14).**
+  `TRACE_PEAK` the binder, find the single ancilla pinning it, prove it's *recomputable from live wires*,
+  free it where it's idle, recompute it after. Here the 1153 peak was owned by the FFG `cy0` carry held
+  live across the **square gate-suffix**; because `f[0]=1`, `cy0 = ctrl ∧ ¬final_a0` is exactly
+  recoverable, so `loan_zero_qubit(cy0)` frees it for the suffix (where it's idle) and `reclaim`+recompute
+  restores it (`arith.rs:1330-1369`, `TLM_FFG_RELEASE_CY0_DURING_SUFFIX` gated to the ~40 peak-binding
+  calls). **Pair it with a cap** (`TLM_SQUARE_PEAK_CAP=1152`, lowering `SQUARE_PEAK_HARD_CAP=1153`) so a
+  later phase's venting can't re-grab the freed lane — without the cap the peak rebinds. This is benhuang
+  **Lever A** aimed at the precise floor-owning lane; the open next rung (1151) is the next such carry.
+  Companion value-exact Toffoli cuts on the coord path: `TLM_COORD_RSUB_FUSED` (fused single-chain
+  `ox−x = ¬x+(ox+1)`, ~−248 avgT), `TLM_COORD_ADD3X_TRUNC` (MSBS-truncated add), `TLM_SQUARE_VENT_SHIFTED`
+  + `TLM_SQUARE_VENT_MARGIN=0`.
 - **⭐ Comparator-width (`GAP_J2`) narrowing — the highest-leverage *static* Toffoli lever per line of diff.**
   `f0c1c42` (bket7) cut **−1.33M from a 22-line schedule-table edit.** `GAP_J2[i]` (`schedule.rs`, len
   258) is the per-step swap-decision comparator **window width** for the jump=2 GCD; `gcd.rs` sets
@@ -732,12 +816,15 @@ a **qubit-lower-bound witness, not a product contender** — would need a ~33× 
 different inversion, not a packing tweak) to compete. High-qubit experiments (abipalli's 2045q, +46%)
 lose the other way. **The PZ route is its own thing — full mechanism (952→948 break + the 851q oracle)
 in `references/SHRUNKEN_PZ_q948_track.md`.** The product is minimized in the **1153–1164q** ludicrous
-band — the SOTA is now the **1153q best-of-both** point (`da51a48`, **1153q × 1,368,487**): the dead-CCX
-low-Toffoli base (`GAP_J2` narrowing + converged-tail cswap elision + doubling-ramp removal + empirical
-**iterated** dead-CCX) **+** the 1153q headroom clamp. The 1157q (`6ba606a`), 1156q (`cde752d`), and the
-first 1153q (`2f8835b`) drops *lost* the product race when they landed — but each width rung **returns
-as SOTA** once the Toffoli base gets cheap enough (the 1156q clamp at §2.10, the 1153q at §2.11);
-"lost" meant "early," not "wrong" (re-test shelved width drops after each Toffoli win).
+band — the SOTA is the **1152q** point (`d44cad3`, **1152q × 1,364,230 = 1,571,592,960**, §2.14): the
+matured low-Toffoli base (`GAP_J2` narrowing + converged-tail cswap elision + doubling-ramp removal),
+now **value-exact via structural-dead skipping** (which *replaced* the empirical iterated dead-CCX,
+`6dafa07`), **+** the headroom clamp, **+** the FFG-`cy0` peak break (free-and-recompute the carry that
+owned the 1153 peak). The 1157q (`6ba606a`), 1156q (`cde752d`), and first 1153q (`2f8835b`) drops *lost*
+the product race when they landed — but each width rung **returns as SOTA** once the Toffoli base gets
+cheap enough (1156q §2.10, 1153q §2.11, 1152q §2.14); "lost" meant "early," not "wrong" (re-test shelved
+width drops after each Toffoli win). And the 1153→1152 break came *value-exactly* — the floor did not
+need a dead-CCX re-hunt.
 
 ### Compare-Bit Narrowing
 
