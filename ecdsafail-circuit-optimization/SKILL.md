@@ -747,10 +747,13 @@ nonce-grind commits — see report):
   pseudo-Mersenne operand widths (`TLM_FFG_SKIP_TOP_CARRY31`/`_30`, `..._INVERSE_MOD_SUB_TOP29`,
   predicate `ffg_call_has_structurally_dead_hybrid_carry`, `arith.rs:217`), exact-remainder no-op
   branches, and baked `(call,bit)`-keyed dead ranges (`FFG_DEAD_HYBRID_CARRY_RANGES`,
-  `TLM_{FFG,CUCCARO,COMPARE,GIDNEY}_SKIP_STRUCTURAL_DEAD_CALLS`/`_EXACT_REMAINDER`). **Value-exact (sound
-  on all inputs — keyed by structure, not by sampled inputs), so no island-overfit and no per-restructure
-  re-screen — yet it came in *lower* Toffoli than the empirical drop it replaced.** This is the cleaner
-  dominant lever: derive the dead set from the arithmetic instead of simulating for it.
+  `TLM_{FFG,CUCCARO,COMPARE,GIDNEY}_SKIP_STRUCTURAL_DEAD_CALLS`/`_EXACT_REMAINDER`). **Keyed by structure
+  `(call,bit)`, not by sampled inputs — so input-independent: no island-overfit, no per-restructure
+  re-screen — yet it came in *lower* Toffoli than the empirical drop it replaced.** The named predicates
+  (top-carry/exact-remainder) are value-exact by construction; the baked dead-range tables are
+  structurally keyed but unaudited for derivation (both are still only *validated* by island 0/0/0 — the
+  win is that the *derivation* is structural, not sampled). The cleaner dominant lever: derive the dead
+  set from the arithmetic instead of simulating for it.
 - **⭐⭐ Peak-break = free-and-recompute the EXACT carry that owns the peak (`d44cad3`, 1153→1152, §2.14).**
   `TRACE_PEAK` the binder, find the single ancilla pinning it, prove it's *recomputable from live wires*,
   free it where it's idle, recompute it after. Here the 1153 peak was owned by the FFG `cy0` carry held
