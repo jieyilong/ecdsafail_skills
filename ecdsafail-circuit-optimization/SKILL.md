@@ -2245,23 +2245,55 @@ work (conditionally-clean ancillae, spooky-pebble hosting) is as valuable as Tof
 
 ---
 
-### Density-Neutral Qubit ↔ Toffoli Tradeoffs — Research Synthesis
+### Density-Neutral Qubit ↔ Toffoli Tradeoffs
 
-**Read `references/density_neutral_tradeoffs.md`** for the full synthesis (Bennett pebbling,
-Gidney MBU, Khattar-Gidney conditionally-clean, dirty ancilla, spooky pebbling, structural dead
-skipping, algebraic fusion — each rated by density-neutrality, exchange rate, and SOTA status).
+**Reference: `references/density_neutral_tradeoffs.md`** — a research synthesis covering the full
+theory-to-practice map for qubit↔Toffoli tradeoffs in this circuit, built from 24 papers spanning
+1989–2025.
 
-**Key take-aways:**
+**What "density-neutral" means here**: value-exact on ALL 9024 Fiat-Shamir inputs, not just the
+island-specific ones. A technique is density-neutral if it is keyed by circuit structure (call-site,
+bit-index, compile-time constants) rather than by sampled runtime data. Density-neutral techniques
+stack safely without requiring a fresh nonce hunt for density reasons (only for op-stream changes).
+Island-exact techniques (GAP_J2, carry truncation, empirical dead-CCX) change the island — always
+need a re-hunt.
 
-- **Density-neutral** = value-exact on ALL inputs (not just the 9024 FS island). Any technique
-  keyed by call-site or bit-index (structural predicates) is density-neutral; any technique keyed
-  by sampled runtime data (empirical dead-CCX, GAP_J2, carry truncation) is island-exact only.
-- **Exchange rate at d44cad3**: break-even ≈ 1,364,230 / 1152 ≈ 1,184 Toffoli per qubit.
-- **Best density-neutral Toffoli wins remaining (not yet in SOTA):**
-  1. Apply-swap involutory pair cancellation (fwd-swap + GCD cswap on same lanes may cancel).
-  2. Extended Cuccaro structural dead-carry beyond indices 13-37.
-  3. `TLM_SQUARE_SUMHILO_VENT` / `TLM_SQUARE_VENT_SHIFTED` (off-peak, near-free).
-- **Best density-neutral qubit win remaining:**
-  1. FFG cy0-style free-and-recompute on ADDITIONAL held values at the 1152q co-bind floor
-     (gidney.rs:1217 fold, fused fold, comparator — all bind 1152; need ALL lowered together).
-  2. Spooky-pebble GCD state machine (−22q, ~+1,200 Toffoli — tight but may clear break-even).
+**The 9 technique families covered** (§2 of the doc, each with exchange rate and SOTA status):
+
+| Technique | Density-neutral | Qubit impact | Toffoli impact | In SOTA? |
+|-----------|-----------------|-------------|----------------|---------|
+| Gidney MBU / carry vent (Jones 2013, Gidney 2018) | YES | +1/vent (off-peak: free) | −1/vent | YES — all carry vents |
+| Khattar-Gidney conditionally-clean (2024) | YES | log\*n clean ancilla | 3n vs 32n for MCX | YES — cinc, mcx_clean_k |
+| Barenco dirty-ancilla MCX (1995) | YES | −k fresh ancilla | +8k (1 dirty) / +4k (k dirty) | MARGINAL (+1209/q) |
+| Bennett pebbling (1989) — classical | YES | varies | +ε×2^(1/ε) factor overhead | NO (too costly) |
+| Spooky/ghost pebbling (Gidney 2019, Kornerup 2021) | YES | −S/k | +O(T/ε) gates vs +ε×2^(1/ε)×T classical | YES (single-gate cy0) |
+| Finite-support transcript codec | YES | −(unused patterns) | +small decode | YES (all-triple, maxed) |
+| Structural dead-gate skipping (6dafa07) | YES | neutral | −varies (baked suite) | YES (TLM_*_SKIP_STRUCTURAL_DEAD) |
+| Algebraic fusion (Karatsuba, NAF, coord_rsub) | YES | neutral | −22.4M+ | YES (all deployed) |
+| Free-and-recompute cheap value (cy0, d44cad3) | YES | −1 | +~0 (2 CNOTs) | YES (40 peak folds) |
+
+**Why quantum beats classical for space-time tradeoffs** (§2.4 and §2.5 in the doc): Bennett
+classical pebbling costs ε × 2^(1/ε) gate overhead per qubit saved — exponentially expensive as
+ε→0. Kornerup-Sadun-Soloveichik 2021 proved quantum mid-circuit measurements achieve only O(1/ε)
+overhead for the same qubit saving — **exponentially better**. This is the theoretical reason
+MBU/spooky-pebble vents dominate.
+
+**Metric disambiguation** (§8): The challenge counts **avg-executed Toffoli** (= Toffoli-count, not
+T-count). Gosset 2013 proved 1 Toffoli = exactly 7 T-gates (tight lower bound), so our avgT metric
+maps to T-count at 7:1. Selinger 2013 T-depth reduction with 4 ancilla is a depth trick (not a
+count trick) and irrelevant here.
+
+**Exchange rate at d44cad3**: break-even ≈ 1,364,230 / 1152 ≈ **1,184 Toffoli per qubit saved**.
+
+**Best density-neutral Toffoli wins not yet in SOTA** (§4):
+1. Gidney 2025 streaming vented adder (arXiv:2507.23079) — ~n/4 Toffoli/adder call, partially
+   ported in `venting.rs:iadd_dirty_2clean_qoffset` but **LEAKS PHASE** — fix needed.
+2. Apply-swap involutory pair cancellation (fwd-swap + GCD cswap on same lanes may cancel structurally).
+3. Extended Cuccaro structural dead-carry — currently only indices 13-37 in `arith.rs`.
+4. `TLM_SQUARE_SUMHILO_VENT` / `TLM_SQUARE_VENT_SHIFTED` — off-peak, near-free, not yet on.
+
+**Best density-neutral qubit win not yet in SOTA** (§4):
+1. FFG cy0-style free-and-recompute on additional values at the 1152q co-bind floor — the floor is
+   a WIDE co-bind (gidney.rs:1217 fold, fused fold, comparator all bind 1152); ALL must move together.
+2. Spooky-pebble GCD state machine (−22q, ~+1,200 Toffoli per qubit — tight at break-even ~1,184;
+   Kahanamoku-Meyer 2025 shows the theoretical floor is 2.47×log(530)≈23 qubits, already close).
