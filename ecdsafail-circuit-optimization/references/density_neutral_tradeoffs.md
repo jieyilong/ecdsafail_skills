@@ -40,10 +40,12 @@ inputs.
 
 ## 2. Technique Catalog
 
-### 2.1 Measurement-Based Uncompute (MBU / Gidney 2018)
+### 2.1 Measurement-Based Uncompute (MBU / Jones 2013, Gidney 2018)
 
-**Literature**: Gidney 2018, "Halving the cost of quantum addition" (arXiv:1709.06648).
-**Also**: Gidney 2019 blog (algassert.com/post/1905) on "spooky pebbling."
+**Literature**:
+- **Jones 2013**, "Low-overhead constructions for the fault-tolerant Toffoli gate" (Phys. Rev. A 87.2). **The original source of MBU.**
+- **Gidney 2018**, "Halving the cost of quantum addition" (arXiv:1709.06648). Applied Jones's MBU to adder carry chains, citing Jones 2013 as the source.
+- **Gidney 2019 blog** (algassert.com/post/1905) on "spooky pebbling."
 
 **Mechanism**: An AND gate (`a AND b → out`) costs 4T forward. The *uncompute* normally costs
 another 4T. With MBU:
@@ -76,9 +78,12 @@ Toffoli savings). On-peak phases: don't vent (the +1 qubit raises width and cost
 
 ---
 
-### 2.2 Conditionally Clean Ancilla (Khattar-Gidney 2024)
+### 2.2 Conditionally Clean Ancilla (Khattar-Gidney 2024 / Nie et al. 2024)
 
-**Literature**: Khattar and Gidney 2024, "Rise of conditionally clean ancillae" (arXiv:2407.17966).
+**Literature**:
+- **Khattar & Gidney 2024**, "Rise of conditionally clean ancillae" (arXiv:2407.17966, published Quantum journal April 2025). Formal definition, three-way taxonomy.
+- **Nie, Zi & Sun 2024**, "Quantum circuit for multi-qubit Toffoli gate with optimal resource" (arXiv:2402.05053). **Independent concurrent discovery, 5 months prior**, first to use the term "conditionally clean qubits."
+- **Chevignard-Fouque-Schrottenloher 2024** (ePrint 2024/222). Khattar-Gidney credit this paper as their first motivation for the concept.
 
 **Mechanism**: A qubit is "conditionally clean when predicate P is True" = its value is 0
 whenever P holds. This is weaker than "always clean" but strictly stronger than "dirty" (the
@@ -111,15 +116,22 @@ incrementer from this paper, cutting ~5,340 avgT. **This vein is exhausted in th
 ### 2.3 Dirty Ancilla Borrowing (Barenco et al. 1995)
 
 **Literature**: Barenco et al. 1995, "Elementary gates for quantum computation" (arXiv:quant-ph/9503016).
-  Also: Maslov 2016 "Advantages of using relative-phase Toffoli gates" for the borrowed-carries extension.
+  Barenco calls them "workspace" bits — the key property is the construction works regardless of
+  the initial state of the auxiliary bits and restores them exactly.
 
 **Mechanism**: A dirty ancilla is any qubit that currently holds an UNKNOWN value (could be 0 or
-1 or a superposition), used temporarily and then RESTORED to its exact original state. Key fact:
-n-qubit MCX with k dirty ancilla costs:
-- k ≥ 1: `12n − 36` Toffoli (Barenco 1995, Lemma 7.3 with 2 dirty ancillae).
-- k ≥ 2: `8⌈n/2⌉ − 4` Toffoli (Barenco 1995, Theorem 9: divide n into two halves with a dirty
-  ancilla as intermediary).
-- For k dirty ancillae: ladder constructions split at k+1 levels → `O(n/k)` Toffoli.
+1 or a superposition), used temporarily and then RESTORED to its exact original state. Key results
+for k-controlled-NOT (MCX with k controls), all O(k) linear:
+
+- **0 dirty ancilla**: O(k²) Toffoli (exponential in recursion depth; impractical for large k).
+- **1 dirty ancilla** (Corollary 7.4): `8(k − 3) ≈ 8k` Toffoli. The "ladder" construction:
+  split k controls into two halves using 1 borrowed qubit as the intermediary carry.
+- **k dirty ancillae** (Lemma 7.2): `4(k − 2) ≈ 4k` Toffoli. More ancillae halve the constant
+  factor but the asymptotic is still O(k).
+
+The critical point: **dirty ancilla reduces the constant factor (8→4), not the asymptotic order**.
+There is no "O(n/k)" formula — it is always O(k) linear in the control count. The gain from
+dirty ancilla is a 2× constant improvement, not a parametric improvement.
 
 **The dirty-borrow MCX** (ecdsafail PZ track): `mcx_dirty_ladder` in `arith.rs` uses the
 Barenco Theorem 9 construction with existing live registers as dirty ancilla. This is the key
@@ -139,33 +151,37 @@ break-even of ~1190 Toffoli/qubit, this is marginally over budget and didn't shi
 
 ---
 
-### 2.4 Bennett Reversible Pebbling (1989)
+### 2.4 Bennett Reversible Pebbling (1989) and Why Quantum Wins (Kornerup 2021)
 
-**Literature**: Bennett 1989, "Time/Space trade-offs for reversible computation" (SIAM J. Computing).
+**Literature**:
+- Bennett 1989, "Time/Space trade-offs for reversible computation" (SIAM J. Computing).
+- Knill 1995 (arXiv:math/9508218), "An analysis of Bennett's pebble game" — tight optimal recursion.
+- Li, Tromp, Vitanyi 1997 (arXiv:quant-ph/9703009) — proved Bennett's bound is **optimal** for classical pebbling.
+- **Kornerup, Sadun, Soloveichik 2021** (arXiv:2110.08973), "Tight Bounds on the Spooky Pebble Game" — the quantum advantage result.
 
-**Mechanism**: Simulates a computation using S space in a reversible way. The naive approach
-duplicates all intermediate states → 2S space. Bennett's pebbling strategy:
-- Divide the T-step computation into √T checkpoints.
-- Each level of recursion: run forward to a checkpoint, uncompute, re-run.
-- Result: **T^(1+ε) time, O(T^(ε)/S^(ε)) × S space** for any ε > 0.
-- Special case ε = 1: **T² time, O(S) space**.
+**Classical Bennett bound** (optimal, proved tight by Li-Tromp-Vitanyi):
+- Simulating T steps with S extra space: requires **T^(1+1/S) time** (exponential in 1/S).
+- For S = 1 extra qubit: T² time. For S = log T: T^(1+1/log T) ≈ 2T (constant overhead).
+- In our context (T=530 GCD steps, S=740 qubits, halving S to 370):
+  `530^(1+1/370) ≈ 530 × 530^(1/370) ≈ 530 × 1.017 ≈ 539 steps (+1.7%)` — nearly free!
 
-For our context (T = ~530 GCD divstep iterations, S = ~740 qubits):
-```
-ε = 1 (√T approach): T² / S = 530² / 740 ≈ 380 iterations overhead
-→ ~380 additional GCD passes, each at ~2,500 Toffoli ≈ 950,000 extra Toffoli
-```
-That would be ~70% Toffoli increase for halving the GCD transcript storage — a terrible trade
-at our score objective.
+**Quantum spooky pebble bound** (Kornerup-Sadun-Soloveichik 2021, tight):
+- With mid-circuit measurements: **O(T/ε) gates, O(T^ε × S^(1-ε)) qubits** for any ε ∈ (0,1].
+- Classical pebbling needs O(2^(1/ε) × T) gates for the same qubit count — **exponentially more**.
+- Key implication: **quantum measurements give an EXPONENTIAL advantage over classical reversible
+  computation for the same space**. MBU/spooky pebbling is not just a constant improvement — it
+  is asymptotically superior by an exponential factor.
 
-**Density-neutral**: YES. The pebbling strategy is structural: same computation, just re-run at
-different checkpoints.
+**Why this matters for ecdsafail**: The theoretical reason MBU and spooky pebbling are so
+effective is precisely this exponential advantage. A classical reversible circuit can only compress
+the GCD transcript at Bennett's T^(1+1/S) cost; a quantum circuit with measurements can do the
+same compression with merely O(T/ε) gate overhead — and in our case ε is chosen so the Toffoli
+cost is small.
 
-**In ecdsafail context**: Bennett pebbling is the THEORETICAL justification for "recompute-to-free"
-tricks, but the constant factor makes it impractical for the whole circuit. The FFG cy0
-free-and-recompute (d44cad3's q1153→1152 break) is a SINGLE-GATE instance: `cy0 = ctrl & !final_a0`
-is recoverable for 40 binding calls at near-0 Toffoli cost because `f[0]=1` is a compile-time
-constant. This is Bennett pebbling at the extreme sweet spot: a trivially recomputable value.
+**In ecdsafail context**: Bennett/spooky pebbling at SINGLE-GATE scale (the cy0 free-and-recompute
+in d44cad3): `cy0 = ctrl & !final_a0` is recoverable from live qubits in 2 CNOTs (near-0 Toffoli).
+This is the extreme sweet spot of pebbling theory: a 1-gate recomputable value where the Bennett
+overhead is 2 gates total (vs ~530² for the whole GCD circuit, which would be impractical).
 
 ---
 
@@ -530,8 +546,13 @@ Three distinct metrics appear in the literature. The ecdsafail challenge uses **
 8. Chevignard, P., Fouque, P.-A., & Schrottenloher, A. (2026). Ghost pebbling for EC inversion. eprint.iacr.org/2026/280.
 9. Karatsuba, A. & Ofman, Y. (1962). Multiplication of Multidigit Numbers on Automata. *Soviet Physics Doklady*, 7, 595.
 10. Häner, T., Roetteler, M., & Svore, K. (2017). Factoring using 2n+2 qubits with Toffoli based modular multiplication. *Quantum Inf. Comput.*, 17(7–8). arXiv:1611.07995.
-11. Gosset, D., Kliuchnikov, V., Mosca, M., & Russo, V. (2013). An algorithm for the T-count. *QIC* 14(15-16), 1261–1276. arXiv:1308.4134. [T-count = 7 per Toffoli, tight lower bound]
+11. Jones, N.C. (2013). Low-overhead constructions for the fault-tolerant Toffoli gate. *Phys. Rev. A* 87(2), 022328. [Original source of MBU — Gidney 2018 cites this]
+12. Gosset, D., Kliuchnikov, V., Mosca, M., & Russo, V. (2013). An algorithm for the T-count. *QIC* 14(15-16), 1261–1276. arXiv:1308.4134. [T-count = 7 per Toffoli, tight lower bound]
 12. Selinger, P. (2013). Quantum circuits of T-depth one. *Phys. Rev. A* 87, 042302. arXiv:1210.0974. [T-depth 1 per Toffoli with 4 ancilla — depth reduction only, not count]
 13. Amy, M., Maslov, D., & Mosca, M. (2014). Polynomial-time T-depth optimization of Clifford+T circuits via matroid partitioning. *IEEE Trans. CAD* 33(10), 1476–1489. arXiv:1303.2042. [T-depth reduction with ancilla]
 14. Saeedi, M. & Markov, I.L. (2013). Synthesis and optimization of reversible circuits — a survey. *ACM Comput. Surv.* 45(2):21. arXiv:1110.2574.
 15. Gidney, C. (2025). Streaming vented adder. arXiv:2507.23079. [~3n CCX with 2 clean + n-2 dirty ancilla; partially ported in venting.rs]
+16. Knill, E. (1995). An analysis of Bennett's pebble game. arXiv:math/9508218. [Tight recursion for optimal space-time tradeoff]
+17. Li, M., Tromp, J., & Vitányi, P. (1997). On the reversible simulation of irreversible computation. arXiv:quant-ph/9703009. [Bennett bound is optimal for classical pebbling]
+18. Kornerup, P., Sadun, L., & Soloveichik, D. (2021). Tight bounds on the spooky pebble game. arXiv:2110.08973. [Quantum measurement gives exponential advantage over classical pebbling: O(T/ε) vs O(2^(1/ε)·T) gates for same qubit count]
+19. Nie, Z., Zi, C., & Sun, T. (2024). Quantum circuit for multi-qubit Toffoli gate with optimal resource. arXiv:2402.05053. [Independent co-discovery of conditionally clean ancilla concept, 5 months before Khattar-Gidney]
