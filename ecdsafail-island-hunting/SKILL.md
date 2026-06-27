@@ -327,6 +327,82 @@ the ranking is clear — if one route has much healthier overall evidence after 
 commit GPUs to it rather than finishing equal pilots on the obvious losers. Re-run a fresh bake-off
 whenever the base circuit changes (a new SOTA base reseeds every route's inputs).
 
+## Density-Neutrality A/B: Verify a Change Before Hunting It
+
+A Toffoli or structural lever that reseeds Fiat-Shamir (any vent, truncation, fusion, or
+comparator-narrowing change) **cannot be validated at the baked nonce** — the reseed makes the
+old clean nonce dirty, so you can no longer tell "did my change preserve the island" from "did the
+nonce just go stale." The expensive way to answer is to run a full nonce hunt for the changed
+design and see if a `0/0/0` still exists. The cheap way is a **controlled A/B on a shared
+candidate set**: confirm the change does not move the `cls/pha/anc` distribution, i.e. that it is
+**density-neutral** (costs no extra hunt difficulty), in minutes instead of GPU-hours.
+
+This is the counterpart to the Route Bake-Off: the bake-off **ranks different routes**; this
+**verifies that one change preserves huntability** relative to its own baseline.
+
+### Protocol
+
+1. **Scan a small range on the baseline** (e.g. 2M nonces) with the GPU prefilter and collect the
+   set of **GCD-clean candidate nonces**.
+2. **Reuse that same candidate set for both designs.** Most Toffoli levers live *downstream* of the
+   GCD (comparator width, fold/coord vents, op-pair fusions), so they do not change *which* nonces
+   are GCD-clean — the candidate list is identical for baseline and changed design. That makes this
+   a perfectly controlled A/B: same inputs, only the circuit differs. **Caveat:** if the change
+   touches the GCD/prefilter path itself, this no longer holds — re-scan the changed design and
+   compare candidate *densities* too.
+3. **Full-validate the same candidates against both designs** (24-way parallel). Use the build-once
+   **tail-swap** (`EVAL_TAIL_NONCE`) so each design's `ops.bin` is built once and the 48 `X;X`
+   grinding-tail pairs are re-targeted per nonce — no per-nonce circuit rebuild. (Verify the
+   tail-swap is bit-identical to a per-nonce build once: at the baked nonce both must give the same
+   `0/0/0`; a random tail nonce must go dirty, proving the swap is active.)
+4. **Compute mean and variance of `cls`, `pha`, `anc`** over the candidate set, for each design.
+
+### Verdict
+
+- **Means and variances match (within noise) → density-neutral.** The change adds no hunt
+  difficulty, so its Toffoli saving is effectively free and it is safe to hunt + submit.
+- **Changed design's `cls`/`pha` mean is higher by Δ → the hunt is harder by ≈ `e^Δ`** (see
+  model below). Decide whether the Toffoli saving justifies the extra GPU time.
+- **Rising or nonzero `anc`** (or `var ≫ mean`) is a structural red flag — a nonce will not fix it;
+  treat the change as not density-neutral regardless of the Toffoli win.
+
+### Why mean *and* variance (the Poisson read)
+
+For a healthy approximate circuit the residuals are ~**Poisson** — i.i.d. across the reachable
+verifier inputs — so **var ≈ mean**. Check this explicitly:
+
+- If `var ≈ mean`, the geometric-decay huntability model holds and the `0/0/0` island density
+  factorizes as `≈ e^(−cls_mean) · e^(−pha_mean)` (with `anc` already 0). The
+  **hunt-difficulty ratio between two designs is `e^(Δcls_mean + Δpha_mean)`** — a single number
+  for "how much more GPU will this change cost."
+- If `var ≫ mean`, the errors are **clustered** (structural, one repeated failure mode), not
+  i.i.d. — the factorized density model does not apply and the change is suspect even if the mean
+  looks fine.
+
+### Worked example (BitWonka d44cad3 vs APPLY18, 6/26)
+
+Baseline = BitWonka SOTA (comparator `MSBS=19`); change = `APPLY18` (apply-site comparator narrowed
+to `MSBS=18`, a Toffoli lever that reseeds FS). 643 shared GCD-clean candidates from one 2M scan,
+validated on both designs via tail-swap:
+
+| metric | baseline MSBS=19 | change APPLY18 | Δ mean |
+|--------|-----------------:|---------------:|-------:|
+| `cls` mean / var | 17.81 / 19.5 | 17.93 / 18.4 | **+0.13** |
+| `pha` mean / var | 12.42 / 11.5 | 13.22 / 12.6 | **+0.80** |
+| `anc` mean / var | 0 / 0 | 0 / 0 | 0 |
+
+`var ≈ mean` on both (Poisson confirmed). Distributions near-identical → hunt-difficulty ratio
+`≈ e^(0.13+0.80) ≈ 2.5×` the baseline's own (already-completed) hunt. Verdict: the −Toffoli is real
+and the island is **not a harder target — the same target shifted by one comparator bit**, so the
+change is safe to commit GPUs to. This A/B reversed a prior "comparator is at its floor" conclusion:
+the floor is **per-nonce**, not absolute, and the A/B is what proves it cheaply.
+
+### Cost discipline (A/B)
+
+The whole verification is one 2M scan + two 24-way validation passes (minutes on a single box),
+versus a multi-hour blind hunt per variant. Run it before committing GPUs to **any** lever whose
+value-exactness can't be checked at the baked nonce (i.e. anything that reseeds Fiat-Shamir).
+
 ## Short Triage Scan
 
 Run a pilot before large-scale search. A useful pilot is usually a few million to a few tens of millions of nonces, distributed across available GPUs if convenient.
