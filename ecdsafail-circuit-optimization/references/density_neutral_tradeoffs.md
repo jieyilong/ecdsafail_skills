@@ -159,29 +159,37 @@ break-even of ~1190 Toffoli/qubit, this is marginally over budget and didn't shi
 - Li, Tromp, Vitanyi 1997 (arXiv:quant-ph/9703009) — proved Bennett's bound is **optimal** for classical pebbling.
 - **Kornerup, Sadun, Soloveichik 2021** (arXiv:2110.08973), "Tight Bounds on the Spooky Pebble Game" — the quantum advantage result.
 
-**Classical Bennett bound** (optimal, proved tight by Li-Tromp-Vitanyi):
-- Simulating T steps with S extra space: requires **T^(1+1/S) time** (exponential in 1/S).
-- For S = 1 extra qubit: T² time. For S = log T: T^(1+1/log T) ≈ 2T (constant overhead).
-- In our context (T=530 GCD steps, S=740 qubits, halving S to 370):
-  `530^(1+1/370) ≈ 530 × 530^(1/370) ≈ 530 × 1.017 ≈ 539 steps (+1.7%)` — nearly free!
+**Classical Bennett bound** (Bennett 1989, constant from Levine-Sherman 1990, optimal by Kralovič 2004):
+```
+T' = O(ε × 2^(1/ε) × T^(1+ε) / S^ε)   [hidden constant c(ε) = ε × 2^(1/ε), diverges as ε→0]
+```
+- Special case ε=1: T' = O(2 × T² / S) time — quadratic overhead, linear space savings.
+- Kralovič 2001/2004 proved Bennett is TIGHT: O(S(1+log(T/S))) qubits requires Ω(T(1+log(T/S))) steps.
+- Lange-McKenzie-Tapp 2000 (RSPACE=DSPACE): O(S) space but 2^O(S) time — impractical extreme.
+- Buhrman-Tromp-Vitanyi 2001: hybrid with k pebbles → T' = S × 3^k × 2^O(T/2^k) time, O(k×S) space.
 
-**Quantum spooky pebble bound** (Kornerup-Sadun-Soloveichik 2021, tight):
-- With mid-circuit measurements: **O(T/ε) gates, O(T^ε × S^(1-ε)) qubits** for any ε ∈ (0,1].
-- Classical pebbling needs O(2^(1/ε) × T) gates for the same qubit count — **exponentially more**.
-- Key implication: **quantum measurements give an EXPONENTIAL advantage over classical reversible
-  computation for the same space**. MBU/spooky pebbling is not just a constant improvement — it
-  is asymptotically superior by an exponential factor.
+In our context (T=530 GCD steps, halving S=740 to 370, ε=1):
+```
+T' = O(2 × 530² / 370) ≈ O(1,518) extra iterations → ~3.8M Toffoli overhead to halve transcript
+```
+That's ~280% increase — terrible.
 
-**Why this matters for ecdsafail**: The theoretical reason MBU and spooky pebbling are so
-effective is precisely this exponential advantage. A classical reversible circuit can only compress
-the GCD transcript at Bennett's T^(1+1/S) cost; a quantum circuit with measurements can do the
-same compression with merely O(T/ε) gate overhead — and in our case ε is chosen so the Toffoli
-cost is small.
+**Quantum spooky pebble bound** (Kornerup-Sadun-Soloveichik 2021, tight in Quantum journal 2025):
+```
+T' = O(T/ε) gates,   S' = O(T^ε × S^(1-ε)) qubits,   constant O(1/ε)
+```
+- Classical needs c(ε) = ε × 2^(1/ε) × T per qubit saved — **exponentially worse constant**.
+- Example: ε=0.5 → classical needs 2^2=4 factor; quantum needs only 2 (1/ε=2). ε=0.1 → classical
+  needs 10 × 2^10 = 10,240 factor; quantum needs 10. **Quantum wins by 2^(1/ε) factor.**
 
-**In ecdsafail context**: Bennett/spooky pebbling at SINGLE-GATE scale (the cy0 free-and-recompute
-in d44cad3): `cy0 = ctrl & !final_a0` is recoverable from live qubits in 2 CNOTs (near-0 Toffoli).
-This is the extreme sweet spot of pebbling theory: a 1-gate recomputable value where the Bennett
-overhead is 2 gates total (vs ~530² for the whole GCD circuit, which would be impractical).
+**In ecdsafail context**: The q1169 `hmr+cz_if` carry venting IS spooky pebbling at 1 gate.
+The cy0 free-and-recompute in d44cad3 IS Bennett pebbling at the 1-gate sweet spot.
+
+**Parallel spooky pebbling** (Kahanamoku-Meyer, Ragavan, Van Kirk 2025, arXiv:2510.08432):
+- Length-ℓ sequential chain: optimal depth 2ℓ using only **2.47 × log(ℓ) qubits** (tight).
+- Applied to Regev factoring: 4096-bit factoring in multiplication depth 193 vs 680 previously.
+- For our 530-step GCD divstep: 2.47 × log(530) ≈ **23 qubits** for the entire state machine
+  (vs 22q current — already near-optimal!).
 
 ---
 
@@ -556,3 +564,8 @@ Three distinct metrics appear in the literature. The ecdsafail challenge uses **
 17. Li, M., Tromp, J., & Vitányi, P. (1997). On the reversible simulation of irreversible computation. arXiv:quant-ph/9703009. [Bennett bound is optimal for classical pebbling]
 18. Kornerup, P., Sadun, L., & Soloveichik, D. (2021). Tight bounds on the spooky pebble game. arXiv:2110.08973. [Quantum measurement gives exponential advantage over classical pebbling: O(T/ε) vs O(2^(1/ε)·T) gates for same qubit count]
 19. Nie, Z., Zi, C., & Sun, T. (2024). Quantum circuit for multi-qubit Toffoli gate with optimal resource. arXiv:2402.05053. [Independent co-discovery of conditionally clean ancilla concept, 5 months before Khattar-Gidney]
+20. Levine, R.Y. & Sherman, A.T. (1990). A note on Bennett's time-space tradeoff for reversible computation. *SIAM J. Comput.* 19(4), 673–677. [Exact constant c(ε) = ε × 2^(1/ε) in Bennett's formula — diverges exponentially as ε→0]
+21. Lange, K.-J., McKenzie, P., & Tapp, A. (2000). Reversible space equals deterministic space. *JCSS* 60(2). [RSPACE(S) = DSPACE(S): O(S) space but exponential 2^O(S) time]
+22. Buhrman, H., Tromp, J., & Vitányi, P. (2001). Time and space bounds for reversible simulation. arXiv:quant-ph/0101133. [Hybrid k-pebble interpolation: T'=S×3^k×2^O(T/2^k), S'=O(k×S)]
+23. Kralovič, R. (2004). Time and space complexity of reversible pebbling. *RAIRO Theor. Inf. App.* 38(2). [Lower bound: Bennett bound is tight — O(S(1+log(T/S))) qubits requires Ω(T(1+log(T/S))) steps]
+24. Kahanamoku-Meyer, G., Ragavan, S., & Van Kirk, R. (2025). Parallel spooky pebbling. arXiv:2510.08432. [Length-ℓ chain: optimal depth 2ℓ, 2.47 log(ℓ) qubits. Regev 4096-bit factoring: depth 193 vs 680 previous]
