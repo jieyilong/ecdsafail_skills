@@ -2242,3 +2242,26 @@ Top Gidney levers to try here, ranked by fit:
 per-Toffoli cost toward a CNOT, which shifts the spacetime balance toward idle-qubit/peak cost — i.e.
 under modern fault-tolerance the **qubit (peak) factor matters relatively more**, so peak-reduction
 work (conditionally-clean ancillae, spooky-pebble hosting) is as valuable as Toffoli-cutting.
+
+---
+
+### Density-Neutral Qubit ↔ Toffoli Tradeoffs — Research Synthesis
+
+**Read `references/density_neutral_tradeoffs.md`** for the full synthesis (Bennett pebbling,
+Gidney MBU, Khattar-Gidney conditionally-clean, dirty ancilla, spooky pebbling, structural dead
+skipping, algebraic fusion — each rated by density-neutrality, exchange rate, and SOTA status).
+
+**Key take-aways:**
+
+- **Density-neutral** = value-exact on ALL inputs (not just the 9024 FS island). Any technique
+  keyed by call-site or bit-index (structural predicates) is density-neutral; any technique keyed
+  by sampled runtime data (empirical dead-CCX, GAP_J2, carry truncation) is island-exact only.
+- **Exchange rate at d44cad3**: break-even ≈ 1,364,230 / 1152 ≈ 1,184 Toffoli per qubit.
+- **Best density-neutral Toffoli wins remaining (not yet in SOTA):**
+  1. Apply-swap involutory pair cancellation (fwd-swap + GCD cswap on same lanes may cancel).
+  2. Extended Cuccaro structural dead-carry beyond indices 13-37.
+  3. `TLM_SQUARE_SUMHILO_VENT` / `TLM_SQUARE_VENT_SHIFTED` (off-peak, near-free).
+- **Best density-neutral qubit win remaining:**
+  1. FFG cy0-style free-and-recompute on ADDITIONAL held values at the 1152q co-bind floor
+     (gidney.rs:1217 fold, fused fold, comparator — all bind 1152; need ALL lowered together).
+  2. Spooky-pebble GCD state machine (−22q, ~+1,200 Toffoli — tight but may clear break-even).
