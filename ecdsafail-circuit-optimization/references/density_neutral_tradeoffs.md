@@ -500,6 +500,24 @@ well under break-even.
 
 ---
 
+## 8. T-count vs Toffoli-count vs T-depth — Metric Disambiguation
+
+Three distinct metrics appear in the literature. The ecdsafail challenge uses **avg-executed Toffoli count**, which maps directly to one of them:
+
+| Metric | Definition | Hardware meaning | Ecdsafail? |
+|--------|-----------|-----------------|-----------|
+| **Toffoli-count** | Number of CCX gates emitted (or executed) | Each = 1 magic-state factory call | **YES — this is the challenge metric** |
+| **T-count** | Number of T-gates | 1 Toffoli = exactly 7 T-gates (Gosset et al. 2013, tight lower bound) | Indirectly (T-count = 7 × Toffoli-count minimum) |
+| **T-depth** | T-gate parallelism depth | Reaction floor for magic-state distillation | NOT the challenge metric |
+
+**Gosset, Kliuchnikov, Mosca, Russo 2013** (arXiv:1308.4134): Proved that 1 Toffoli requires exactly 7 T-gates (matching the known decomposition). This means our Toffoli savings translate directly to T-gate savings at a 7:1 ratio — every −1 avgT in our metric = −7 T-gates on real hardware.
+
+**Selinger 2013** (arXiv:1210.0974): T-depth can be reduced to 1 per Toffoli gate using 4 clean ancilla qubits, while T-count stays = 7. This is a **T-depth improvement, not a Toffoli-count improvement** — irrelevant to our avg-executed Toffoli metric, but matters for hardware reaction-floor depth.
+
+**Amy, Maslov, Mosca 2014** (arXiv:1303.2042): With k ancilla, T-depth reducible to near-zero (up to 99.7% T-depth reduction), but T-count is unchanged. Again: depth trick, not count trick.
+
+**Implication for this work**: All "Toffoli reduction" techniques in the ecdsafail context are reducing the **count** (emitted or executed), not the depth. Depth is roughly irrelevant here because our circuit is largely serial. The qubit↔Toffoli exchange rate is a count-vs-count trade.
+
 ## References
 
 1. Bennett, C.H. (1989). Time/space trade-offs for reversible computation. *SIAM J. Comput.*, 18(4), 766–776.
@@ -512,3 +530,8 @@ well under break-even.
 8. Chevignard, P., Fouque, P.-A., & Schrottenloher, A. (2026). Ghost pebbling for EC inversion. eprint.iacr.org/2026/280.
 9. Karatsuba, A. & Ofman, Y. (1962). Multiplication of Multidigit Numbers on Automata. *Soviet Physics Doklady*, 7, 595.
 10. Häner, T., Roetteler, M., & Svore, K. (2017). Factoring using 2n+2 qubits with Toffoli based modular multiplication. *Quantum Inf. Comput.*, 17(7–8). arXiv:1611.07995.
+11. Gosset, D., Kliuchnikov, V., Mosca, M., & Russo, V. (2013). An algorithm for the T-count. *QIC* 14(15-16), 1261–1276. arXiv:1308.4134. [T-count = 7 per Toffoli, tight lower bound]
+12. Selinger, P. (2013). Quantum circuits of T-depth one. *Phys. Rev. A* 87, 042302. arXiv:1210.0974. [T-depth 1 per Toffoli with 4 ancilla — depth reduction only, not count]
+13. Amy, M., Maslov, D., & Mosca, M. (2014). Polynomial-time T-depth optimization of Clifford+T circuits via matroid partitioning. *IEEE Trans. CAD* 33(10), 1476–1489. arXiv:1303.2042. [T-depth reduction with ancilla]
+14. Saeedi, M. & Markov, I.L. (2013). Synthesis and optimization of reversible circuits — a survey. *ACM Comput. Surv.* 45(2):21. arXiv:1110.2574.
+15. Gidney, C. (2025). Streaming vented adder. arXiv:2507.23079. [~3n CCX with 2 clean + n-2 dirty ancilla; partially ported in venting.rs]
