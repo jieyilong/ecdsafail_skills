@@ -697,6 +697,52 @@ island_rate = d · P(c=0) · P(p=0|c=0) · P(a=0|…)
 E[N]        = k · 1/island_rate ;  report p50/p90/p99 ;  update k from each landed hunt
 ```
 
+### Covariance shortcut for `P(p=0 | c=0)` — measure the correlation, don't assume it
+
+Refinement #2 says to use the conditional funnel because `cls`/`pha` are positively correlated. Here
+is how to **quantify** that correlation from the same GCD-clean panel, and what it costs to ignore
+it. From each GCD-clean candidate's `(cls, pha)`, compute the covariance of the two counts directly:
+
+```
+cov  = mean(cls·pha) − mean(cls)·mean(pha)
+corr = cov / (std(cls)·std(pha))
+```
+
+Under the shared-component count model — `cls = A+C`, `pha = B+C` with independent Poisson parts and
+`C` = shots that fail *both* (the dropped-bit mode that corrupts the value **and** leaves measured
+phase garbage) — the union bad-shot mean is `cls̄ + phā − cov` (because `cov = E[C]` for Poisson `C`):
+
+```
+P(0/0/0 | GCD-clean) ≈ exp( −( cls̄ + phā − cov ) )        (anc̄ ≈ 0)
+```
+
+This is exactly Refinement #2's "fit one NB to the union bad-shot count," but computed from the
+**covariance of the marginal counts** — no failing-shot-index dump needed, just `cls`/`pha` per
+candidate. `cov = 0` recovers the (wrong) independent product `∏ P(channel=0)`; `cov > 0` is the
+correlation refund.
+
+**Ignoring the correlation is a ~7000× error that flips feasibility.** Measured on the d44cad3 base,
+643 GCD-clean candidates from one 2M scan:
+
+| design | cls̄ | phā | cov | corr | P(0/0/0\|clean) | E[nonces] |
+|---|---:|---:|---:|---:|---:|---:|
+| BitWonka MSBS=19 | 17.80 | 12.41 | 8.90 | 0.60 | 5.6e‑10 | ~5.6e12 |
+| ours APPLY18 | 17.93 | 13.22 | 7.76 | 0.51 | 7.0e‑11 | ~4.5e13 |
+
+The independent product predicts `e^(−30.2) → ~4e16` nonces for BitWonka — centuries of GPU, i.e.
+"unlandable." The covariance refund (`e^cov ≈ e^8.9 ≈ 7000×`) brings it to ~5.6e12 ≈ a few GPU-days,
+consistent with BitWonka having actually landed their nonce. **Always measure `cov` before quoting an
+absolute ETA — an independence estimate can be 3–4 orders of magnitude too pessimistic and wrongly
+declare a feasible hunt impossible.**
+
+**For an A/B ratio, lean on the means, not the covariance.** The hunt-cost ratio between two designs
+is `exp( (cls̄_A+phā_A−cov_A) − (cls̄_B+phā_B−cov_B) )`. The `cls̄/phā` differences are tight (means
+of ~643 small counts), but `cov` carries a large standard error (`≈ std(cls)·std(pha)/√n ≈ 0.6`
+here), and two designs one comparator-bit apart should share a correlation structure. So the
+**robust ratio is the mean-only part `exp(Δcls̄ + Δphā)`** (≈ `e^0.94 ≈ 2.6×` for APPLY18 vs MSBS=19);
+treat any extra factor implied by a `cov` gap (the raw table above suggests ~8×) as noise until a
+much larger panel confirms it. **Rule: covariance for the absolute ETA, means for the A/B ratio.**
+
 ## Remote Validation Hygiene
 
 Prefer remote parallel validation for large batches because local CPU validation is slow.
