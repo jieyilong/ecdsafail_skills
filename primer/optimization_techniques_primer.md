@@ -15,7 +15,7 @@
 3. [The Challenge Circuit — Elliptic Curve Point Addition](#3)
 4. [Measuring Progress — The Peak Qubit Profile and Hot Spots](#4)
 5. [Qubit Reduction: The Core Loop](#5)
-6. [Qubit Reduction Techniques (A–N)](#6)
+6. [Qubit Reduction Techniques (A–O)](#6)
 7. [Toffoli Reduction: The Core Loop](#7)
 8. [Toffoli Reduction Techniques (A–P)](#8)
 9. [The Qubit ↔ Toffoli Exchange Rate and the Product Race](#9)
@@ -603,6 +603,80 @@ without information loss.
 - HMR-ghost `dy` before the GCD peak (measure it, record `m`).
 - At the end: reconstruct `dy = λ × dx`, apply phase correction via `m`.
 - Freed 256 qubits across the peak at the cost of one modular multiply for reconstruction.
+
+---
+
+### 6.O EEA Register Sharing — The Qubit Floor (and Why It Is an Anti-Lever)
+
+**The deepest qubit-reduction idea, and the most important cautionary tale.** This is the
+technique behind the lowest qubit numbers ever recorded on the challenge — the 948q → 851q → 829q
+descent — but it is also the cleanest example of a lever that *wins the qubit axis and loses the
+score by 250×*. Understanding both halves is the point.
+
+**The naive EEA register budget.** The extended Euclidean algorithm carries four full-width
+256-bit registers through all ~530 steps:
+- `A`, `B` — the two operands (the shrinking `u`, `v`)
+- `CA`, `CB` — their two Bézout cofactors (the running `a`, `b` such that `a·dx + b·p = gcd`)
+
+Naively that is `4 × 256 = 1024` qubits just for the inversion core, before any scratch.
+
+**The sharing observation** (Proos–Zalka 2003, the origin of "inversion dominates point-add space"):
+the operands and their cofactors are *complementary in size*. As the algorithm runs, operand `A`
+loses high bits (it shrinks toward 1) while its cofactor `CA` grows from zero. At every step the
+sum `bitlen(A) + bitlen(CA)` is bounded by roughly one word. So `A` and `CA` can be **packed into a
+single physical 256-bit register**: `A` in the high part, `CA` in the low part, with a small
+*bit-length tracker* recording where the boundary sits. As `A` shrinks and `CA` grows, the boundary
+simply slides — but the total never exceeds one word.
+
+```
+Naive:   [====== A ======][== CA (mostly zero) ==]   two separate 256-bit words
+         [====== B ======][== CB (mostly zero) ==]
+
+Shared:  [== A ==|== CA ==]   ONE word; boundary slides right as A shrinks, CA grows
+         [== B ==|== CB ==]   ONE word; a 9-bit length tracker remembers the split
+```
+
+Four full registers collapse to **two "work words" + a handful of small length/control trackers**.
+This is the structural source of Luo et al. 2026's compact exact reversible inversion at
+`3n + 4⌊log₂ n⌋` qubits (1333q for n=256 as a standalone inversion). In the Shrunken-PZ track,
+packing `A∥CA` and `B∥CB` plus dirty-catalytic borrowing and gate-hosting drove the inversion core
+down to `REGISTER_SHARED_PAPER_INVERSION_QUBITS = 3·256 + 52 = 820` qubits, giving an **851-qubit
+peak** for the whole point-add — a 97-qubit drop below the prior 948q record.
+
+**Why it is an anti-lever (the catch undergrads should internalize).** A packed word has a
+*data-dependent boundary*: "where does `A` end and `CA` begin?" depends on values computed at
+runtime. Every arithmetic step must first **locate and realign that boundary with a full-width
+comparator**, and because the circuit is reversible, that comparator must be recomputed *before AND
+after* each hosted gate. The bookkeeping:
+
+```
+Cost to realize ONE useful Toffoli on a packed word:
+   toggle_gate ; ccx ; toggle_gate
+   where toggle_gate ≈ a full-width comparator ≈ 12 × width ≈ 3,075 Toffoli at width 256
+```
+
+Across 530 divsteps this surrounded-comparator envelope lands at ~4.6 × 10⁸ Toffoli — the
+851q circuit measures **464,495,956 average Toffoli, an 8.5× explosion** over the 948q route's
+54.8M. The score: `851 × 464,495,956 ≈ 3.95 × 10¹¹`, rejected at **+3659%**, roughly 250× over
+the product break-even.
+
+This is the qubit↔Toffoli-depth reciprocal (§9) *violated in the flesh*: the saved lanes are paid
+back as full-width recompute on both sides of every gate, so the trade is **super-linear, not
+1:1**. The qubit minimum and the score minimum are simply not reached by the same construction.
+
+**It is not even a circuit.** The implementing module says so itself: `register_shared_eea.rs` is
+labelled *"an analysis oracle, not a reversible circuit implementation … passing this oracle does
+not establish a challenge-valid qubit count."* It *models* the qubit count assuming the hosting is
+free, then charges the hosting Toffoli separately. The subsequent 851→829q race (three competitors
+leapfrogging over ~26 hours via ever-more-aggressive borrowing on a *frozen* width envelope) is the
+same disclaimed oracle, accreting turn by turn — every rung still `proof_status: "reject"`.
+
+**The lesson.** Register sharing is the genuine route below ~948 qubits, and the Luo-2026 /
+Proos–Zalka mechanism is the structural source worth knowing. But on the *product* objective it is
+an anti-lever — a qubit-lower-bound *witness*, not a shippable circuit. Treat sub-948q PZ numbers
+as combinatorial lower-bound claims. The takeaway generalizes: **a qubit lever whose savings are
+funded by data-dependent recompute around every gate will violate break-even by a large factor —
+always price the recompute, not just the freed lanes.**
 
 ---
 
@@ -1291,6 +1365,28 @@ Each qubit drop used the technique that fit its specific bottleneck:
 4. **Structural correctness wins over island-exact tricks.** The 6dafa07 pivot to structural dead-CCX
    eliminated the empirical approach entirely — correct for all inputs, not just the 9024.
 
+### The parallel low-qubit witness track (a separate line — NOT the product SOTA)
+
+Running *alongside* the product-SOTA journey above is a separate **Shrunken-PZ / Proos–Zalka
+divstep** line whose only goal is to minimize qubits, ignoring score. It is worth seeing because it
+maps the qubit *floor* and demonstrates the exchange-rate trap (§6.O, §9):
+
+| Qubit record | Technique | Status |
+|--------------|-----------|--------|
+| 1050q | trailmix shrunken-PZ embedded op stream | witness |
+| 1019q | source-level dynamic-width PZ port | witness |
+| 988→956q | dirty-borrow / gate-hosting lever stack | witness |
+| 952→948q | further lane borrowing + thin schedule | witness (lowest *validated* witness) |
+| **851q** (`e7dd3de`, 6/23) | **EEA register sharing (§6.O), Luo 2026** | **analysis oracle — rejected +3659%** |
+| 829q (`1dd61ca`, 6/24) | more borrowing/relocation on a frozen envelope | analysis oracle — rejected |
+
+Everything below 948q is the **analysis-oracle regime**: it validates `0/0/0` only on its own
+island, costs ~400–500M Toffoli (~250× over the product break-even), and the implementing module
+explicitly disclaims being a reversible circuit. **851q and 829q are qubit-lower-bound claims, not
+shippable circuits.** The product SOTA (1152q × 1.36M) lives in a completely different regime: more
+qubits, but ~340× fewer Toffoli, and value-exact. The two minima are not reached by the same
+construction — which is the whole lesson of §6.O.
+
 ---
 
 ## 14. Open Frontiers
@@ -1347,6 +1443,7 @@ Each qubit drop used the technique that fit its specific bottleneck:
 | In-place decode (§6.L) | varies | codec overhead | YES |
 | Borrowed-carry fusion (§6.M) | k | 0 | YES |
 | HMR ghosting / passenger ghosting (§6.N) | 256 | +1 modular multiply | YES |
+| EEA register sharing (§6.O) | ~97–119 (to 851→829q) | **8.5× explosion** (anti-lever) | YES (but oracle, not a circuit) |
 
 ### Toffoli reduction techniques
 
@@ -1381,6 +1478,8 @@ Each qubit drop used the technique that fit its specific bottleneck:
 | Conditionally-clean (co-discovery) | Nie, Zi & Sun 2024 (arXiv:2402.05053) | Independent discovery, Feb 2024 (5 months earlier) |
 | secp256k1 ECDLP frontier | Babbush, Gidney et al. 2026 (arXiv:2603.28846) | ≤1200q / ≤90M Toffoli for 256-bit ECDLP |
 | Karatsuba algorithm | Karatsuba & Ofman 1962 | O(n^1.585) vs O(n²) for multiplication |
+| EEA register sharing (origin) | Proos & Zalka 2003 (arXiv:quant-ph/0301141) | Inversion dominates point-add space; operand+cofactor packing |
+| Compact exact reversible inversion | Luo et al. 2026 (arXiv:2604.02311) | 3n + 4⌊log₂n⌋ qubits (1333q, n=256) via bit-length-tracked register sharing |
 
 ---
 
