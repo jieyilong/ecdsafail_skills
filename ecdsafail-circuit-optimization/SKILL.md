@@ -500,7 +500,7 @@ narrowing (`TLM_CMP_CARRY_K_DELTA=-6`). 1133 is a **value-exact repair** of an o
 (over-trimmed active width → no clean island; gave back 2q). Also introduced (flag-gated, unused by
 1133): **`compact.rs` reset-bounded qubit-id compaction** — interval-colors temp lifetimes after
 resets/HMRs to minimize `max qubit-id` (the scored width), a reusable general lever. **Full analysis:
-`references/pareto-frontier-push-1153-to-1133.md`.** Next-qubit hunt (1133→1132 cy0/u[0] lever
+`references/pareto-frontier-push.md`.** Next-qubit hunt (1133→1132 cy0/u[0] lever
 EXHAUSTED on this base; fold consumer has `free_pool=0`): memory `ecdsafail-q1133-resident-cyl0-hunt.md`.
 
 ### BitWonka's q1152 — recompute-to-free a held carry + off-peak vents (current SOTA `71f5115`/`d44cad3`, 2026-06-26)
@@ -1221,7 +1221,7 @@ break-even). Do NOT conflate it with the ludicrous arithmetic.
 For the **(Q,T) Pareto-frontier push** (objective 3 — the clean value-exact basis circuits below
 1153q, in the *useful corner* under the single-point-addition estimate ≤1175q / ~2.69M Toffoli,
 Babbush space-opt via Schrottenloher 2026 Table 1 — not the full-ECDLP ≤1200q/≤90M figure), read
-`references/pareto-frontier-push-1153-to-1133.md` when the task involves the 1153→1147→1146→1143→
+`references/pareto-frontier-push.md` when the task involves the 1153→1147→1146→1143→
 1142→1141→1133 clean basis ladder, the lever taxonomy (fold-vent clamp → no-ancilla/dirty-borrow →
 constant-lane loan → active-width trim), `TLM_GCD_ACTIVE_WIDTH_TRIM`, the `compact.rs` reset-bounded
 qubit-id compaction pass, or forking a dead-CCX-free basis at a target qubit count. These are

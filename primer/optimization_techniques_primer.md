@@ -1973,48 +1973,91 @@ track** (minimize Q alone), and the **Pareto-frontier track** (map the clean (Q,
 
 ### The score track (Q×T): the 2715q→1152q journey
 
-#### Pre-history: 2715q → 1211q (where the circuit came from)
+The score track has three clearly distinct eras, each defined by its **inversion engine**: the
+Kaliski pre-history, the dialog-GCD frontier (which stalled at a 1168q wall for days), and the
+*ludicrous* breakthrough that broke it and drove to today's SOTA.
 
-The challenge *started* at a baseline of **2,715 qubits × ~3.96M Toffoli**. The journey down to the
-1211q dialog-GCD circuit (where the technique table below begins) is its own story, and it's worth
-knowing because it shows the same methods appearing in cruder form:
+#### Era 1 — Pre-history: 2715q → 1698q (the Roetteler/Kaliski era)
 
-- **The baseline architecture** was a **Roetteler-style two-Kaliski affine** point addition: affine
-  coordinates (not projective), the modular inverse done by *two* runs of the Kaliski binary-GCD
-  algorithm, with `Q` and the prime kept **classical from the start** and direct/Solinas reduction (no
-  Montgomery). The inverse was ~80–90% of the Toffoli — the bottleneck §4 names.
-- **2708 → ~2002 (scratch-packing on a fixed inverse).** With the Kaliski engine treated as fixed,
-  the early drops were *all* live-range and hosting tricks: the `cswap(p⊕q)` swap-merge (§9.19,
-  −274k Toffoli), borrowing **provably-`|0⟩` high bits of the shrinking GCD register** as carry
-  scratch (the high bits of `u` are zero as a classical function of the iteration index — gate-hosting
-  §7.16 in its first form, reaching the published "9n" peak floor), square-recompute eviction (§7.1),
-  and **joint-pin plateau breaking** (§7.9) — the realization, present from the very start, that a
-  peak co-owned by several scratch clusters only drops when you reduce all of them *together*.
-- **2002 → 1698 (the engine swap).** The first true *architectural* jump replaced the entire Kaliski
-  stack with a **dialog-GCD inverter that streams a compressed transcript** instead of holding wide
-  history registers resident (§3) — a single change worth −304 qubits. This is the lineage the SOTA
-  still descends from.
-- **1698 → 1211 (windowing + recompute-to-free).** On the dialog-GCD engine, the peak fell via the
-  **windowed/chunked apply** dial (§7.18, the era's biggest peak lever), carry self-hosting on the
-  operand lanes themselves (§7.13/§7.16), shift-free modular doublings (§7.19), keep-live-vs-recompute
-  in the Solinas fold (the keep-alive dual, §7.1), and the first **recompute-to-free fold carries**
-  (`FOLD_FREED_TAIL` / `FOLD_PARK_LOW_CARRIES`) — the same family as the cy0 trick (§7.5) that later
-  broke 1153→1152.
+The challenge *started* at a baseline of **2,715 qubits × ~3.96M Toffoli**: a **Roetteler-style
+two-Kaliski affine** point addition — affine coordinates (not projective), the modular inverse done
+by *two* runs of the Kaliski binary-GCD algorithm, direct/Solinas reduction (no Montgomery), with the
+prime and `Q` known as compile-time constants. The inverse was ~80–90% of the Toffoli (the bottleneck
+§4 names), and was treated as algorithmically fixed — so the early drops were *all* live-range and
+hosting tricks, the same methods in this primer appearing in cruder form:
 
-So nearly every technique in this primer was *already in play* before 1211q, just on a coarser
-circuit. The table below picks up at 1211q, where the modern dialog-GCD/trailmix line begins.
+- **2708 → ~2002 (scratch-packing on a fixed inverse):** the `cswap(p⊕q)` swap-merge (§9.19, −274k
+  Toffoli), borrowing **provably-`|0⟩` high bits of the shrinking GCD register** as carry scratch
+  (gate-hosting §7.16 in its first form, reaching the published "9n" peak floor), square-recompute
+  eviction (§7.1), and **joint-pin plateau breaking** (§7.9) — the realization, present from the very
+  start, that a peak co-owned by several scratch clusters only drops when you reduce all of them
+  *together*.
+- **2002 → 1698 (the engine swap):** the first true *architectural* jump replaced the entire Kaliski
+  stack with a **dialog-GCD inverter that streams a compressed transcript** (§3) instead of holding
+  wide history registers resident — a single change worth −304 qubits, and the lineage everything
+  after descends from.
 
-#### The 1211 → 1152 ladder
+#### Era 2 — The dialog-GCD frontier: 1698q → 1168q (and the wall)
 
-Each qubit drop used the technique that fit its specific bottleneck:
+On the dialog-GCD engine the peak fell steadily via the **windowed/chunked apply** dial (§7.18, the
+era's biggest peak lever), carry self-hosting on the operand lanes (§7.13/§7.16), shift-free modular
+doublings (§7.19), keep-live-vs-recompute in the Solinas fold (the keep-alive dual, §7.1), the first
+**recompute-to-free fold carries** (`FOLD_FREED_TAIL` / `FOLD_PARK_LOW_CARRIES`), and progressively
+tighter transcript codecs:
 
 | Transition | Technique | What was released |
 |-----------|-----------|-------------------|
+| 1698→1211 | windowed apply + recompute-to-free + carry self-hosting | the whole 1698→1211 descent (§7.18/§7.13/§7.19/§7.1) |
 | 1211→1193 (−18q) | Live-range hole (§7.1) | GCD-apply scratch block freed during shift sub-phase; reacquired after |
 | 1193→1192 (−1q) | Truncation / segmentation (§7.4) | Square segment one notch tighter |
 | 1192→1185 (−7q) | Transcript codec (§7.8) | Per-step fold carry scheduling + exact 11-bit head codec |
 | 1185→1170 (−15q) | Plateau decomposition (§7.9) + 5 techniques | Coordinated: tail codec, streaming apply, square rebalance, 5 co-binders |
-| 1170→1169 | MBU vent on fold carry (§9.1/2) | `hmr+cz_if` on the −f fold peak owner: 0 Toffoli to vent it |
+| 1170→1169→**1168** | MBU vent on fold carry (§9.1/2) | `hmr+cz_if` on the −f fold peak owner: 0 Toffoli to vent it — and then **the wall** |
+
+**The 1168q wall.** The dialog-GCD frontier reached 1168q (BitWonka, 6/15) and *stuck there for
+days*. Every remaining lever on that engine was a single-qubit grind against a hard floor: with the
+two 256-bit `Q` coordinates materialized as resident quantum operands across the GCD peak, the
+architecture simply had no more room. Breaking 1168 needed a different circuit, not another knob.
+
+#### Era 3 — The *ludicrous* breakthrough: 1167q → 1152q
+
+On 6/18 **tob-joe (Trail of Bits), `af5abb1`**, broke the wall by porting trailmix's **"ludicrous"**
+point-add — *a new circuit family, distinct from dialog-GCD* — onto the challenge. It landed at
+**1167q × 1,422,591** (only −1q below the wall on day one), but the point wasn't the −1q: it opened a
+**fundamentally lower-headroom family** that the dialog-GCD line could not reach, and over the next
+days drove to 1152. Its design (the architecture §12 describes in full):
+
+- **The decisive lever — `Q` classical *and off-peak* (−512q).** Hold both 256-bit `Q` coordinates as
+  *classical* registers and load them into a transient quantum temp **only at off-peak coordinate
+  steps**, so all 512 of those qubits never co-reside at the GCD peak. (Earlier circuits knew `Q` was
+  a constant but still paid for it as resident quantum operands at the peak; ludicrous is what finally
+  kept it off — tob-joe's note calls this "the decisive product-min lever.")
+- **One shared inversion, two passes.** The whole add is two GCD passes sharing one modular-inversion
+  primitive (`Direction::{Inverse, Forward}`), a fused square-subtract for `λ²`, and a zero-Toffoli
+  negate `ox − x2 = −(x2 − ox)` (§9.9).
+- **Schrottenloher jump-GCD (jump=2, 258 steps).** Each forward step records a 3-bit dialog symbol
+  `(subtracted, swap, s₂)`; the reverse replays it. The GCD registers **shrink and regrow along a
+  baked width schedule**, running the adders in the freed headroom — this sets the 1167q floor and is
+  the primary lossy lever.
+- **All-triple base-5 codec** (§7.8): 3 jump-2 symbols (9 raw bits) fold into a 7-bit code (only 5 of
+  8 patterns reachable; `log₂(5³) ≈ 6.97`), from a SAT-synthesized in-place pairs core — tighter than
+  the earlier K5 15→12 codec.
+- **Inline interleaving + streamed decompression:** each window is compressed the instant its symbols
+  are produced, so the full raw tape never exists (resident **603q vs ~775 raw**); the reverse pass
+  decompresses one window at a time, and the apply is fused *into* the GCD passes, not a separate phase.
+- **A vented-adder zoo on baked per-call schedules** (§9.2): plain / variable-chunk / headroom-adaptive
+  / chunked-Cuccaro / carry-out adders plus a fused `double+cdouble` `(e+2d)·f` fold; for each of the
+  ~258×2 calls the adder choice, carry cap, vent count and chunk split are replayed from baked tables
+  sized for that call's live-qubit position — not a live cost model.
+- **Deliberate exact-modular truncations:** the `+f` fold touches only the low 54 bits (~2⁻²¹ miss)
+  and the swap comparators recompute on a narrow top window — bounded rare errors for large savings
+  (§9.18, §11). Everything is baked, so `build()` is deterministic and a tail nonce (28565) is ground
+  to land all 9024 shots clean.
+
+From that base the trailmix_ludicrous line ground down to the SOTA:
+
+| Transition | Technique | What was released |
+|-----------|-----------|-------------------|
 | 1167→1166 | Step-0 swap_flag elimination | `swap_flag` becomes `Option<QubitId>`, lazy-alloc; freed one tape lane |
 | 1166→1165 | Odd-u0 parking (§7.1) | `u[0]` is provably 1; park+loan the lane, restore in 2 gates |
 | 1164→1163 | Source-as-carry suffix | Paid drop: surrendered apply-phase vents to free one carry lane |
@@ -2154,7 +2197,7 @@ step 205), the dynamic-width-register idea (§7.6) applied to the ludicrous GCD.
 *value-exact repair* of an over-aggressive 1131 attempt: trimming the active width is a **graded**
 correctness lever (§6) — push until the residual breaks, then give back one notch (1131→1133) so a
 clean nonce is reachable. The push also introduced a reusable general pass — **reset-bounded qubit-id
-compaction** (§7.17). Full analysis: [`pareto-frontier-push-1153-to-1133.md`](https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/pareto-frontier-push-1153-to-1133.md).
+compaction** (§7.17). Full analysis: [`pareto-frontier-push.md`](https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/pareto-frontier-push.md).
 
 ---
 
@@ -2282,7 +2325,7 @@ compaction** (§7.17). Full analysis: [`pareto-frontier-push-1153-to-1133.md`](h
 - [`external-literature-2000-2026.md`](https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/external-literature-2000-2026.md) — broader academic literature map
 - [`REPORT_1168_wall_revamp.md`](https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/REPORT_1168_wall_revamp.md) — the trailmix_ludicrous introduction and burst analysis
 - [`frontier-1211-to-1170.md`](https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/frontier-1211-to-1170.md) — detailed 1211→1170 step-by-step record
-- [`pareto-frontier-push-1153-to-1133.md`](https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/pareto-frontier-push-1153-to-1133.md) — the (Q,T) Pareto-frontier push (§14.3)
+- [`pareto-frontier-push.md`](https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/pareto-frontier-push.md) — the (Q,T) Pareto-frontier push (§14.3)
 - [`SHRUNKEN_PZ_q948_track.md`](https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/SHRUNKEN_PZ_q948_track.md) — the low-qubit Shrunken-PZ track (§14.2)
 
 > **Note on code paths.** Source files named in this primer (e.g. `arith.rs`, `fused.rs`,
