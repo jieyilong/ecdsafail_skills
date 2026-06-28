@@ -79,26 +79,35 @@ The best known result as of 2026-06-27 (BitWonka, commit `d44cad3`, trailmix_lud
 1152 qubits × 1,364,230 avg Toffoli = 1,571,592,960 score
 ```
 
-### Two separate competitions, two separate objectives
+### Three objectives, not one
 
-This is important context for the whole document. There are **two distinct optimization tracks**,
-and a technique that is optimal for one can be irrelevant for the other:
+This is important context for the whole document. The ecdsa.fail challenge is really **three
+optimization tracks**, and a technique that is optimal for one can be irrelevant — or even
+counterproductive — for another:
 
-1. **The Q×T score competition** (the main subject of this primer): minimize the *product*
-   `peak_qubits × avg_executed_Toffoli`. Here both resources matter, and every move is judged by
-   the exchange rate (§9). The SOTA above (1152q × 1.36M) lives in this track.
+1. **Minimize the spacetime volume (the Q×T score competition)** — the main subject of this primer.
+   Minimize the *product* `peak_qubits × avg_executed_Toffoli`. Both resources matter, and every
+   move is judged by the exchange rate (§9). The SOTA above (1152q × 1.36M) lives in this track.
 
-2. **The low-qubit competition** (a separate objective): minimize **peak qubits alone**. Toffoli
-   count is *unconstrained* — you may spend as many Toffoli gates as you like. The only thing that
-   counts is how few qubits the circuit is simultaneously live on.
+2. **Minimize qubits regardless of Toffoli (the low-qubit competition)** — a question of academic
+   curiosity: *how few qubits can a correct point-add possibly use?* Toffoli count is
+   *unconstrained* — you may spend as many gates as you like. This track maps the qubit **floor**;
+   the deepest technique here is EEA register sharing (§6.O), which reaches 851q → 829q (far below
+   anything score-competitive). Under this objective, spending 8× more Toffoli to save 10% of qubits
+   is *free*, because Toffoli never enters the scoring.
 
-These are genuinely different games. Under the Q×T objective you would never spend 8× more Toffoli
-to save 10% of qubits; under the low-qubit objective that trade is *free*, because Toffoli simply
-does not appear in the scoring. Most of this primer optimizes track 1, but the deepest qubit-floor
-technique — **EEA register sharing (§6.O)** — belongs to track 2, and reaches qubit counts
-(851q → 829q) far below anything competitive on the product score. Keep the two objectives separate
-in your head: many "is this worth it?" questions only have an answer once you know *which*
-competition you are playing.
+3. **Explore the (Q, T) Pareto frontier** — especially the *useful corner* where **both** Q and T
+   are lower than the published Google Quantum AI / Babbush–Gidney resource estimates for secp256k1
+   (≤1200q / ≤90M Toffoli, arXiv:2603.28846). A point is Pareto-optimal if you cannot lower one of
+   Q or T without raising the other. The goal here is not a single score but a *clean, reusable basis
+   curve*: a value-exact circuit at each qubit count that others can fork and improve (see the
+   1147→1141q clean Pareto bases, §13). This track deliberately avoids island-overfit tricks (§10)
+   so the curve stays a sound reference.
+
+These are genuinely different games. Most of this primer optimizes track 1, but several techniques
+(register sharing, the clean Pareto bases) only make sense under tracks 2 and 3. Keep the three
+objectives separate in your head: many "is this worth it?" questions only have an answer once you
+know *which* track you are on.
 
 ---
 
@@ -708,28 +717,33 @@ contrast, under the *Q×T product* objective the very same packing would be ~250
 this technique belongs squarely to the low-qubit track, not the score track. The two objectives have
 genuinely different optimal constructions — see §9 for the exchange-rate math behind that statement.)
 
-**A note on rigor — is 851q a *real* qubit count?** Only partly. It is a **lower-bound witness**,
-not a proven width, and the gap is worth understanding precisely (the source spells it out):
+**How to read the 851q figure.** 851q is a carefully-scoped **lower-bound witness** — a research
+milestone that says "this width looks reachable," with its modeling assumptions documented openly in
+the source. It is exactly the kind of result objective 2 (§1) is meant to surface. Three things are
+worth knowing so you read the number for what it is:
 
-- **The deepest figure is a *classical* oracle, not a circuit.** `register_shared_eea.rs` computes
-  on `U256`/`U512` integers — **there is not a single qubit or gate in it**. Its own header says:
-  *"an analysis oracle, not a reversible circuit implementation. In particular, passing this oracle
-  does not establish a challenge-valid qubit count."* Its job is only to check the packing invariant
-  `l_t + 1 + l_q + bitlen(r) ≤ n + 3` holds at all 1,479 steps — i.e. that operand and cofactor
-  *fit in one word*, proving the packing is **feasible in principle**, classically.
-- **The low count is bought by gate-hosting whose zero-claims are *sampled, not proven*** (see §6.P).
-  The hosting modules disclaim it: `q945_local_hosts.rs` — *"does not certify reachable-state zero
-  claims. Q945 acceptance remains blocked until the Q946 hardening prerequisites … are integrated"*;
-  `q944_gate_host_lifecycle.rs` only checks the host composition *"over every basis state at small
-  widths,"* then extrapolates to 256 bits.
-- **The submission self-reports rejection.** `Q949_ROBUST_ENVELOPE_FRESH_VALIDITY_CLAIMED = false`
-  (with an `assert!` enforcing it), and every artifact carries `"proof_status":"reject"`.
+- **The deepest figure rests on a *classical* feasibility model.** `register_shared_eea.rs` computes
+  on `U256`/`U512` integers — a classical simulation rather than an emitted gate stream. Its job is
+  to confirm the packing invariant `l_t + 1 + l_q + bitlen(r) ≤ n + 3` holds at all 1,479 steps —
+  i.e. that operand and cofactor genuinely *fit in one word*, establishing the packing is **feasible
+  in principle**. The authors flag this transparently in the header: *"an analysis oracle … passing
+  this oracle does not establish a challenge-valid qubit count"* (i.e. it is a feasibility model, to
+  be paired with a hardened emission before it counts as a finalized circuit).
+- **The lowest counts use gate-hosting whose zero-claims are *sampled* rather than proven** (see §6.P).
+  The route is honest about which guarantees are still open: `q945_local_hosts.rs` notes the
+  reachable-state zero claims are not yet certified and lists the remaining "Q946 hardening"
+  prerequisites; `q944_gate_host_lifecycle.rs` verifies the hosting exhaustively *at small widths*
+  and extrapolates to 256 bits.
+- **The status is labelled, not hidden.** `Q949_ROBUST_ENVELOPE_FRESH_VALIDITY_CLAIMED = false` and
+  the `proof_status` fields mark these as lower-bound explorations rather than finalized circuits —
+  good hygiene for a frontier-mapping result.
 
-So: passing the `0/0/0` run check certifies the **output values are correct on the hunted island**;
-it does **not** certify that 851 qubits suffices for *all* inputs. The lowest count backed by a
-fully-emitted, island-validated circuit *without* the extra uncertified-hosting assumption is the
-**948q** route. Treat 851q/829q as "this width looks reachable, modulo an uncertified zero-lane
-assumption." The reusable, sound idea underneath is the structural one — operand/cofactor packing.
+In short: the `0/0/0` run check confirms the **outputs are correct on the hunted island**, and the
+851/829q figures show **how low the width can plausibly go**. The lowest count backed by a
+fully-emitted, island-validated circuit with *no* outstanding hosting assumptions is the **948q**
+route — the natural "validated" milestone to cite — while 851q/829q are the further-reaching
+witnesses on top of it. Either way, the durable, fully-sound takeaway is the structural mechanism:
+operand/cofactor packing.
 
 **The lesson.** Register sharing is *the* route below ~948 qubits, and the Proos–Zalka / Luo-2026
 mechanism is the structural source worth knowing. It is the right tool when your objective is pure
@@ -1062,39 +1076,60 @@ the full modular reduction.
 
 ---
 
-### 8.H Structural Dead Gate Skipping
+### 8.H Dead-CCX Elimination (Empirical Drop vs Structural Skip)
 
-Some CCX gates provably never fire because their control condition is structurally always zero.
+Some CCX gates contribute nothing to the answer — either their control is always zero, or their net
+effect cancels out — yet the scorer still *charges* them. Deleting such "dead" gates lowers the
+average-executed Toffoli. There are two ways to find them, with **very different correctness
+profiles**, and the difference is the single clearest example of the overfitting trap in the whole
+project.
 
-**Example**: In a Cuccaro adder computing `x + f` where `f = 2^32 + 977`, the carry-out at
-certain high bit positions is always 0 when the operands are in the known range from the GCD
-convergence. The CCX gate for that carry can be omitted.
+**(1) Empirical dead-CCX drop (the island-overfit lever).** Run the circuit over a large sample of
+inputs (~9 million reachable EC points, or many Fiat-Shamir test sets); record which CCX gates
+**never flip their target** — i.e. are *inert-but-charged* on the sample. Collect their positions
+into a `.idx` file (e.g. 13,873 op indices) and simply filter them out of the emitted op stream:
 
-**Two flavors** (with very different correctness profiles):
+```
+ops = ops.filter(|(i, _)| !drop_set.contains(i))   // delete the inert-but-charged CCX
+```
 
-1. **Empirical dead-CCX** (REMOVED from SOTA): Sample ~9 million inputs; find CCX gates
-   whose target never flips; skip them. Problem: these gates might fire on inputs not in the
-   sample. This was removed in commit `6dafa07`.
+This was the engine behind the SOTA average-Toffoli for a long time (a single drop was worth
+~13,000+ avg-Toffoli). **But it is distribution-exact / island-overfit, and dangerous for three
+reasons:**
 
-2. **Structural dead-CCX** (CURRENT SOTA): Prove mathematically that a CCX gate never fires
-   on ANY input using circuit structure alone (known-constant carries, exact-remainder
-   conditions, call-site bit patterns). Named predicates in `trailmix_ludicrous`:
-   - `TLM_FFG_SKIP_STRUCTURAL_DEAD_*` (specific bit positions in FFG adders)
-   - `TLM_CUCCARO_SKIP_STRUCTURAL_DEAD_*` (carry positions in Cuccaro adders)
-   - `TLM_COMPARE_SKIP_STRUCTURAL_DEAD_*` (always-zero comparator outputs)
-   - `TLM_GIDNEY_SKIP_STRUCTURAL_DEAD_*`, `TLM_CONST_CHUNK_SKIP_STRUCTURAL_DEAD_*`
+- **It deletes gates that *could* fire on unsampled inputs.** The result is "clean on its island"
+  (`0/0/0` over the hunted 9024) but **not** provably correct off-island. A gate that was inert on
+  every sampled input may be live on some input you never tried — and then the deletion silently
+  corrupts the output.
+- **The indices are absolute positions in one exact op stream.** *Any* structural change — a clamp,
+  a knob, a fold toggle, even reordering — shifts every later gate onto the wrong index, so a stale
+  list now deletes *live* gates → catastrophic failure (the `9024/141/141` all-shots breakage). Every
+  variant must ship its own freshly-screened list and a freshly-hunted nonce.
+- **It does not improve the construction.** A genuinely better circuit would not *emit* these gates
+  in the first place; the drop just hides them from the scorer. It is the first thing invalidated by
+  any real structural improvement. Think of it as a sophisticated nonce grind — worth knowing it
+  exists (it's why the SOTA avg-T looked low), but low-value to reimplement except to squeeze a
+  *frozen* final artifact.
 
-These are keyed by call-site and bit-index, not by sampled data. Density-neutral.
+**Iterated (two-pass) empirical drop** (`DROP_DEAD_ROBUST_SECOND`): the drop is **iterable**. After
+the first drop reshapes the stream, re-screen the *already-dropped* stream — a second screen finds
+gates that are newly (or only now detectably) dead — drop a second, smaller list, and re-hunt the
+nonce with *both* drops on. Each pass is subset-monotone with diminishing returns (the 2nd pass was
+worth ~−2,411 avgT at 1153q). All the overfitting caveats above apply at every pass.
 
-**Iterated (two-pass) dead-CCX** (`DROP_DEAD_ROBUST_SECOND`, the empirical flavor — this is what
-carried the 1153 SOTA over the line before the structural pivot): dead-CCX deletion is **iterable**.
-Drop a first list, then **re-screen the already-dropped op stream** — the first drop reshapes the
-stream, so a second screen finds gates that are newly (or only now detectably) dead. Drop a second,
-smaller list, and re-hunt the nonce with *both* drops on. Each pass is subset-monotone and the
-returns diminish, but they are real (the second pass was worth ~−2,411 avgT at 1153q). This is a
-distribution-exact / island-overfit lever (§10): the indices are absolute positions in one exact op
-stream, so any structural change invalidates them and forces a full re-screen. Reusable mainly for
-squeezing a frozen final artifact; the durable wins are the *structural* levers above.
+**(2) Structural dead-CCX skip (the sound, density-neutral lever — CURRENT SOTA).** Instead of
+*sampling*, **prove** a CCX never fires on *any* input from circuit structure alone (known-constant
+carries, exact-remainder conditions, call-site bit patterns). Named predicates in
+`trailmix_ludicrous`: `TLM_FFG_SKIP_STRUCTURAL_DEAD_*`, `TLM_CUCCARO_SKIP_STRUCTURAL_DEAD_*`,
+`TLM_COMPARE_SKIP_STRUCTURAL_DEAD_*`, `TLM_GIDNEY_SKIP_STRUCTURAL_DEAD_*`. These are keyed by
+call-site and bit-index, not by sampled data, so they are **density-neutral** (correct on all
+inputs, stackable freely, no `.idx`, no re-screen).
+
+**The 6dafa07 pivot.** The SOTA *replaced* the empirical drop entirely with structural skipping —
+which turned out to be **both sound and lower-Toffoli**. This is the general lesson in miniature:
+when an island-exact lever is doing real work, look for the *structural* reason those gates are dead
+and skip them provably. If the gates truly never fire, you can usually prove it — and then the
+overfitting risk disappears for free. (See §10 for the value-exact vs island-exact framing.)
 
 ---
 
@@ -1630,7 +1665,8 @@ entering — see §6.O and §9.
 | Off-peak loosening (§8.O) | free refund | 0 | YES |
 | Constprop deeper (§8.P) | ~377k | 0 | YES |
 | Cinc cascade replacement (§8.Q) | ~5,175 (O(t²)→O(t)) | 0 | YES |
-| Iterated 2-pass dead-CCX (§8.H) | ~2,400 / extra pass | 0 | NO |
+| Empirical dead-CCX drop (§8.H) | ~13,000+ (1st pass) | 0 | NO (island-overfit) |
+| Iterated 2-pass dead-CCX (§8.H) | ~2,400 / extra pass | 0 | NO (island-overfit) |
 
 ### Key theoretical results
 
