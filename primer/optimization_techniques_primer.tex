@@ -1533,6 +1533,57 @@ For a length-$\ell$ sequential computation chain:
 For our 530-step GCD: $2.47 \times \log(530) \approx 23$ qubits. Our current GCD state machine
 uses $\approx22$ qubits --- already near the theoretical minimum.
 
+\subsection{How the optimization techniques \emph{are} pebble-game moves}
+
+This theory is not background decoration --- \textbf{every qubit-freeing technique in
+\S\ref{sec:qubittech}--\S\ref{sec:toftech} is literally a move in one of these two pebble games.}
+Naming the move tells you its exact cost and risk:
+
+\begin{center}
+\small
+\begin{tabular}{p{3.4cm}p{5.2cm}p{2.4cm}p{2.6cm}}
+\toprule
+\textbf{Technique} & \textbf{Pebble-game move} & \textbf{Which game} & \textbf{Cost to un-pebble} \\
+\midrule
+Live-range hole (\S6.A) & remove a pebble by \textbf{uncompute}, re-place later by \textbf{recompute} & Bennett & full Toffoli, \emph{twice} \\
+Free-and-recompute cy0 (\S6.E) & same, on one cheap pebble & Bennett & $\approx$0 (a few CNOTs) \\
+MBU / carry vent (\S8.A--B) & remove a carry pebble by \textbf{X-measurement $+$ CZ} & spooky & \textbf{0 Toffoli} \\
+Conditional replay (\S8.C) & measure the pebble; recompute only on the firing branch & spooky & $\Pr[\text{fire}] \times$ cost \\
+HMR ghosting (\S6.N) & measure, leave a \textbf{ghost}, recompute $+$ phase-fix & spooky & one recompute \\
+Transcript compression (\S6.H) & \textbf{don't pebble it} --- shrink the data so fewer pebbles persist & (out of the game) & codec only \\
+Parallel GCD schedule (\S\ref{sec:trailmix}) & optimal pebble \emph{placement} over the 530-step chain & parallel spooky & --- (already optimal) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The Bennett$\to$spooky upgrade is the single biggest constant-factor lever.} A live-range
+hole (\S6.A) is a \emph{Bennett} move: to free a pebble you uncompute it (paying its Toffoli) and
+later recompute it (paying again) --- the classical-reversible game, where un-pebbling is expensive.
+MBU (\S8.A) is the \emph{spooky} move on the same kind of pebble: you remove it by \textbf{measuring}
+it, and a measurement costs no Toffoli. That is exactly why an $n$-bit adder drops from $\sim$2n
+Toffoli (compute $+$ coherent uncompute) to $\sim$n (compute $+$ measured uncompute) --- \textbf{MBU
+is the pebble game's quantum advantage cashed out on every carry bit.}
+
+\textbf{Pebbling theory also tells you \emph{which} qubits to attack.} The recompute-to-free move
+only pays when $\texttt{recompute\_Toffoli} < \texttt{qubits\_freed} \times \texttt{break\_even}$
+(\S\ref{sec:exchange}). The two extremes:
+\begin{itemize}
+  \item \textbf{The transcript is firmly in the ``never recompute'' regime.} Bennett's
+    exponentially-growing constant is why: re-deriving it costs $\sim$3.8M Toffoli to free $\sim$370
+    qubits ($\sim$8$\times$ over break-even). So take it \emph{out} of the game by \textbf{compressing
+    the data} (\S6.H), not by recomputing it.
+  \item \textbf{A scratch pebble like \texttt{cy0} is deep in the ``always recompute'' regime.} It is
+    a cheap function of live qubits, so recompute costs $\sim$0 Toffoli --- free it without hesitation
+    (\S6.E).
+\end{itemize}
+
+And the parallel-spooky bound says the \textbf{GCD control chain is already done} ($\approx$22q vs
+the $2.47\cdot\log(530) \approx 23$q floor). So the theory aims every remaining qubit lever at the
+\textbf{data pebbles} --- transcript, passengers, coordinate registers --- exactly where \S6 and
+\S\ref{sec:trailmix} spend their effort. In short: \emph{recompute the cheap pebbles (Bennett), measure
+the carry pebbles (spooky), compress the expensive data instead of pebbling it, and stop optimizing
+the control chain.}
+
 % ===========================================================================
 \section{The SOTA Circuit: How trailmix\_ludicrous Works}
 \label{sec:trailmix}
