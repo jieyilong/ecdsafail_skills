@@ -691,7 +691,36 @@ adder is still correct.
 \textbf{The tradeoff}: Tighter ceilings force narrower carries $\to$ more carry-chunk splits $\to$
 more Toffoli. The break-even exchange rate governs when to tighten.
 
+\textbf{Crucial nuance --- the clamp is only a \emph{ceiling}, not a lane-freeing lever.} Lowering
+\texttt{TLM\_TARGET\_Q} declares an aspiration; it does nothing unless there are \emph{actually
+freeable lanes} for the narrower arithmetic to fit into --- ``a clamp with no freed lanes just
+panics or fails to fit.'' So a clamp drop must be \textbf{paired with companion levers that genuinely
+eliminate live qubits} at the peak. The \textbf{1156 $\to$ 1153} drop is the textbook example --- it
+stacked three coordinated levers:
+
+\begin{enumerate}
+  \item \textbf{The clamp} itself: \texttt{TLM\_TARGET\_Q} 1156 $\to$ 1152 (the binding peak lands
+    at 1153, one above the aspiration --- the irreducible co-resident set).
+  \item \textbf{Zero-cin fold} (\texttt{TLM\_FOLD\_CHUNK\_ZERO\_CIN}): the fold-chunk loop's
+    persistent carry-in ancilla \texttt{cin0} is \emph{no longer allocated at all} --- the first
+    chunk's carry-in is provably 0, so a new ``zero-cin boundary-erase'' path
+    (\lstinline{fold_boundary_erase_zero_direct}) does the carry cleanup without it. This is the
+    actual freed lane (a live-range elimination, cf.\ \S\ref{sec:lazycarry}) that the clamp reclaims.
+  \item \textbf{FFG vent-count cap} (\texttt{TLM\_FFG\_MAX\_G = 47}): caps the FFG half-product
+    fold's clean-vent count $g$ so fewer transient vent qubits co-reside at the peak
+    ($\texttt{capped\_g} = \min(\texttt{scheduled\_g}, \texttt{cap})$).
+\end{enumerate}
+
+\textbf{And the qubit drop alone is not enough to \emph{win}.} Pushing the peak 1156 $\to$ 1153
+makes the clamped adders run on tighter chunks $\to$ more carry work $\to$ avgT went \emph{up} by
+$+11{,}369$ (to 1{,}392{,}603), i.e.\ $\sim$3{,}790 Toffoli/qubit, far above break-even. That
+``clean q1153 base'' was \textbf{rejected} until Toffoli levers (the cinc cascade replacement
+\S\ref{sec:cinc} + iterated dead-CCX \S\ref{sec:deadccx}) were stacked back on top to carry it over
+the line --- a perfect illustration of the product-race rule (\S\ref{sec:exchange}): a qubit drop is
+only real on the score once enough Toffoli is recovered to pay for it.
+
 \subsection{Lazy Carry Liveness}
+\label{sec:lazycarry}
 
 A specific instance of live-range shortening for carry-in qubits. The carry-in qubit was being
 allocated before a chunk loop and held live across all $N$ iterations, even though it was only
@@ -1058,6 +1087,7 @@ For $977$: 4 terms instead of 6, saving $\approx33\%$ of the Solinas fold cost.
 for all inputs.
 
 \subsection{Structural Dead Gate Skipping}
+\label{sec:deadccx}
 
 Some CCX gates provably never fire because their control condition is structurally always zero.
 
@@ -1074,6 +1104,17 @@ Some CCX gates provably never fire because their control condition is structural
     \texttt{TLM\_FFG\_SKIP\_STRUCTURAL\_DEAD\_*},
     \texttt{TLM\_COMPARE\_SKIP\_STRUCTURAL\_DEAD\_*}, etc. Density-neutral.
 \end{enumerate}
+
+\textbf{Iterated (two-pass) dead-CCX} (\texttt{DROP\_DEAD\_ROBUST\_SECOND}, the empirical flavor ---
+this is what carried the 1153 SOTA over the line before the structural pivot): dead-CCX deletion is
+\textbf{iterable}. Drop a first list, then \textbf{re-screen the already-dropped op stream} --- the
+first drop reshapes the stream, so a second screen finds gates that are newly (or only now
+detectably) dead. Drop a second, smaller list and re-hunt the nonce with \emph{both} drops on. Each
+pass is subset-monotone and the returns diminish, but they are real (the second pass was worth
+$\sim$$-2{,}411$ avgT at 1153q). This is a distribution-exact / island-overfit lever
+(\S\ref{sec:density}): the indices are absolute positions in one exact op stream, so any structural
+change invalidates them and forces a full re-screen. Reusable mainly for squeezing a frozen final
+artifact; the durable wins are the \emph{structural} levers above.
 
 \subsection{Classical Constant Folding}
 
@@ -1174,6 +1215,35 @@ and eliminates:
 
 Setting \texttt{CONSTPROP\_MAX\_ITERS=256} (vs default 16) runs to a deeper fixpoint, finding
 more opportunities: $-377$k Toffoli in one version.
+
+\subsection{Quadratic-Cascade $\to$ Controlled-Increment (cinc)}
+\label{sec:cinc}
+
+\textbf{Replace an $O(t^2)$ gadget with an $O(t)$ one when the math allows.} A recurring pattern is
+a ``carry-into-tail'' or prefix-propagation built as a \textbf{quadratic cascade of
+multi-controlled-X gates} (\lstinline{mcx_clean_k} over a window $[nv, L)$ --- every position
+controls on all positions below it, giving $O(t^2)$ MCX work).
+
+When the cascade is computing a \emph{carry propagation} (the standard ``increment if all low bits
+are 1'' pattern), it is exactly a \textbf{controlled increment}, and there is a cheaper exact
+primitive for that: the \textbf{Khattar--Gidney controlled-increment} \texttt{cinc}
+(arXiv:2407.17966), which uses only $\log^* n$ clean ancilla and $O(n)$ Toffoli instead of the
+quadratic cascade.
+
+\begin{lstlisting}
+Old: clean-tail fold carry = mcx_clean_k prefix cascade over [nv, L)   -> O(t^2) MCX
+New: clean-tail fold carry = cinc_khattar_gidney (one controlled +1)   -> O(t), log*-ancilla
+\end{lstlisting}
+
+\textbf{Value-exact and density-neutral}: an exact functional replacement (same truth table), so it
+does not touch the island distribution --- it can be stacked freely without re-hunting a nonce.
+Named \texttt{TLM\_FOLD\_TAIL\_CINC}; worth $\sim$$-5{,}175$ avgT alone. This is the \textbf{``safe''
+Toffoli lever class}: unlike dead-CCX deletion (\S\ref{sec:deadccx}, distribution-exact), a cinc swap
+is correct on all inputs --- prefer this class when choosing what to stack first.
+
+The general principle: \textbf{whenever a gadget's cost is quadratic in a window width, ask whether
+it is secretly a standard primitive (increment, compare, prefix-AND) with a known linear
+construction.}
 
 % ===========================================================================
 \section{The Qubit $\leftrightarrow$ Toffoli Exchange Rate}
@@ -1415,6 +1485,8 @@ At the SOTA (\texttt{d44cad3}):
 Toffoli: $-22.4$M & Karatsuba square (\S8.F) & 3 sub-squares instead of 4 \\
 Toffoli: $-1.33$M & GAP\_J2 narrowing (\S8.K) & 22-line per-step comparator table edit \\
 Toffoli: $-377$k & Constprop deeper (\S8.P) & \texttt{CONSTPROP\_MAX\_ITERS} $16\to256$ \\
+1163$\to$1159$\to$1156 & Headroom clamp returns (\S6.J + shelved-lever \S\ref{sec:exchange}) & Same clamp that lost early now wins on the cheap Karatsuba$+$dead-CCX base ($\sim$527 T/qubit) \\
+1156$\to$1153 & Clamp $+$ zero-cin fold $+$ FFG cap (\S6.J), paid by cinc (\S\ref{sec:cinc}) $+$ iterated dead-CCX (\S\ref{sec:deadccx}) & Qubit drop alone cost $+11{,}369$ avgT (rejected); Toffoli levers stacked back to win \\
 \textbf{1153$\to$1152} & Free-and-recompute cy0 (\S6.E) & \texttt{cy0 = ctrl \& !a0}; loan lane for 40 binding folds \\
 Structural & 6dafa07 pivot (\S8.H/\S\ref{sec:density}) & Replaced empirical dead-CCX with $\approx15$ structural predicates \\
 \bottomrule
@@ -1564,6 +1636,8 @@ Exact-adder recovery (\S8.M) & $\approx2{,}600$/call & 0 & Yes \\
 Redundant cleanup skip (\S8.N) & varies & 0 & Risky \\
 Off-peak loosening (\S8.O) & free refund & 0 & Yes \\
 Constprop deeper (\S8.P) & $\approx377$k & 0 & Yes \\
+Cinc cascade replacement (\S8.Q) & $\approx5{,}175$ ($O(t^2)\to O(t)$) & 0 & Yes \\
+Iterated 2-pass dead-CCX (\S8.H) & $\approx2{,}400$/extra pass & 0 & No \\
 \bottomrule
 \end{tabular}
 \end{center}
