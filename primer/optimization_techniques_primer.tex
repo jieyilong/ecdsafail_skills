@@ -345,6 +345,55 @@ or equivalent, which takes $\approx530$ steps of binary GCD (divstep) operations
 \end{itemize}
 This accounts for roughly 90\% of the circuit's \tof count.
 
+\subsection{How an in-place modular inverse actually works: the dialog transcript}
+\label{sec:dialog}
+
+A classical EEA tracks two ``B\'ezout coefficient'' registers alongside the operands to build the
+inverse. Doing that reversibly would carry several extra 256-bit registers through all $\sim$530
+steps --- very expensive in qubits. The trick that makes the circuit affordable (Schrottenloher
+Algs 2--4, descended from the Khattar--Gidney ``Dialog'') is to \textbf{split the algorithm into a
+cheap construction pass and a cheap reconstruction pass that share a small recorded tape}:
+\begin{itemize}
+  \item \textbf{Pass 1 --- GCD construction (records the tape).} Drive the binary-GCD pair $(u, v)$
+    from $(p, dx)$ toward $(1, 0)$. The only data-dependent information at each step is the small
+    \textbf{decision symbol} (subtracted?, swapped?, shift) --- a few bits. Record those onto a
+    \textbf{transcript tape}. This pass uses \emph{non-modular} arithmetic with $\sim$n free ancilla,
+    so it is cheap. It \emph{consumes} $dx$ into the tape.
+  \item \textbf{Pass 2 --- B\'ezout reconstruction (replays the tape).} Read the tape \textbf{in
+    reverse}, maintaining one \emph{modular} pair $(r, s)$ and applying only linear updates
+    \textbf{controlled solely by the recorded bits}: $s = 2s \bmod p$; if subtracted: $s \mathrel{+}= r$;
+    if swapped: $\mathrm{swap}(r,s)$. No comparisons, no operand-dependent branching --- just replay.
+\end{itemize}
+
+\textbf{The elegant part (why no explicit inverse is ever built).} Because the replay updates are
+\emph{linear}, the seed you feed into pass 2 comes straight out. Seeding $(r, s) = (1, 0)$
+reconstructs $dx^{-1}$; seeding $(r, s) = (y, 0)$ instead yields $(0,\; y\cdot dx^{-1} \bmod p)$
+\textbf{directly} --- the inversion \emph{and} the multiply-by-$y$ happen together, with the inverse
+never materialized as its own register. And reading the tape \textbf{forward vs reversed flips
+between $y\cdot dx$ and $y\cdot dx^{-1}$} --- the same machinery is a modular multiply or a modular
+divide by replay direction. This is how the SOTA does both EC slope steps with \textbf{one inversion
+engine and one tape} (\S\ref{sec:trailmix}).
+
+\textbf{Where the peak lives --- and the one knob that sets the Pareto split.} The qubit peak is
+\emph{not} during construction (operands shrink, freeing room for the tape); it is during
+\textbf{reconstruction}, where the compressed transcript ($\sim$2.355n) and the two n-bit modular
+registers $r, s$ co-reside:
+\[
+  \text{peak} \approx \text{compressed transcript} + 2\,\text{modular registers} + O(\sqrt{n})
+  \approx 4.355n.
+\]
+So \emph{both} score factors are set by the reconstruction step --- that is where transcript
+compression (\S6.8) and the vented adders (\S8.1) are aimed. And one clean knob sits behind the whole
+(Q, T) Pareto curve: spending \textbf{n extra ancilla during reconstruction} lets you use a cheap
+Gidney adder (2n Toffoli) instead of a CDKM adder (3n) --- that single choice \emph{is} the
+space-optimized-vs-gate-optimized split in both Babbush and Schrottenloher.
+
+\textbf{Jump-GCD (fewer steps).} A plain binary GCD does one reduction per trailing-zero bit. A
+\textbf{jump (Stein-style) divstep} strips up to \texttt{jump=2} trailing zeros at once, so the
+algorithm finishes in fewer steps --- directly fewer adder/comparator firings, hence fewer Toffoli.
+The cost is a slightly larger symbol alphabet to record (5 symbols instead of 3), which the codec
+absorbs. The SOTA runs \texttt{jump=2} (258 steps).
+
 \subsection{The key design choice: Q is classical}
 
 The second point $Q$ is a \textbf{fixed constant} (the secp256k1 generator point, known at circuit
@@ -974,6 +1023,13 @@ ccx(psi, c2, target)
     The two extra gates restore $\psi$ perfectly. Cost: 4 Toffoli instead of 3 --- a textbook
     \textbf{$-1$ qubit, $+1$ Toffoli} trade (great when the objective does not score Toffoli).
 \end{itemize}
+
+The principled, scaled-up form of dirty hosting is \textbf{conditionally-clean ancillae}
+(Khattar--Gidney 2024, ``Laddered Toggle Detection''): a method to borrow dirty bits \emph{as if
+they were clean}, with no allocation and no separate toggle-detection pass. It is what lets a
+multi-controlled-X run in $\sim$3n Toffoli with only $\log^* n$ truly-clean ancilla, and it underlies
+the cheap MCX/\texttt{cinc} primitives (\S\ref{sec:cinc}). When you need a lot of scratch and have
+only dirty lanes, this is the formal tool.
 
 \textbf{It is a compile-time bet, not a runtime scan.} A quantum circuit is static --- you cannot
 peek at a qubit mid-run to check ``is this $|0\rangle$?'' (measuring would collapse it). So nothing
@@ -1925,6 +1981,15 @@ compaction} (\S\ref{sec:compact}). Full analysis:
   \item \textbf{Apply-swap involutory pair cancellation}: The forward GCD-swap and the immediately
     following GCD-cswap on the same $(u/v)$ lanes may cancel algebraically (swap twice $=$ identity).
     Not yet checked structurally.
+
+  \item \textbf{Windowed arithmetic / QROM lookup} (Gidney 2019, arXiv:1905.07682) --- \emph{the
+    biggest untried structural lever.} A multiply-by-a-quantum-value normally does $2^w$ controlled
+    add-shifts. The windowed trick reads a \textbf{$w$-bit window} of the multiplier and uses it to
+    \textbf{address a QROM table lookup} that adds the precomputed partial product in one shot ---
+    turning $2^w$ controlled adds into one table read. The B\'ezout-reconstruction multiplies
+    (\S\ref{sec:dialog}) are $\sim$90\% of the Toffoli, so a windowed/QROM form there is the largest
+    single cut on the board. Open question: whether the value-dependent reconstruction multiply can
+    be windowed the way the fixed-base $k\cdot G$ scalar mult already is.
 \end{enumerate}
 
 \subsection{Density-neutral qubit cuts not yet applied}
@@ -2027,6 +2092,8 @@ secp256k1 \emph{single point-add} (the challenge unit) & Babbush space-opt, via 
 Karatsuba algorithm & Karatsuba \& Ofman 1962 & $O(n^{1.585})$ vs $O(n^2)$ for multiplication \\
 EEA register sharing (origin) & Proos \& Zalka 2003 (arXiv:quant-ph/0301141) & Inversion dominates point-add space; operand$+$cofactor packing \\
 Compact exact reversible inversion & Luo et al.\ 2026 (arXiv:2604.02311) & $3n + 4\lfloor\log_2 n\rfloor$ qubits (1333q, $n{=}256$) via bit-length-tracked sharing \\
+DQI ``Dialog'' in-place EEA multiply (\S\ref{sec:dialog}) & Khattar, Shutty \& Gidney 2025 (arXiv:2510.10967) & construct/reconstruct split; $(y,0)$ seeding fuses inverse$+$multiply, no explicit inverse \\
+Windowed arithmetic / QROM (\S\ref{sec:frontiers}) & Gidney 2019 (arXiv:1905.07682) & $2^w$ controlled adds $\to$ one $w$-bit-window table lookup \\
 \bottomrule
 \end{tabular}
 \end{center}

@@ -186,6 +186,53 @@ equivalent, which takes ~530 steps of binary GCD (divstep) operations. Each step
 
 This accounts for roughly 90% of the circuit's Toffoli count.
 
+### How an in-place modular inverse actually works: the dialog transcript
+
+A classical EEA tracks two "Bézout coefficient" registers alongside the operands to build the
+inverse. Doing that reversibly would carry several extra 256-bit registers through all ~530 steps —
+very expensive in qubits. The trick that makes the circuit affordable (Schrottenloher Algs 2–4,
+descended from the Khattar–Gidney "Dialog") is to **split the algorithm into a cheap construction
+pass and a cheap reconstruction pass that share a small recorded tape**:
+
+- **Pass 1 — GCD construction (records the tape).** Drive the binary-GCD pair `(u, v)` from
+  `(p, dx)` toward `(1, 0)`. At each step, the only data-dependent information is the small
+  **decision symbol** `(subtracted?, swapped?, shift)` — a few bits. Record those bits onto a
+  **transcript tape** and throw away nothing else. This pass uses *non-modular* arithmetic and has
+  ~n free ancilla, so it is cheap. It *consumes* `dx` into the tape.
+- **Pass 2 — Bézout reconstruction (replays the tape).** Read the tape **in reverse**, maintaining
+  one *modular* pair `(r, s)` and applying, at each step, only linear updates **controlled solely by
+  the recorded bits**: `s = 2s mod p; if subtracted: s += r; if swapped: swap(r, s)`. No
+  comparisons, no operand-dependent branching — just replay.
+
+**The elegant part (why no explicit inverse is ever built).** Because the replay updates are
+*linear*, the seed you feed into pass 2 comes straight out. Seeding `(r, s) = (1, 0)` reconstructs
+`dx⁻¹`. But seeding `(r, s) = (y, 0)` instead yields `(0, y · dx⁻¹ mod p)` **directly** — the
+inversion *and* the multiply-by-`y` happen together, with the inverse never materialized as its own
+register. And reading the tape **forward vs reversed flips between `y·dx` and `y·dx⁻¹`** — the same
+machinery does a modular multiply or a modular divide just by replay direction. This is exactly how
+the SOTA does both EC slope steps (`λ = dy·dx⁻¹` and later `λ·(…)`) with **one inversion engine and
+one tape** (§12).
+
+**Where the peak lives — and the one knob that sets the Pareto split.** The qubit peak is *not*
+during construction (operands shrink, freeing room for the tape); it is during **reconstruction**,
+where the compressed transcript (~2.355n) and the two n-bit modular registers `r, s` co-reside:
+
+```
+peak ≈ compressed_transcript + 2 modular registers + O(√n) ≈ 4.355n
+```
+
+So *both* score factors are set by the reconstruction step — that is where every later technique
+(transcript compression §6.8, vented adders §8.1) is aimed. And there is a single clean knob behind
+the whole (Q, T) Pareto curve: spending **n extra ancilla during reconstruction** lets you use a
+cheap Gidney adder (2n Toffoli) instead of a CDKM adder (3n) — that one choice *is* the
+space-optimized-vs-gate-optimized split in both Babbush and Schrottenloher.
+
+**Jump-GCD (fewer steps).** A plain binary GCD does one reduction per trailing-zero bit. A
+**jump (Stein-style) divstep** strips up to `jump=2` trailing zeros at once, so the algorithm
+finishes in fewer steps — directly fewer adder/comparator firings, hence fewer Toffoli. The cost is
+a slightly larger symbol alphabet to record (5 symbols instead of 3), which the codec absorbs. The
+SOTA runs `jump=2` (258 steps).
+
 ### The key design choice: Q is classical
 
 The second point `Q` is a **fixed constant** (the secp256k1 generator point, known at circuit
@@ -829,6 +876,12 @@ desk, the peak never rose.
   ```
   The two extra gates restore `ψ` perfectly. Cost: 4 Toffoli instead of 3 — a textbook
   **−1 qubit, +1 Toffoli** trade (great when the objective does not score Toffoli).
+
+The principled, scaled-up form of dirty hosting is **conditionally-clean ancillae** (Khattar–Gidney
+2024, "Laddered Toggle Detection"): a method to borrow dirty bits *as if they were clean*, with no
+allocation and no separate toggle-detection pass. It is what lets a multi-controlled-X run in `~3n`
+Toffoli with only `log* n` truly-clean ancilla, and it underlies the cheap MCX/`cinc` primitives
+(§8.17). When you need a lot of scratch and have only dirty lanes, this is the formal tool.
 
 **It is a compile-time bet, not a runtime scan.** A quantum circuit is static — you cannot peek at a
 qubit mid-run to check "is this `|0⟩`?" (measuring would collapse it). So nothing searches for zeros
@@ -1825,6 +1878,15 @@ compaction** (§6.17). Full analysis: [`pareto-frontier-push-1153-to-1133.md`](r
    GCD-cswap on the same (u/v) lanes may cancel algebraically (swap twice = identity). Not yet
    checked structurally.
 
+5. **Windowed arithmetic / QROM lookup** (Gidney 2019, arXiv:1905.07682) — *the biggest untried
+   structural lever.* A multiply-by-a-quantum-value normally does `2^w` controlled add-shifts. The
+   windowed trick reads a **`w`-bit window** of the multiplier and uses it to **address a QROM table
+   lookup** that adds the precomputed partial product in one shot — turning `2^w` controlled adds
+   into one table read. The Bézout-reconstruction multiplies (§3) are ~90% of the Toffoli, so if
+   they admit a windowed/QROM form it is the largest single cut on the board. Open question: whether
+   the in-circuit, *value-dependent* reconstruction multiply can be windowed the way the
+   fixed-base `k·G` scalar mult already is.
+
 ### Density-neutral qubit cuts not yet applied
 
 1. **The co-bind plateau at 1152q**: Multiple independent phases all tie at 1152q. Each needs a
@@ -1905,6 +1967,8 @@ compaction** (§6.17). Full analysis: [`pareto-frontier-push-1153-to-1133.md`](r
 | Karatsuba algorithm | Karatsuba & Ofman 1962 | O(n^1.585) vs O(n²) for multiplication |
 | EEA register sharing (origin) | Proos & Zalka 2003 (arXiv:quant-ph/0301141) | Inversion dominates point-add space; operand+cofactor packing |
 | Compact exact reversible inversion | Luo et al. 2026 (arXiv:2604.02311) | 3n + 4⌊log₂n⌋ qubits (1333q, n=256) via bit-length-tracked register sharing |
+| DQI "Dialog" in-place EEA multiply (§3) | Khattar, Shutty & Gidney 2025 (arXiv:2510.10967) | construct/reconstruct split; (y,0) seeding fuses inverse+multiply, no explicit inverse |
+| Windowed arithmetic / QROM (§14) | Gidney 2019 (arXiv:1905.07682) | 2^w controlled adds → one w-bit-window table lookup |
 
 ---
 
