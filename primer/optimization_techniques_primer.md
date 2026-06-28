@@ -8,6 +8,43 @@
 
 ---
 
+## Introduction: What Is the ecdsa.fail Challenge?
+
+Elliptic-curve cryptography (ECC) secures essentially all of today's digital signatures — including
+the keys that control Bitcoin and Ethereum funds. A large enough quantum computer would break it:
+**Shor's algorithm** can recover a private key from a public key by solving the elliptic-curve
+discrete logarithm problem in time polynomial in the key size. The overwhelming majority of that
+quantum computation is spent running **one tiny primitive over and over** — *elliptic-curve point
+addition* on the curve `secp256k1` (Bitcoin's curve). Make that inner circuit cheaper and the entire
+attack gets cheaper. [**ecdsa.fail**](https://github.com/ecdsafail/ecdsafail-challenge) is an open,
+collaborative competition to build the **leanest possible reversible quantum circuit for that single
+point addition** — a public, reproducible race to map exactly how expensive (or cheap) breaking ECC
+really is.
+
+A submission is a circuit that computes one in-place affine point addition `P += Q` on secp256k1,
+and it is scored by its **spacetime cost: `peak_qubits × average_executed_Toffoli`** (lower is
+better) — the two resources that dominate cost on a fault-tolerant quantum computer (§1). Every
+submission must be *exactly correct and physically valid*: it is checked against 9,024 random test
+cases for classical-value correctness, for reversibility (all scratch qubits returned to `|0⟩`), and
+for phase cleanliness, and contributors may only edit the point-addition circuit itself — the
+evaluation harness, validator, and toolchain are locked. The headline goalpost is **Google Quantum
+AI's published resource estimate** for the same task (≈1,425 qubits × ≈2.1M Toffoli ≈ 2.99 × 10⁹
+qubit-Toffoli, March 2026). The challenge's starting baseline scored ~1.07 × 10¹⁰; as of late June
+2026 the community-driven state of the art sits near **1,152 qubits × ~1.36M Toffoli ≈ 1.57 × 10⁹**
+— roughly **47% below** Google's number, with the bar still dropping.
+
+What makes the effort unusual is *how* the records are won. Participants — ranging from academic
+researchers to programmers with no quantum-computing background — increasingly drive the work with
+**AI agent pipelines**: the circuit harness is fed directly into large-language-model loops that
+propose, test, and validate optimizations around the clock, preserving their findings as versioned
+research notes. The result is a fast-moving catalogue of genuinely clever, circuit-level tricks for
+shaving qubits and Toffoli gates. **This primer is a guided tour of those techniques**, explained
+from quantum-circuit first principles for a reader who has just learned the basics — covering all
+three of the challenge's objectives (minimize the spacetime product, minimize qubits alone, and map
+the clean (qubit, Toffoli) Pareto frontier; see §1).
+
+---
+
 ## Table of Contents
 
 1. [What We Are Optimizing — The Score and Why Toffoli Gates Are Expensive](#1-what-we-are-optimizing--the-score-and-why-toffoli-gates-are-expensive)

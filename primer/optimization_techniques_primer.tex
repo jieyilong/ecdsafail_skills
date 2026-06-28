@@ -161,6 +161,46 @@ from circuit-level first principles, with concrete examples from actual research
 {\small As of 2026-06-27\par}
 \end{titlepage}
 
+\section*{Introduction: What Is the ecdsa.fail Challenge?}
+\addcontentsline{toc}{section}{Introduction: What Is the ecdsa.fail Challenge?}
+
+Elliptic-curve cryptography (ECC) secures essentially all of today's digital signatures --- including
+the keys that control Bitcoin and Ethereum funds. A large enough quantum computer would break it:
+\textbf{Shor's algorithm} can recover a private key from a public key by solving the elliptic-curve
+discrete logarithm problem in time polynomial in the key size. The overwhelming majority of that
+quantum computation is spent running \textbf{one tiny primitive over and over} --- \emph{elliptic-curve
+point addition} on the curve \texttt{secp256k1} (Bitcoin's curve). Make that inner circuit cheaper
+and the entire attack gets cheaper.
+\href{https://github.com/ecdsafail/ecdsafail-challenge}{\textbf{ecdsa.fail}} is an open, collaborative
+competition to build the \textbf{leanest possible reversible quantum circuit for that single point
+addition} --- a public, reproducible race to map exactly how expensive (or cheap) breaking ECC really
+is.
+
+A submission is a circuit that computes one in-place affine point addition $P \mathrel{+}= Q$ on
+secp256k1, and it is scored by its \textbf{spacetime cost: $\texttt{peak\_qubits} \times
+\texttt{average\_executed\_Toffoli}$} (lower is better) --- the two resources that dominate cost on a
+fault-tolerant quantum computer (\S\ref{sec:score}). Every submission must be \emph{exactly correct
+and physically valid}: it is checked against 9{,}024 random test cases for classical-value
+correctness, for reversibility (all scratch qubits returned to $|0\rangle$), and for phase
+cleanliness, and contributors may only edit the point-addition circuit itself --- the evaluation
+harness, validator, and toolchain are locked. The headline goalpost is \textbf{Google Quantum AI's
+published resource estimate} for the same task ($\approx$1{,}425 qubits $\times$ $\approx$2.1M Toffoli
+$\approx 2.99 \times 10^{9}$ qubit-Toffoli, March 2026). The challenge's starting baseline scored
+$\sim$$1.07 \times 10^{10}$; as of late June 2026 the community-driven state of the art sits near
+\textbf{1{,}152 qubits $\times$ $\sim$1.36M Toffoli $\approx 1.57 \times 10^{9}$} --- roughly
+\textbf{47\% below} Google's number, with the bar still dropping.
+
+What makes the effort unusual is \emph{how} the records are won. Participants --- ranging from
+academic researchers to programmers with no quantum-computing background --- increasingly drive the
+work with \textbf{AI agent pipelines}: the circuit harness is fed directly into large-language-model
+loops that propose, test, and validate optimizations around the clock, preserving their findings as
+versioned research notes. The result is a fast-moving catalogue of genuinely clever, circuit-level
+tricks for shaving qubits and Toffoli gates. \textbf{This primer is a guided tour of those
+techniques}, explained from quantum-circuit first principles for a reader who has just learned the
+basics --- covering all three of the challenge's objectives (minimize the spacetime product, minimize
+qubits alone, and map the clean (qubit, Toffoli) Pareto frontier; see \S\ref{sec:score}).
+
+\newpage
 \tableofcontents
 \newpage
 
