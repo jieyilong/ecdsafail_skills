@@ -473,7 +473,7 @@ whole reason this challenge is approachable is that $p$ is a \textbf{pseudo-Mers
     emphasizes that \textbf{$c$ is small}, which keeps the $H\cdot c$ multiply cheap.
   \item \textbf{Solinas prime} (a.k.a.\ \emph{generalized Mersenne}, Jerome Solinas, 1999) --- $c$ is
     not just small but a \textbf{sparse signed sum of a few powers of two}. For secp256k1,
-    $c = 2^{32} + 977 = 2^{32} + 2^{10} - 2^{5} - 2^{4} + 1$ (see NAF, \S9.7) --- only $\sim$5 signed
+    $c = 2^{32} + 977 = 2^{32} + 2^{10} - 2^{6} + 2^{4} + 1$ (see NAF, \S9.7) --- only $\sim$5 signed
     terms. \emph{Solinas} emphasizes that \textbf{$c$ is sparse}, so the $H\cdot c$ ``multiply'' is
     really a handful of \emph{shifted adds/subtracts}, not a general multiplication.
 \end{itemize}
@@ -1506,17 +1506,46 @@ is binding decides which square you want.
 
 \subsection{NAF Recoding of Constants}
 
-\textbf{Non-Adjacent Form (NAF)} uses signed digits $\{-1, 0, +1\}$ to represent constants with
-fewer non-zero digits:
+\textbf{Why the digit count of a constant matters.} A Solinas fold (\S\ref{sec:pmarith}) reduces the
+high part $H$ of a wide value by adding $H \cdot c$ back into the low bits, where $c = 2^{32} + 977$.
+Because $c$ is a \emph{sum of powers of two}, you never run a general multiplier --- $H \cdot c$ is
+just \textbf{one shifted addition of $H$ per non-zero bit of $c$}. So the number of modular adds per
+fold \emph{equals the number of non-zero digits of $c$}. Fewer digits $\Rightarrow$ fewer adds
+$\Rightarrow$ fewer Toffoli, directly.
+
+\textbf{Standard binary is wasteful when a constant has a run of 1-bits.} Write 977 in binary:
 \[
-  977 = 2^{10} - 2^{5} - 2^{4} + 1 \quad \text{(4 signed terms vs 6 binary terms)}
+  977 = 1111010001_2 = 2^9 + 2^8 + 2^7 + 2^6 + 2^4 + 2^0 \quad\text{(six 1-bits $\to$ six shifted adds)}.
 \]
+The four \emph{consecutive} 1-bits at positions 6--9 are the waste: each costs a separate add.
 
-In NAF, no two adjacent digits are both non-zero, and the number of non-zero digits is minimal.
-For $977$: 4 terms instead of 6, saving $\approx33\%$ of the Solinas fold cost.
+\textbf{Non-Adjacent Form (NAF)} allows each digit to be \textbf{signed} ($-1$, $0$, or $+1$ instead
+of just $0/1$) and picks the representation with the \emph{fewest} non-zero digits (and, as the name
+says, never two non-zero digits adjacent). The trick it exploits: a \textbf{run of 1-bits collapses
+into a single subtraction}, using $1 + 2 + 4 + \dots + 2^{k-1} = 2^k - 1$ shifted up:
+\[
+  2^6 + 2^7 + 2^8 + 2^9 = 2^{10} - 2^6 \quad\text{(four terms become two)}.
+\]
+Applying that to the run inside 977:
+\[
+  \mathrm{NAF}(977) = 2^{10} - 2^6 + 2^4 + 2^0 \quad\text{(four signed terms: } +,\,-,\,+,\,+\text{)}
+\]
+(check: $1024 - 64 + 16 + 1 = 977$). The $-2^6$ digit means \emph{that} fold step is a \textbf{shifted
+subtraction} instead of an addition --- and in a reversible circuit a controlled modular subtract
+costs exactly the same as a controlled add (it is the adder run backwards), so a signed digit is as
+cheap as a binary one.
 
-\textbf{Density-neutral}: The identity $977 = 1024 - 32 - 16 + 1$ is a mathematical fact, correct
-for all inputs.
+\textbf{The payoff.} 6 non-zero digits $\to$ 4: \textbf{four shifted add/subtracts per fold instead of
+six, $\approx33\%$ off the 977 part of every Solinas reduction.} That reduction runs on essentially
+every modular multiply/square across all $\sim$530 GCD steps, so the saving compounds. The same
+recoding is applied to the full $c = 2^{32} + 977$ and to the $2^{32}$ term of the pseudo-Mersenne
+fold (\S\ref{sec:pmarith}).
+
+\textbf{Density-neutral (\S\ref{sec:density})}: $2^{10} - 2^6 + 2^4 + 1 = 977$ is a mathematical
+identity, correct for all inputs, so it stacks freely with no nonce hunt. (Any minimal-weight signed
+recoding works; the codebase sometimes writes an equivalent 4-term form like $2^{10} - 2^5 - 2^4 + 1$
+--- note that one is not \emph{strictly} NAF, since $2^5$ and $2^4$ are adjacent, but it has the same
+4-vs-6 digit count and the same cost.)
 
 \subsection{Dead-CCX Elimination (Empirical Drop vs Structural Skip)}
 \label{sec:deadccx}

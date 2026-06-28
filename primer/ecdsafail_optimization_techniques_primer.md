@@ -307,8 +307,8 @@ p = 2^256 − c,   where   c = 2^32 + 977   (only 33 bits wide)
   fold is "high bits **× c**, then add." The word *pseudo-Mersenne* emphasizes that **`c` is small**,
   which is what keeps the `H·c` multiply cheap.
 - **Solinas prime** (a.k.a. *generalized Mersenne*, Jerome Solinas, 1999) — `c` is not just small but
-  a **sparse signed sum of a few powers of two**. For secp256k1, `c = 2^32 + 977 = 2^32 + 2^10 − 2^5
-  − 2^4 + 1` (see NAF, §9.7) — only ~5 signed terms. The word *Solinas* emphasizes that **`c` is
+  a **sparse signed sum of a few powers of two**. For secp256k1, `c = 2^32 + 977 = 2^32 + 2^10 − 2^6
+  + 2^4 + 1` (see NAF, §9.7) — only ~5 signed terms. The word *Solinas* emphasizes that **`c` is
   sparse**, so the `H·c` "multiply" is really just a handful of *shifted adds/subtracts*, not a
   general multiplication.
 
@@ -1386,22 +1386,44 @@ which axis is binding here decides which square you want.
 
 ### 9.7 NAF Recoding of Constants
 
-**The problem**: The secp256k1 constant `977 = 1111010001₂` has 6 set bits. Each Solinas
-reduction fold involving `977` requires 6 modular additions.
+**Why the digit count of a constant matters.** A Solinas fold (§9.18) reduces the high part `H` of a
+wide value by adding `H · c` back into the low bits, where `c = 2^32 + 977`. Because `c` is a *sum of
+powers of two*, you never run a general multiplier — `H · c` is just **one shifted addition of `H` per
+non-zero bit of `c`**. So the number of modular adds per fold *equals the number of non-zero digits of
+`c`*. Fewer digits ⇒ fewer adds ⇒ fewer Toffoli, directly.
 
-**NAF (Non-Adjacent Form)** uses signed digits `{−1, 0, +1}`:
+**Standard binary is wasteful when a constant has a run of 1-bits.** Write 977 in binary:
 ```
-977 = 2^10 − 2^5 − 2^4 + 1   (4 signed terms vs 6 unsigned)
+977 = 1111010001₂ = 2^9 + 2^8 + 2^7 + 2^6 + 2^4 + 2^0      ← six 1-bits → six shifted adds
 ```
+The four *consecutive* 1-bits at positions 6–9 are the waste: each one costs a separate add.
 
-In NAF, no two adjacent digits are both non-zero, and the number of non-zero digits is minimal.
-For `977`: 4 terms instead of 6, saving ~33% of the Solinas fold cost.
+**NAF (Non-Adjacent Form)** allows each digit to be **signed** — −1, 0, or +1 instead of just 0/1 —
+and picks the representation with the *fewest* non-zero digits (and, as the name says, never two
+non-zero digits adjacent). The trick it exploits: a **run of 1-bits collapses into a single
+subtraction**, using the schoolboy fact `1 + 2 + 4 + … + 2^(k−1) = 2^k − 1` shifted up:
+```
+2^6 + 2^7 + 2^8 + 2^9  =  2^10 − 2^6      ← four terms become two
+```
+Applying that to the run inside 977:
+```
+NAF(977) = 2^10 − 2^6 + 2^4 + 2^0          ← four signed terms:  +, −, +, +
+```
+(Check: 1024 − 64 + 16 + 1 = 977.) The `−2^6` digit simply means *that* fold step is a **shifted
+subtraction** instead of an addition — and in a reversible circuit a controlled modular subtract costs
+exactly the same as a controlled add (it is the adder run backwards). So a signed digit is as cheap as
+a binary one.
 
-**Density-neutral**: The identity `977 = 1024 − 32 − 16 + 1` is a mathematical fact, correct
-for all inputs.
+**The payoff.** 6 non-zero digits → 4: **four shifted add/subtracts per fold instead of six, ~33% off
+the 977 part of every Solinas reduction.** That reduction runs on essentially every modular
+multiply/square across all ~530 GCD steps, so the saving compounds. The same recoding is applied to
+the full `c = 2^32 + 977` and to the `2^32` term of the pseudo-Mersenne fold (§9.18).
 
-Also applied to `c = 2^32 + 977` (the secp256k1 pseudo-Mersenne fold constant — see §9.18),
-saving terms in every modular reduction fold.
+**Density-neutral (§11)**: `2^10 − 2^6 + 2^4 + 1 = 977` is a mathematical identity, correct for all
+inputs, so it stacks freely with no nonce hunt. (Any minimal-weight signed recoding works; the
+codebase sometimes writes an equivalent 4-term form like `2^10 − 2^5 − 2^4 + 1` — note that one isn't
+*strictly* NAF, since `2^5` and `2^4` are adjacent, but it has the same 4-vs-6 digit count and the same
+cost.)
 
 ---
 
