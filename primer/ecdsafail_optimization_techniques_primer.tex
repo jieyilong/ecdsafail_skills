@@ -2093,43 +2093,70 @@ The score track has three clearly distinct eras, each defined by its \textbf{inv
 Kaliski pre-history, the dialog-GCD frontier (which stalled at a 1168q wall for days), and the
 \emph{ludicrous} breakthrough that broke it and drove to today's SOTA.
 
-\subsubsection{Era 1 --- Pre-history: 2715q $\to$ 1698q (the Roetteler/Kaliski era)}
+\subsubsection{Era 1 --- Pre-history: 2715q $\to$ 2002q (the Roetteler/Kaliski era)}
 
-The challenge \emph{started} at a baseline of \textbf{2{,}715 qubits $\times$ $\sim$3.96M Toffoli}: a
+The challenge \emph{started} at \textbf{2{,}715 qubits $\times$ $\sim$3.96M Toffoli}: a
 \textbf{Roetteler-style two-Kaliski affine} point addition --- affine coordinates (not projective),
-the modular inverse done by \emph{two} runs of the Kaliski binary-GCD algorithm, direct/Solinas
-reduction (no Montgomery), with the prime and $Q$ known as compile-time constants. The inverse was
-$\sim$80--90\% of the Toffoli (the bottleneck \S\ref{sec:circuit} names), treated as algorithmically
-fixed --- so the early drops were \emph{all} live-range and hosting tricks, the same methods in this
-primer in cruder form:
+the modular inverse done by \emph{two} runs of the \textbf{Kaliski binary-GCD} algorithm,
+direct/Solinas reduction (no Montgomery), with the prime and $Q$ known as compile-time constants. The
+inverse was $\sim$80--90\% of the Toffoli (the bottleneck \S\ref{sec:circuit} names), treated as
+\textbf{algorithmically fixed} --- so for this whole era the gains came not from a better inverse but
+from packing scratch ever tighter around it. These are the same techniques in this primer, in their
+first and cruder form.
 
+\smallskip\noindent\textbf{Early Toffoli wins (still at 2708q):}
 \begin{itemize}
-  \item \textbf{2708 $\to$ $\sim$2002 (scratch-packing on a fixed inverse):} the
-    $\texttt{cswap}(p\oplus q)$ swap-merge (\S\ref{sec:cswapmerge}, $-274$k Toffoli), borrowing
-    \textbf{provably-\ket{0} high bits} of the shrinking GCD register as carry scratch (gate-hosting
-    \S\ref{sec:gatehost} in its first form, reaching the published ``$9n$'' peak floor),
-    square-recompute eviction (\S\ref{sec:liverange}), and \textbf{joint-pin plateau breaking}
-    (\S7.9) --- the realization, present from the very start, that a peak co-owned by several scratch
-    clusters drops only when you reduce them all \emph{together}.
-  \item \textbf{2002 $\to$ 1698 (the engine swap):} the first true \emph{architectural} jump replaced
-    the entire Kaliski stack with a \textbf{dialog-GCD inverter that streams a compressed transcript}
-    (\S\ref{sec:dialog}) instead of holding wide history registers resident --- one change worth
-    $-304$ qubits, and the lineage everything after descends from.
+  \item \textbf{cswap boundary-merge} (\S\ref{sec:cswapmerge}): merge the B\'ezout \texttt{cswap}s that
+    straddle adjacent Kaliski iterations via $\texttt{cswap}(p)\cdot\texttt{cswap}(q)=\texttt{cswap}(p
+    \oplus q)$, carried on one frame-parity qubit --- \textbf{$-274$k Toffoli}, peak-neutral. The era's
+    single biggest gate win.
+  \item \textbf{Solinas-skip on early doublings}: in the early iterations the operands satisfy
+    $\max(r,s) \le 2^{\text{iter}}$, so a \texttt{mod\_double}'s Solinas constant-add is the
+    \emph{identity} --- replace it with a plain wire-relabel shift (0 Toffoli).
+  \item \textbf{Late-iteration carry recovery}: the Kaliski STEP-4 adds borrow their carry register
+    from bits that are \textbf{provably \ket{0} as a classical function of the iteration index} (the
+    high bits of $u$, since $\mathrm{bitlen}(u) \le 2n-\text{iter}$) --- clean for \emph{all} inputs
+    (gate-hosting \S\ref{sec:gatehost} / borrowed-carry \S\ref{sec:borrowcarry} in their first form).
 \end{itemize}
 
-\subsubsection{Era 2 --- The dialog-GCD frontier: 1698q $\to$ 1168q (and the wall)}
+\smallskip\noindent\textbf{The qubit drops 2708 $\to$ 2002 (scratch-packing):}
+\begin{itemize}
+  \item \textbf{Joint-pin plateau breaking} (\S7.9) --- the recurring method, present from the very
+    start: a peak co-owned by several multiply-scratch clusters drops only when you reduce \emph{all of
+    them together}. This one insight drives every qubit drop in the era.
+  \item \textbf{Square-recompute eviction} (\S\ref{sec:liverange}): uncompute the dead 512-bit
+    $\lambda^2$ product before the affine $y$-multiply, run the multiply without it resident, recompute
+    once after --- a live-range hole worth $\sim$512 qubits at the binder.
+  \item \textbf{Dialog history-fold}: relabel the per-iteration Kaliski history qubits into the
+    \textbf{idle, provably-\ket{0} high bits of the shrinking GCD register} instead of a dedicated bank
+    (0-Toffoli qubit relabeling --- the shrinking-register idea that dynamic-width \S7.6 later
+    formalizes).
+  \item \textbf{Carry-pool relocation}: move the wide STEP-4 add/sub carries off their dedicated
+    $\sim$277-qubit pool onto provably-zero high bits of the operands, freeing the history pool.
+    Together these reach the \textbf{published ``$9n$'' peak floor}.
+\end{itemize}
 
-On the dialog-GCD engine the peak fell steadily via the \textbf{windowed/chunked apply} dial
+By $\sim$2002q the Kaliski route was packed about as tight as it goes: with the inverse held fixed,
+scratch-packing had run its course. The next jump needed a \emph{new engine} --- which opens Era 2.
+
+\subsubsection{Era 2 --- The dialog-GCD frontier: 2002q $\to$ 1168q (engine swap, then the wall)}
+
+\textbf{The engine swap (2002 $\to$ 1698)} is the first true \emph{architectural} jump: it replaced
+the entire Kaliski stack with a \textbf{dialog-GCD inverter} --- one that \textbf{streams a compressed
+transcript} of its branch decisions (\S\ref{sec:dialog}) instead of holding wide history registers
+resident. A single change worth \textbf{$-304$ qubits}, and the lineage everything after descends
+from. On this new engine the peak then fell steadily via the \textbf{windowed/chunked apply} dial
 (\S\ref{sec:windowed}, the era's biggest peak lever), carry self-hosting on the operand lanes
 (\S\ref{sec:borrowcarry}/\S\ref{sec:gatehost}), shift-free modular doublings (\S\ref{sec:shiftfree}),
-keep-live-vs-recompute in the Solinas fold (\S\ref{sec:liverange}), the first \textbf{recompute-to-free
-fold carries}, and progressively tighter transcript codecs:
+keep-live-vs-recompute in the Solinas fold (\S\ref{sec:liverange}), the first
+\textbf{recompute-to-free fold carries}, and progressively tighter transcript codecs:
 
 \begin{center}
 \begin{tabular}{p{3.8cm}p{4.5cm}p{5.2cm}}
 \toprule
 \textbf{Transition} & \textbf{Technique} & \textbf{What was released} \\
 \midrule
+2002$\to$1698 ($-304$q) & \textbf{Dialog-GCD engine swap} (\S\ref{sec:dialog}) & replaced the Kaliski stack with a streamed compressed transcript \\
 1698$\to$1211 & windowed apply + recompute-to-free + carry self-hosting & the whole 1698$\to$1211 descent (\S\ref{sec:windowed}/\S\ref{sec:borrowcarry}/\S\ref{sec:shiftfree}) \\
 1211$\to$1193 ($-18$q) & Live-range hole (\S\ref{sec:liverange}) & GCD-apply scratch block freed during shift sub-phase; reacquired after \\
 1193$\to$1192 ($-1$q) & Truncation (\S7.4) & Square segment one notch tighter \\

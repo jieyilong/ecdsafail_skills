@@ -2011,36 +2011,60 @@ The score track has three clearly distinct eras, each defined by its **inversion
 Kaliski pre-history, the dialog-GCD frontier (which stalled at a 1168q wall for days), and the
 *ludicrous* breakthrough that broke it and drove to today's SOTA.
 
-#### Era 1 — Pre-history: 2715q → 1698q (the Roetteler/Kaliski era)
+#### Era 1 — Pre-history: 2715q → 2002q (the Roetteler/Kaliski era)
 
-The challenge *started* at a baseline of **2,715 qubits × ~3.96M Toffoli**: a **Roetteler-style
-two-Kaliski affine** point addition — affine coordinates (not projective), the modular inverse done
-by *two* runs of the Kaliski binary-GCD algorithm, direct/Solinas reduction (no Montgomery), with the
-prime and `Q` known as compile-time constants. The inverse was ~80–90% of the Toffoli (the bottleneck
-§4 names), and was treated as algorithmically fixed — so the early drops were *all* live-range and
-hosting tricks, the same methods in this primer appearing in cruder form:
+The challenge *started* at **2,715 qubits × ~3.96M Toffoli**: a **Roetteler-style two-Kaliski affine**
+point addition — affine coordinates (not projective), the modular inverse done by *two* runs of the
+**Kaliski binary-GCD** algorithm, direct/Solinas reduction (no Montgomery), with the prime and `Q`
+known as compile-time constants. The inverse was ~80–90% of the Toffoli (the bottleneck §4 names), and
+was treated as **algorithmically fixed** — so for this whole era the gains came not from a better
+inverse but from packing scratch ever tighter around it. These are the same techniques in this primer,
+in their first and cruder form:
 
-- **2708 → ~2002 (scratch-packing on a fixed inverse):** the `cswap(p⊕q)` swap-merge (§9.19, −274k
-  Toffoli), borrowing **provably-`|0⟩` high bits of the shrinking GCD register** as carry scratch
-  (gate-hosting §7.16 in its first form, reaching the published "9n" peak floor), square-recompute
-  eviction (§7.1), and **joint-pin plateau breaking** (§7.9) — the realization, present from the very
-  start, that a peak co-owned by several scratch clusters only drops when you reduce all of them
-  *together*.
-- **2002 → 1698 (the engine swap):** the first true *architectural* jump replaced the entire Kaliski
-  stack with a **dialog-GCD inverter that streams a compressed transcript** (§3) instead of holding
-  wide history registers resident — a single change worth −304 qubits, and the lineage everything
-  after descends from.
+**Early Toffoli wins (still at 2708q):**
+- **cswap boundary-merge** (§9.19): merge the Bézout `cswap`s that straddle adjacent Kaliski iterations
+  via `cswap(p)·cswap(q) = cswap(p⊕q)`, carried on one frame-parity qubit — **−274k Toffoli**,
+  peak-neutral. The era's single biggest gate win.
+- **Solinas-skip on early doublings**: in the early iterations the operands satisfy `max(r,s) ≤ 2^iter`,
+  so a `mod_double`'s Solinas constant-add is the *identity* — replace it with a plain wire-relabel
+  shift (0 Toffoli).
+- **Late-iteration carry recovery**: the Kaliski STEP-4 adds borrow their carry register from bits that
+  are **provably `|0⟩` as a classical function of the iteration index** (the high bits of `u`, since
+  `bitlen(u) ≤ 2n−iter`) — clean for *all* inputs (gate-hosting §7.16 / borrowed-carry §7.13 in their
+  first form).
 
-#### Era 2 — The dialog-GCD frontier: 1698q → 1168q (and the wall)
+**The qubit drops 2708 → 2002 (scratch-packing):**
+- **Joint-pin plateau breaking** (§7.9) — the recurring method, present from the very start: a peak
+  co-owned by several multiply-scratch clusters only drops when you reduce *all of them together*. This
+  one insight drives every qubit drop in the era.
+- **Square-recompute eviction** (§7.1): uncompute the dead 512-bit λ² product before the affine
+  y-multiply, run the multiply without it resident, recompute it once after — a live-range hole worth
+  ~512 qubits at the binder.
+- **Dialog history-fold**: relabel the per-iteration Kaliski history qubits into the **idle,
+  provably-`|0⟩` high bits of the shrinking GCD register** instead of a dedicated bank (0-Toffoli qubit
+  relabeling — the same shrinking-register idea that dynamic-width §7.6 later formalizes).
+- **Carry-pool relocation**: move the wide STEP-4 add/sub carries off their dedicated ~277-qubit pool
+  onto provably-zero high bits of the operands, freeing the history pool. Together these reach the
+  **published "9n" peak floor**.
 
-On the dialog-GCD engine the peak fell steadily via the **windowed/chunked apply** dial (§7.18, the
-era's biggest peak lever), carry self-hosting on the operand lanes (§7.13/§7.16), shift-free modular
-doublings (§7.19), keep-live-vs-recompute in the Solinas fold (the keep-alive dual, §7.1), the first
-**recompute-to-free fold carries** (`FOLD_FREED_TAIL` / `FOLD_PARK_LOW_CARRIES`), and progressively
-tighter transcript codecs:
+By ~2002q the Kaliski route was packed about as tight as it goes: with the inverse held fixed,
+scratch-packing had run its course. The next jump needed a *new engine* — which opens Era 2.
+
+#### Era 2 — The dialog-GCD frontier: 2002q → 1168q (engine swap, then the wall)
+
+**The engine swap (2002 → 1698)** is the first true *architectural* jump: it replaced the entire
+Kaliski stack with a **dialog-GCD inverter** — one that **streams a compressed transcript** of its
+branch decisions (§3) instead of holding wide history registers resident. A single change worth
+**−304 qubits**, and the lineage everything after descends from. On this new engine the peak then fell
+steadily via the **windowed/chunked apply** dial (§7.18, the era's biggest peak lever), carry
+self-hosting on the operand lanes (§7.13/§7.16), shift-free modular doublings (§7.19),
+keep-live-vs-recompute in the Solinas fold (the keep-alive dual, §7.1), the first **recompute-to-free
+fold carries** (`FOLD_FREED_TAIL` / `FOLD_PARK_LOW_CARRIES`), and progressively tighter transcript
+codecs:
 
 | Transition | Technique | What was released |
 |-----------|-----------|-------------------|
+| 2002→1698 (−304q) | **Dialog-GCD engine swap** (§3) | replaced the Kaliski stack with a streamed compressed transcript |
 | 1698→1211 | windowed apply + recompute-to-free + carry self-hosting | the whole 1698→1211 descent (§7.18/§7.13/§7.19/§7.1) |
 | 1211→1193 (−18q) | Live-range hole (§7.1) | GCD-apply scratch block freed during shift sub-phase; reacquired after |
 | 1193→1192 (−1q) | Truncation / segmentation (§7.4) | Square segment one notch tighter |
