@@ -6,8 +6,8 @@
 participants and leaderboard contributors of the [ecdsa.fail](https://ecdsa.fail) challenge**.
 Summarized and compiled by **Jieyi Long**, with Claude Code.
 
-> **Audience**: This primer is written for an undergrad who has just learned the basics of quantum
-> computing — superposition, entanglement, Toffoli/CNOT/Hadamard gates, quantum circuits, and
+> **Audience**: This primer is written for undergraduate students who have just learned the basics of
+> quantum computing — superposition, entanglement, Toffoli/CNOT/Hadamard gates, quantum circuits, and
 > reversible computation. It explains every optimization technique used in the ecdsa.fail quantum
 > circuit challenge from circuit-level first principles, with concrete examples from the actual
 > research.
