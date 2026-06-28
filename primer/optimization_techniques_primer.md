@@ -1,5 +1,11 @@
 # Qubit & Toffoli Reduction Techniques: A Comprehensive Primer
 
+*ecdsa.fail quantum circuit benchmark*
+
+**Contributors:** The optimization techniques described here were collectively contributed by **all
+participants and leaderboard contributors of the [ecdsa.fail](https://ecdsa.fail) challenge**.
+Summarized and compiled by **Jieyi Long**, with Claude Code.
+
 > **Audience**: An undergrad who has learned the basics of quantum computing — superposition,
 > entanglement, Toffoli/CNOT/Hadamard gates, quantum circuits, and the idea of reversible
 > computation. This document explains every optimization technique used in the ecdsa.fail
