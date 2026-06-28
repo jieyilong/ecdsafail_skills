@@ -79,6 +79,27 @@ The best known result as of 2026-06-27 (BitWonka, commit `d44cad3`, trailmix_lud
 1152 qubits × 1,364,230 avg Toffoli = 1,571,592,960 score
 ```
 
+### Two separate competitions, two separate objectives
+
+This is important context for the whole document. There are **two distinct optimization tracks**,
+and a technique that is optimal for one can be irrelevant for the other:
+
+1. **The Q×T score competition** (the main subject of this primer): minimize the *product*
+   `peak_qubits × avg_executed_Toffoli`. Here both resources matter, and every move is judged by
+   the exchange rate (§9). The SOTA above (1152q × 1.36M) lives in this track.
+
+2. **The low-qubit competition** (a separate objective): minimize **peak qubits alone**. Toffoli
+   count is *unconstrained* — you may spend as many Toffoli gates as you like. The only thing that
+   counts is how few qubits the circuit is simultaneously live on.
+
+These are genuinely different games. Under the Q×T objective you would never spend 8× more Toffoli
+to save 10% of qubits; under the low-qubit objective that trade is *free*, because Toffoli simply
+does not appear in the scoring. Most of this primer optimizes track 1, but the deepest qubit-floor
+technique — **EEA register sharing (§6.O)** — belongs to track 2, and reaches qubit counts
+(851q → 829q) far below anything competitive on the product score. Keep the two objectives separate
+in your head: many "is this worth it?" questions only have an answer once you know *which*
+competition you are playing.
+
 ---
 
 ## 2. The Reversibility Constraint
@@ -606,12 +627,13 @@ without information loss.
 
 ---
 
-### 6.O EEA Register Sharing — The Qubit Floor (and Why It Is an Anti-Lever)
+### 6.O EEA Register Sharing — The Low-Qubit Frontier
 
-**The deepest qubit-reduction idea, and the most important cautionary tale.** This is the
-technique behind the lowest qubit numbers ever recorded on the challenge — the 948q → 851q → 829q
-descent — but it is also the cleanest example of a lever that *wins the qubit axis and loses the
-score by 250×*. Understanding both halves is the point.
+**The deepest qubit-reduction idea, and the headline technique for the low-qubit competition**
+(§1, track 2 — minimize peak qubits, Toffoli unconstrained). This is what drives the lowest qubit
+counts ever recorded on the challenge: the 948q → 851q → 829q descent. Because that competition does
+not score Toffoli at all, register sharing is free to spend gates lavishly in exchange for lanes —
+exactly the trade it makes.
 
 **The naive EEA register budget.** The extended Euclidean algorithm carries four full-width
 256-bit registers through all ~530 steps:
@@ -641,13 +663,14 @@ This is the structural source of Luo et al. 2026's compact exact reversible inve
 `3n + 4⌊log₂ n⌋` qubits (1333q for n=256 as a standalone inversion). In the Shrunken-PZ track,
 packing `A∥CA` and `B∥CB` plus dirty-catalytic borrowing and gate-hosting drove the inversion core
 down to `REGISTER_SHARED_PAPER_INVERSION_QUBITS = 3·256 + 52 = 820` qubits, giving an **851-qubit
-peak** for the whole point-add — a 97-qubit drop below the prior 948q record.
+peak** for the whole point-add — a 97-qubit drop below the prior 948q record, and the 851→829q race
+then squeezed out another 22.
 
-**Why it is an anti-lever (the catch undergrads should internalize).** A packed word has a
-*data-dependent boundary*: "where does `A` end and `CA` begin?" depends on values computed at
-runtime. Every arithmetic step must first **locate and realign that boundary with a full-width
-comparator**, and because the circuit is reversible, that comparator must be recomputed *before AND
-after* each hosted gate. The bookkeeping:
+**Where the Toffoli goes (and why that's fine here).** Packing is not free in gates: a shared word
+has a *data-dependent boundary* — "where does `A` end and `CA` begin?" depends on values computed at
+runtime. So every arithmetic step must first **locate and realign that boundary with a full-width
+comparator**, and because the circuit is reversible, that comparator is recomputed *before and
+after* each hosted gate:
 
 ```
 Cost to realize ONE useful Toffoli on a packed word:
@@ -655,28 +678,25 @@ Cost to realize ONE useful Toffoli on a packed word:
    where toggle_gate ≈ a full-width comparator ≈ 12 × width ≈ 3,075 Toffoli at width 256
 ```
 
-Across 530 divsteps this surrounded-comparator envelope lands at ~4.6 × 10⁸ Toffoli — the
-851q circuit measures **464,495,956 average Toffoli, an 8.5× explosion** over the 948q route's
-54.8M. The score: `851 × 464,495,956 ≈ 3.95 × 10¹¹`, rejected at **+3659%**, roughly 250× over
-the product break-even.
+Across 530 divsteps this lands the 851q route at ~464.5M average Toffoli (vs ~54.8M for the
+unshared 948q route). **Under the low-qubit objective this is a non-issue** — Toffoli does not enter
+the score, so spending ~8× more of it to buy 97 qubits is precisely the intended trade. (For
+contrast, under the *Q×T product* objective the very same packing would be ~250× over break-even, so
+this technique belongs squarely to the low-qubit track, not the score track. The two objectives have
+genuinely different optimal constructions — see §9 for the exchange-rate math behind that statement.)
 
-This is the qubit↔Toffoli-depth reciprocal (§9) *violated in the flesh*: the saved lanes are paid
-back as full-width recompute on both sides of every gate, so the trade is **super-linear, not
-1:1**. The qubit minimum and the score minimum are simply not reached by the same construction.
+**A note on rigor.** The very lowest figures (851q, 829q) come from an *analysis-oracle* accounting
+in `register_shared_eea.rs` — it models the achievable qubit count assuming the gate-hosting is
+realizable, then charges the hosting Toffoli separately, rather than emitting one fully-hardened
+reversible op stream end to end. Treat them as the leading **lower-bound witnesses** for the
+pure-qubit frontier; the lowest *fully-validated* circuit witness on this track is the 948q route.
+Either way, the structural mechanism — operand/cofactor packing — is the real and reusable idea.
 
-**It is not even a circuit.** The implementing module says so itself: `register_shared_eea.rs` is
-labelled *"an analysis oracle, not a reversible circuit implementation … passing this oracle does
-not establish a challenge-valid qubit count."* It *models* the qubit count assuming the hosting is
-free, then charges the hosting Toffoli separately. The subsequent 851→829q race (three competitors
-leapfrogging over ~26 hours via ever-more-aggressive borrowing on a *frozen* width envelope) is the
-same disclaimed oracle, accreting turn by turn — every rung still `proof_status: "reject"`.
-
-**The lesson.** Register sharing is the genuine route below ~948 qubits, and the Luo-2026 /
-Proos–Zalka mechanism is the structural source worth knowing. But on the *product* objective it is
-an anti-lever — a qubit-lower-bound *witness*, not a shippable circuit. Treat sub-948q PZ numbers
-as combinatorial lower-bound claims. The takeaway generalizes: **a qubit lever whose savings are
-funded by data-dependent recompute around every gate will violate break-even by a large factor —
-always price the recompute, not just the freed lanes.**
+**The lesson.** Register sharing is *the* route below ~948 qubits, and the Proos–Zalka / Luo-2026
+mechanism is the structural source worth knowing. It is the right tool when your objective is pure
+qubit count. The broader point generalizes both ways: **know which competition you are playing
+before pricing a lever** — a move that is a clear win for the low-qubit objective (trade unlimited
+Toffoli for lanes) can be a clear loss for the Q×T objective, and vice versa.
 
 ---
 
@@ -1365,27 +1385,28 @@ Each qubit drop used the technique that fit its specific bottleneck:
 4. **Structural correctness wins over island-exact tricks.** The 6dafa07 pivot to structural dead-CCX
    eliminated the empirical approach entirely — correct for all inputs, not just the 9024.
 
-### The parallel low-qubit witness track (a separate line — NOT the product SOTA)
+### The low-qubit competition track (a separate objective — §1, track 2)
 
-Running *alongside* the product-SOTA journey above is a separate **Shrunken-PZ / Proos–Zalka
-divstep** line whose only goal is to minimize qubits, ignoring score. It is worth seeing because it
-maps the qubit *floor* and demonstrates the exchange-rate trap (§6.O, §9):
+Running *alongside* the Q×T product-SOTA journey above is the separate **low-qubit competition**
+line — the **Shrunken-PZ / Proos–Zalka divstep** family — whose objective is to minimize peak qubits
+with Toffoli unconstrained. This is the frontier where EEA register sharing (§6.O) shines:
 
-| Qubit record | Technique | Status |
-|--------------|-----------|--------|
-| 1050q | trailmix shrunken-PZ embedded op stream | witness |
-| 1019q | source-level dynamic-width PZ port | witness |
-| 988→956q | dirty-borrow / gate-hosting lever stack | witness |
-| 952→948q | further lane borrowing + thin schedule | witness (lowest *validated* witness) |
-| **851q** (`e7dd3de`, 6/23) | **EEA register sharing (§6.O), Luo 2026** | **analysis oracle — rejected +3659%** |
-| 829q (`1dd61ca`, 6/24) | more borrowing/relocation on a frozen envelope | analysis oracle — rejected |
+| Qubit record | Technique | Notes |
+|--------------|-----------|-------|
+| 1050q | trailmix shrunken-PZ embedded op stream | early low-qubit route |
+| 1019q | source-level dynamic-width PZ port | |
+| 988→956q | dirty-borrow / gate-hosting lever stack | |
+| 952→948q | further lane borrowing + thin schedule | lowest *fully-validated* circuit witness |
+| **851q** (`e7dd3de`, 6/23) | **EEA register sharing (§6.O), Luo 2026** | **−97q; the register-sharing breakthrough** |
+| 829q (`1dd61ca`, 6/24) | more borrowing/relocation on a frozen envelope | current low-qubit frontier |
 
-Everything below 948q is the **analysis-oracle regime**: it validates `0/0/0` only on its own
-island, costs ~400–500M Toffoli (~250× over the product break-even), and the implementing module
-explicitly disclaims being a reversible circuit. **851q and 829q are qubit-lower-bound claims, not
-shippable circuits.** The product SOTA (1152q × 1.36M) lives in a completely different regime: more
-qubits, but ~340× fewer Toffoli, and value-exact. The two minima are not reached by the same
-construction — which is the whole lesson of §6.O.
+These are records on the **pure-qubit objective**, where the ~400–500M Toffoli they spend simply
+does not enter the scoring. The 851q and 829q figures come from an analysis-oracle accounting
+(§6.O) — read them as the leading **lower-bound witnesses** for the qubit floor; the 948q route is
+the lowest fully-validated circuit on the track. This is a *different game* from the Q×T product SOTA
+(1152q × 1.36M, value-exact): more qubits but ~340× fewer Toffoli. The two minima are reached by
+different constructions, and which one is "best" depends entirely on which competition you are
+entering — see §6.O and §9.
 
 ---
 
@@ -1443,7 +1464,7 @@ construction — which is the whole lesson of §6.O.
 | In-place decode (§6.L) | varies | codec overhead | YES |
 | Borrowed-carry fusion (§6.M) | k | 0 | YES |
 | HMR ghosting / passenger ghosting (§6.N) | 256 | +1 modular multiply | YES |
-| EEA register sharing (§6.O) | ~97–119 (to 851→829q) | **8.5× explosion** (anti-lever) | YES (but oracle, not a circuit) |
+| EEA register sharing (§6.O) | ~97–119 (to 851→829q) | high (irrelevant to low-qubit objective) | YES — for the low-qubit competition (§1) |
 
 ### Toffoli reduction techniques
 
