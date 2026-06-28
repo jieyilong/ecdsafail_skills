@@ -592,7 +592,7 @@ near-misses.
 \end{tcolorbox}
 
 % ===========================================================================
-\section{Qubit Reduction Techniques (1--17)}
+\section{Qubit Reduction Techniques (1--19)}
 \label{sec:qubittech}
 % ===========================================================================
 
@@ -1145,6 +1145,56 @@ the difference for free. (In the 1133 push the lever is present but gated off --
 active-width trimming, not compaction --- so it is an untapped drop-in for any future rung whose
 \texttt{max id} exceeds its true peak.)
 
+\subsection{Windowed (Chunked) Materialization --- the \texttt{F\_CUT} Dial}
+\label{sec:windowed}
+
+\textbf{The biggest peak lever of the 1693$\to$1411 era.} Many operations need a \emph{materialized}
+operand --- a full-width quantum register built from something cheaper. The classic case: to add the
+quantum-controlled value $f = \texttt{ctrl}\cdot a$ into an accumulator (where $a$ is 256 bits), the
+naive circuit first builds all 256 bits of $f$, then runs a 256-bit ripple adder. Two wide things are
+now live at once --- the materialized $f$ \emph{and} the adder's carry lane --- and their sum is the
+peak.
+
+\textbf{The fix: never materialize the whole operand at once.} Split the add into chunks. For each
+chunk: materialize only that slice of $f$, run a small adder over just that slice, then
+\textbf{immediately clear the slice with a measurement (HMR)} before moving to the next chunk. Only
+one chunk's worth of $f$ is ever live, and the boundary carry between chunks is cleaned up with a
+short truncated comparator against the source bits.
+
+\begin{lstlisting}
+Naive:   build all 256 bits of f=ctrl.a  ->  256-bit ripple add   (f + carry both wide -> tall peak)
+Chunked: per block:  build slice of f  ->  add slice  ->  HMR-clear slice  ->  fix boundary carry
+         (only one slice of f live at a time -> much shorter peak)
+\end{lstlisting}
+
+\textbf{Why it's a \emph{dial}, not a one-shot.} The chunk boundary (\texttt{F\_CUT},
+\texttt{APPLY\_CHUNKED\_F\_BLOCKS}) is tunable: each $+1$ narrows the materialized slice and lowers
+the peak by $\sim$1--2 qubits, at the cost of one more boundary comparator (a few Toffoli). So you
+``sink'' the apply phase to the next floor by turning the dial, then re-tune it after every
+\emph{other} lever lands. This single knob, re-cut at nearly every step from 1572q down to 1411q, did
+most of the era's peak work. It is the materialized-operand version of venting and per-step
+truncation: \textbf{process a wide value a window at a time so its full width never co-resides at the
+peak.}
+
+\subsection{Shift-Free Scaling via Modular Doublings}
+\label{sec:shiftfree}
+
+A subtle qubit trap hides in ``multiply by a power of two.'' Computing $x \cdot 2^k \bmod p$ the
+obvious way --- $\texttt{shift\_left}(k) \to \texttt{op} \to \texttt{shift\_right}(k)$ --- needs a
+\textbf{spill register} to catch the $k$ bits that fall off the top during the shift, plus
+overflow/sign flags. In the Solinas $2^{32}$ fold of the square tail, that parked $\sim$24 persistent
+flag qubits and pinned the peak.
+
+\textbf{The fix uses a number-theoretic identity:} modulo $p$, multiplying by 2 \emph{is} a modular
+doubling (\texttt{mod\_double}, \S\ref{sec:pmarith}) --- a shift that immediately folds its overflow
+back via $+f$, leaving nothing to spill. So $x \cdot 2^k \bmod p$ can be done as \textbf{$k$ successive
+modular doublings} (and $\div 2^k$ as $k$ modular halvings), value-identical to the shift route but
+allocating \textbf{no spill register and no flags}. It trades a handful of extra Toffoli for $\sim$24
+freed qubits (\texttt{KARA\_SOL\_SHIFT22\_DOUBLES}, the 1558q drop). The lesson: a ``free'' classical
+operation (a bit-shift) can be quietly \emph{expensive} in a reversible circuit because the
+shifted-out bits must be stored, not discarded --- and re-expressing it in the modular arithmetic you
+already have can dodge that storage entirely.
+
 % ===========================================================================
 \section{Toffoli Reduction: The Core Loop}
 \label{sec:tofloop}
@@ -1176,7 +1226,7 @@ Adjacent algebraic stages (add/negate/subtract chains) & Algebraic fusion (\S\re
 \end{center}
 
 % ===========================================================================
-\section{Toffoli Reduction Techniques (1--18)}
+\section{Toffoli Reduction Techniques (1--19)}
 \label{sec:toftech}
 % ===========================================================================
 
@@ -1378,6 +1428,14 @@ integers.
 
 \textbf{Recursive Karatsuba}: Tested on 128-bit sub-squares $\to$ net Toffoli LOSS (the overhead
 of the additions outweighs the sub-square savings at that level). Dead end.
+
+\textbf{The space/Toffoli tension (it cuts both ways).} Karatsuba saves Toffoli but \emph{needs
+scratch} for the three sub-products and the $(lo+hi)^2$ term. When the square sits at the qubit peak,
+the \textbf{opposite} move can win: drop back to a plain \textbf{schoolbook} square, which needs no
+middle-term scratch (fewer qubits) at the cost of more Toffoli. The SOTA toggles this per context
+(\texttt{ROUND84} ``schoolbook x-tail'') --- Karatsuba where Toffoli is binding, schoolbook where
+\emph{qubits} are. Same exchange-rate decision as everywhere else (\S\ref{sec:exchange}): which axis
+is binding decides which square you want.
 
 \subsection{NAF Recoding of Constants}
 
@@ -1643,6 +1701,33 @@ vs 24\%, \S\ref{sec:pmmath}). \textbf{No Montgomery form is used} --- both the p
 keep plain integer representation and fold directly. NAF recoding (\S9.7) is the next layer: it makes
 the fold constant $c$ itself cheaper (4 signed terms instead of 6).
 
+\subsection{Merging Adjacent Controlled-Swaps}
+\label{sec:cswapmerge}
+
+The GCD loop swaps its two operand registers conditionally at almost every step (the ``is
+$|u| > |v|$?'' decision swaps $u$ and $v$, and likewise their B\'ezout cofactors). A controlled swap
+of two $n$-bit registers costs $n$ Toffoli (one \texttt{cswap} per bit). Across $\sim$530 steps
+$\times$ two register pairs, these swaps are a large slice of the Toffoli budget.
+
+\textbf{The identity that merges them.} Two controlled swaps of the \emph{same pair of registers},
+controlled by bits $p$ and $q$, compose into a \emph{single} controlled swap controlled by
+$p \oplus q$:
+\[
+  \texttt{cswap}(p, A, B)\cdot\texttt{cswap}(q, A, B) \;=\; \texttt{cswap}(p \oplus q, A, B).
+\]
+(Swapping under $p$, then again under $q$, swaps exactly when an odd number of the two controls fired
+--- i.e.\ when $p \oplus q = 1$.) So wherever two swap decisions on the same registers sit next to
+each other --- e.g.\ the cofactor swap at the \emph{end} of one GCD step and the operand swap at the
+\emph{start} of the next --- you replace \textbf{two} $n$-Toffoli swaps with \textbf{one}, after
+spending a single cheap CNOT to compute $p \oplus q$ into a ``frame-parity'' qubit that carries the
+accumulated swap state across the boundary.
+
+This is \textbf{algebraic fusion (\S\ref{sec:fusion}) specialized to swaps}, and it is value-exact (a
+pure identity, all inputs). It was the single biggest Toffoli win of the early era --- the Kaliski
+\texttt{step9}$\circ$\texttt{step3} boundary merge, \textbf{$-274{,}000$ Toffoli, peak-neutral}. The
+general lesson: \emph{controlled swaps compose through XOR of their controls} --- look for adjacent
+swaps on the same lanes and collapse them.
+
 % ===========================================================================
 \section{The Qubit $\leftrightarrow$ Toffoli Exchange Rate and the Product Race}
 \label{sec:exchange}
@@ -1725,6 +1810,27 @@ looks ``irreducible'' (structured data) but is often the cheap lever. The scratc
 When you apply an island-exact optimization, you need to find a new \textbf{nonce} --- a 48-byte
 seed for the test input generator --- such that all 9024 generated inputs happen to be in the
 safe zone. Stacking multiple island-exact optimizations makes the safe zone smaller.
+
+\subsection{A common island-exact lever: active-iteration trimming}
+
+The GCD inversion is run for a fixed number of steps chosen to cover the \emph{worst-case} input. But
+the worst case is rare, so you can run \textbf{fewer} iterations
+(\texttt{DIALOG\_GCD\_ACTIVE\_ITERATIONS}, e.g.\ $399\to393$) and accept that a $\sim2^{-k}$-rare
+fraction of inputs won't have fully converged. This is a pure island-exact lever --- it drops whole
+divsteps (qubits \emph{and} Toffoli) but makes the circuit wrong on those rare inputs, so it must be
+paired with a nonce hunt. It sits alongside carry-truncation (\S7.4) and comparator-narrowing
+(\S9.11/\S9.18) as a ``graded'' knob (\S\ref{sec:qubitloop}).
+
+\begin{tcolorbox}[noteboxstyle, title={The line between island-exact and cheating}]
+Island-exact levers are legitimate \emph{because the 9024 validated inputs are the actual scored
+distribution} and the failures they introduce are genuinely rare and structurally understood. There
+is a real line, though: deliberately truncating the circuit so it is wrong on a \emph{large} fraction
+of inputs and then re-rolling the nonce purely to \emph{hide} those failures is verifier-gaming, not
+optimization --- the early history contains at least one flagged ``red-team'' example (a 396-iteration
+build wrong on $\sim$$3\times10^{-4}$ of inputs, shipped with a comment admitting it). The community
+norm: an island-exact cut should be a structurally-sound approximation whose error you can
+\emph{bound and explain}, not a way to launder a broken circuit past the gate.
+\end{tcolorbox}
 
 \subsection{The 6dafa07 pivot: empirical $\to$ structural dead-CCX}
 
@@ -1924,6 +2030,44 @@ Q$\times$T), the \textbf{low-qubit track} (minimize Q alone), and the \textbf{Pa
 (map the clean (Q, T) curve).
 
 \subsection{The score track (Q$\times$T): the 1211$\to$1152 journey}
+
+\subsubsection{Pre-history: 2715q $\to$ 1211q (where the circuit came from)}
+
+The challenge \emph{started} at a baseline of \textbf{2{,}715 qubits $\times$ $\sim$3.96M Toffoli}.
+The journey down to the 1211q dialog-GCD circuit (where the table below begins) is its own story, and
+it shows the same methods appearing in cruder form:
+
+\begin{itemize}
+  \item \textbf{The baseline} was a \textbf{Roetteler-style two-Kaliski affine} point addition: affine
+    coordinates (not projective), the modular inverse done by \emph{two} runs of the Kaliski
+    binary-GCD algorithm, with $Q$ and the prime kept \textbf{classical from the start} and
+    direct/Solinas reduction (no Montgomery). The inverse was $\sim$80--90\% of the Toffoli --- the
+    bottleneck \S\ref{sec:circuit} names.
+  \item \textbf{2708 $\to$ $\sim$2002 (scratch-packing on a fixed inverse).} With the Kaliski engine
+    fixed, the early drops were \emph{all} live-range and hosting tricks: the $\texttt{cswap}(p\oplus
+    q)$ swap-merge (\S\ref{sec:cswapmerge}, $-274$k Toffoli), borrowing \textbf{provably-\ket{0} high
+    bits} of the shrinking GCD register as carry scratch (zero as a classical function of the
+    iteration index --- gate-hosting \S\ref{sec:gatehost} in its first form, reaching the published
+    ``$9n$'' peak floor), square-recompute eviction (\S\ref{sec:liverange}), and \textbf{joint-pin
+    plateau breaking} (\S7.9) --- the realization, present from the very start, that a
+    peak co-owned by several scratch clusters drops only when you reduce them all \emph{together}.
+  \item \textbf{2002 $\to$ 1698 (the engine swap).} The first true \emph{architectural} jump replaced
+    the entire Kaliski stack with a \textbf{dialog-GCD inverter that streams a compressed transcript}
+    instead of holding wide history registers resident (\S\ref{sec:dialog}) --- one change worth
+    $-304$ qubits, and the lineage the SOTA still descends from.
+  \item \textbf{1698 $\to$ 1211 (windowing + recompute-to-free).} On the dialog-GCD engine the peak
+    fell via the \textbf{windowed/chunked apply} dial (\S\ref{sec:windowed}, the era's biggest peak
+    lever), carry self-hosting on the operand lanes (\S\ref{sec:borrowcarry}/\S\ref{sec:gatehost}),
+    shift-free modular doublings (\S\ref{sec:shiftfree}), keep-live-vs-recompute in the Solinas fold
+    (the keep-alive dual, \S\ref{sec:liverange}), and the first \textbf{recompute-to-free fold
+    carries} --- the same family as the cy0 trick (\S7.5) that later broke
+    1153$\to$1152.
+\end{itemize}
+
+So nearly every technique in this primer was \emph{already in play} before 1211q, just on a coarser
+circuit. The table below picks up at 1211q, where the modern dialog-GCD/trailmix line begins.
+
+\subsubsection{The 1211 $\to$ 1152 ladder}
 
 Each qubit drop used the technique that fit its specific bottleneck:
 
@@ -2183,6 +2327,8 @@ HMR ghosting (\S7.14) & 256 & $+1$ modular multiply & Yes \\
 EEA register sharing (\S7.15) & $\sim$97--119 (to 851$\to$829q) & high (irrelevant to low-q objective) & Yes --- low-qubit competition \\
 Gate-hosting (\S7.16) & 1 per hosted gate & 0 (clean) / $+1$ Tof (dirty) & Yes if host-zero \emph{proven}; island-exact if \emph{sampled} \\
 Reset-bounded id compaction (\S7.17) & gap (max-id $-$ true peak) & 0 & Yes (relabels wires only) \\
+Windowed/chunked materialization (\S7.18) & many (the \texttt{F\_CUT} dial) & $+$few (boundary cmps) & Yes \\
+Shift-free modular doublings (\S7.19) & $\sim$24 (drops spill$+$flags) & $+$few & Yes \\
 GCD active-width trim (\S7.6 applied) & varies (deep tail) & small & Partial (graded; nonce-hunted) \\
 \bottomrule
 \end{tabular}
@@ -2203,6 +2349,7 @@ Witness-first dataflow (\S9.5) & $\approx13$M / instance & 0 & Yes \\
 Karatsuba square (\S9.6) & $\approx22$M (one change) & 0 & Yes \\
 NAF recoding (\S9.7) & $\approx5$--10\% of fold cost & 0 & Yes \\
 Pseudo-Mersenne reduction (\S9.18) & huge (15\% vs 34\% of CCX) & 0 & Yes (fold); Partial (lsbs/msbs trunc) \\
+Merge adjacent controlled-swaps (\S9.19) & $n$ per merged pair ($-274$k once) & 0 & Yes \\
 Structural dead-gate skip (\S9.8) & varies & 0 & Yes \\
 Classical constant ops (\S9.9) & significant & 0 & Yes \\
 Converged-tail elision (\S9.10) & hundreds/iter $\times K$ & 0 & No \\

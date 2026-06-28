@@ -18,7 +18,7 @@ tour of *every* optimization technique used in the challenge, explained from qua
 principles with concrete examples and ablation numbers from real submissions:
 
 - **What the challenge is** and why one elliptic-curve point addition is the thing being optimized.
-- **17 qubit-reduction techniques** and **18 Toffoli-reduction techniques** — live-range holes, MBU /
+- **19 qubit-reduction techniques** and **19 Toffoli-reduction techniques** — live-range holes, MBU /
   measurement-based uncompute, venting, Karatsuba squaring, gate-hosting, pseudo-Mersenne (Solinas)
   reduction, structural dead-gate skipping, and more.
 - The **theory** (Bennett vs. spooky pebbling), the **density-neutral vs. island-exact** correctness
