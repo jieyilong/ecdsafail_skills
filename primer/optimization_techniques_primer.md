@@ -22,7 +22,7 @@
 10. [Density-Neutral vs Island-Exact — Correctness Regimes](#10)
 11. [Pebbling Theory — The Formal Foundation](#11)
 12. [The SOTA Circuit: How trailmix_ludicrous Works](#12)
-13. [The 1211→1152 Historical Journey](#13)
+13. [The Three Tracks: Score, Low-Qubit, and Pareto Frontier](#13)
 14. [Open Frontiers](#14)
 15. [Quick-Reference Summary Tables](#15)
 
@@ -105,7 +105,7 @@ counterproductive — for another:
    **one** point addition, so the per-point-addition figure is the correct reference.)* A point is
    Pareto-optimal if you cannot lower one of Q or T without raising the other. The goal here is not a
    single score but a *clean, reusable basis curve*: a value-exact circuit at each qubit count that
-   others can fork and improve (see the 1153q→1133q clean Pareto bases, §13.2). This track deliberately
+   others can fork and improve (see the 1153q→1133q clean Pareto bases, §13.3). This track deliberately
    avoids island-overfit tricks (§10)
    so the curve stays a sound reference.
 
@@ -1767,7 +1767,13 @@ and boundary-carry phases at the peak.
 
 ---
 
-## 13. The 1211→1152 Historical Journey
+## 13. The Three Tracks: Score, Low-Qubit, and Pareto Frontier
+
+The challenge has three distinct objectives (§1), and each has its own history and its own winning
+constructions. This section walks all three: the **score track** (minimize Q×T), the **low-qubit
+track** (minimize Q alone), and the **Pareto-frontier track** (map the clean (Q, T) curve).
+
+### The score track (Q×T): the 1211→1152 journey
 
 Each qubit drop used the technique that fit its specific bottleneck:
 
@@ -1802,7 +1808,7 @@ Each qubit drop used the technique that fit its specific bottleneck:
 4. **Structural correctness wins over island-exact tricks.** The 6dafa07 pivot to structural dead-CCX
    eliminated the empirical approach entirely — correct for all inputs, not just the 9024.
 
-### The low-qubit competition track (a separate objective — §1, track 2)
+### The low-qubit track: the Shrunken-PZ inversion (§1, track 2)
 
 #### What the Shrunken-PZ approach is (the backbone of this track)
 
@@ -1879,7 +1885,7 @@ the lowest fully-validated circuit on the track. This is a *different game* from
 different constructions, and which one is "best" depends entirely on which competition you are
 entering — see §6.15 and §9.
 
-### The (Q, T) Pareto-frontier push (objective 3) — clean basis circuits 1153q → 1133q
+### The Pareto-frontier track: clean (Q, T) basis circuits 1153q → 1133q (§1, track 3)
 
 The third track (§1, objective 3) maps the **value-exact Pareto frontier** below the 1153q SOTA as a
 sequence of **clean, dead-CCX-free basis circuits** others can fork. Unlike the low-qubit witness

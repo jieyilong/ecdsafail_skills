@@ -1839,9 +1839,18 @@ At the SOTA (\texttt{d44cad3}):
 \end{itemize}
 
 % ===========================================================================
-\section{The 1211$\to$1152 Historical Journey}
+\section{The Three Tracks: Score, Low-Qubit, and Pareto Frontier}
 \label{sec:history}
 % ===========================================================================
+
+The challenge has three distinct objectives (\S\ref{sec:twocomps}), and each has its own history and
+its own winning constructions. This section walks all three: the \textbf{score track} (minimize
+Q$\times$T), the \textbf{low-qubit track} (minimize Q alone), and the \textbf{Pareto-frontier track}
+(map the clean (Q, T) curve).
+
+\subsection{The score track (Q$\times$T): the 1211$\to$1152 journey}
+
+Each qubit drop used the technique that fit its specific bottleneck:
 
 \begin{center}
 \begin{tabular}{p{3.8cm}p{4.5cm}p{5.2cm}}
@@ -1883,7 +1892,7 @@ Structural & 6dafa07 pivot (\S8.8/\S\ref{sec:density}) & Replaced empirical dead
     not just the 9024.
 \end{enumerate}
 
-\subsection{The low-qubit competition track (a separate objective --- \S\ref{sec:twocomps})}
+\subsection{The low-qubit track: the Shrunken-PZ inversion (\S\ref{sec:twocomps}, track 2)}
 
 \subsubsection{What the Shrunken-PZ approach is (the backbone of this track)}
 
@@ -1976,7 +1985,7 @@ $\sim$340$\times$ fewer Toffoli. The two minima are reached by different constru
 is ``best'' depends entirely on which competition you are entering --- see \S\ref{sec:regshare} and
 \S\ref{sec:exchange}.
 
-\subsection{The (Q, T) Pareto-frontier push (objective 3) --- clean basis 1153q $\to$ 1133q}
+\subsection{The Pareto-frontier track: clean (Q, T) basis circuits 1153q $\to$ 1133q (\S\ref{sec:twocomps}, track 3)}
 \label{sec:paretopush}
 
 The third track (\S\ref{sec:twocomps}, objective 3) maps the \textbf{value-exact Pareto frontier}
