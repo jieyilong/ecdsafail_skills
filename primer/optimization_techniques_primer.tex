@@ -746,6 +746,7 @@ the circuit, only 5 cells are allocated. This is \texttt{DIALOG\_GCD\_K2\_APPLY\
 the 1218$\to$1215 qubit drop.
 
 \subsection{Borrowed-Carry Fusion}
+\label{sec:borrowcarry}
 
 Standard carry/borrow vectors allocate fresh qubits. But if an adjacent scratch register is
 currently known \ket{0}, borrow its qubits as the carry vector instead:
@@ -848,14 +849,32 @@ would be $\sim$250$\times$ over break-even, so this technique belongs squarely t
 track, not the score track. The two objectives have genuinely different optimal constructions --- see
 \S\ref{sec:exchange} for the exchange-rate math behind that statement.)
 
-\begin{tcolorbox}[noteboxstyle, title={A note on rigor}]
-The very lowest figures (851q, 829q) come from an \emph{analysis-oracle} accounting in
-\lstinline{register_shared_eea.rs} --- it models the achievable qubit count assuming the
-gate-hosting is realizable, then charges the hosting Toffoli separately, rather than emitting one
-fully-hardened reversible op stream end to end. Treat them as the leading \textbf{lower-bound
-witnesses} for the pure-qubit frontier; the lowest \emph{fully-validated} circuit witness on this
-track is the 948q route. Either way, the structural mechanism --- operand/cofactor packing --- is the
-real and reusable idea.
+\begin{tcolorbox}[noteboxstyle, title={A note on rigor --- is 851q a \emph{real} qubit count?}]
+Only partly. It is a \textbf{lower-bound witness}, not a proven width, and the gap is worth
+understanding precisely (the source spells it out):
+\begin{itemize}
+  \item \textbf{The deepest figure is a \emph{classical} oracle, not a circuit.}
+    \lstinline{register_shared_eea.rs} computes on \texttt{U256}/\texttt{U512} integers --- \textbf{not
+    a single qubit or gate in it}. Its own header: \emph{``an analysis oracle, not a reversible
+    circuit implementation. In particular, passing this oracle does not establish a challenge-valid
+    qubit count.''} It only checks the packing invariant $l_t + 1 + l_q + \mathrm{bitlen}(r) \le n+3$
+    at all 1{,}479 steps --- i.e.\ that operand and cofactor \emph{fit in one word}, proving the
+    packing is feasible in principle, classically.
+  \item \textbf{The low count is bought by gate-hosting whose zero-claims are \emph{sampled, not
+    proven}} (see \S\ref{sec:gatehost}). \lstinline{q945_local_hosts.rs}: \emph{``does not certify
+    reachable-state zero claims. Q945 acceptance remains blocked until the Q946 hardening
+    prerequisites $\ldots$ are integrated''}; \lstinline{q944_gate_host_lifecycle.rs} checks the host
+    composition only \emph{``over every basis state at small widths,''} then extrapolates to 256 bits.
+  \item \textbf{The submission self-reports rejection.}
+    \texttt{Q949\_ROBUST\_ENVELOPE\_FRESH\_VALIDITY\_CLAIMED = false} (with an \texttt{assert!}
+    enforcing it), and every artifact carries \texttt{"proof\_status":"reject"}.
+\end{itemize}
+So passing the $0/0/0$ run check certifies the \textbf{output values are correct on the hunted
+island}; it does \textbf{not} certify that 851 qubits suffices for \emph{all} inputs. The lowest
+count backed by a fully-emitted, island-validated circuit \emph{without} the extra uncertified-hosting
+assumption is the \textbf{948q} route. Treat 851q/829q as ``this width looks reachable, modulo an
+uncertified zero-lane assumption.'' The reusable, sound idea underneath is the structural one ---
+operand/cofactor packing.
 \end{tcolorbox}
 
 \textbf{The lesson.} Register sharing is \emph{the} route below $\sim$948 qubits, and the
@@ -864,6 +883,78 @@ your objective is pure qubit count. The broader point generalizes both ways: \te
 competition you are playing before pricing a lever} --- a move that is a clear win for the low-qubit
 objective (trade unlimited Toffoli for lanes) can be a clear loss for the Q$\times$T objective, and
 vice versa.
+
+\subsection{Gate-Hosting: Borrowing an Idle Lane Instead of Allocating}
+\label{sec:gatehost}
+
+\textbf{The technique that powers the 948 $\to$ 851 drop (\S\ref{sec:regshare}) --- and the clearest
+place to see how a qubit lever can quietly become island-overfit at the level of a \emph{single
+borrowed qubit}.}
+
+\textbf{The idea.} Every reversible gadget needs \textbf{scratch ancilla} (a multi-controlled-X
+needs a lane to accumulate the AND of its controls; a carry chain needs carry bits; a comparator
+needs a borrow bit). Allocating a fresh $|0\rangle$ for each is what drives the peak up. But at the
+instant you need scratch, some lane \emph{elsewhere} is often idle --- the high bits of a shrunk
+number, a register between its last read and next write, an idle metadata lane.
+\textbf{Gate-hosting borrows that idle lane as scratch, then restores it before its owner needs it
+again} --- so the ancilla costs no new peak qubit. The scratch is ``hosted'' inside a register that
+belongs to something else (the codebase has explicit per-step tables naming which \texttt{A/B/CA/CB/Q}
+lane+bit hosts each gate). This generalizes \S\ref{sec:borrowcarry} (borrowed-carry fusion) to
+\emph{any} gate's scratch.
+
+\textbf{The hot-desking intuition.} Qubits are desks in a crowded office. Allocating a fresh ancilla
+$=$ renting a new desk (the office gets more crowded). Gate-hosting $=$ doing your hour of work at a
+colleague's empty desk while they are at lunch, then clearing it spotless before they return --- no
+new desk, the peak never rose.
+
+\textbf{Two flavors:}
+\begin{itemize}
+  \item \textbf{Clean hosting} --- the borrowed lane is known $|0\rangle$. Use it directly, restore
+    it to $|0\rangle$.
+  \item \textbf{Dirty hosting} --- the borrowed lane holds unknown live data $\psi$. You can still
+    borrow it via a trick that disturbs $\psi$ and then exactly un-disturbs it (the Barenco
+    ``surrounded'' pattern):
+\begin{lstlisting}
+ccx(c0, c1, psi)        <- scribble onto the borrowed lane
+ccx(psi, c2, target)    <- do the real work using it
+ccx(c0, c1, psi)        <- un-scribble: psi restored to its original value
+ccx(psi, c2, target)
+\end{lstlisting}
+    The two extra gates restore $\psi$ perfectly. Cost: 4 Toffoli instead of 3 --- a textbook
+    \textbf{$-1$ qubit, $+1$ Toffoli} trade (great when the objective does not score Toffoli).
+\end{itemize}
+
+\textbf{It is a compile-time bet, not a runtime scan.} A quantum circuit is static --- you cannot
+peek at a qubit mid-run to check ``is this $|0\rangle$?'' (measuring would collapse it). So nothing
+searches for zeros at runtime. The hosting choices are \textbf{frozen into the gate list at build
+time}: the compiler asserts \emph{``at step 437, lane 12 of register B will be $|0\rangle$, so host
+the scratch there,''} and the circuit runs that exact plan on every input. The whole question is
+whether that compile-time claim was \emph{true}.
+
+\textbf{Proven-zero vs sampled-zero (value-exact vs island-exact, one qubit at a time).} The
+zero-claims come in two grades:
+\begin{itemize}
+  \item \textbf{Proven zero (sound, density-neutral):} the lane is zero for a \emph{structural}
+    reason --- e.g.\ the high bits of an operand the GCD has provably shrunk, or a known-constant
+    register. Safe for all inputs.
+  \item \textbf{Sampled zero (island-exact, risky):} the claim ``this lane is $|0\rangle$ here'' is
+    established by an \textbf{empirical census} --- run many sample inputs, observe the lane was
+    always zero, \emph{assume} it always is. This is the grade the aggressive 851q borrows rely on.
+    ``The desk was empty every time I checked'' is not ``the desk is always empty.''
+\end{itemize}
+
+\textbf{How it breaks.} If an input arrives (one not in the sample) that makes a sampled-zero host
+lane \emph{non-zero} at borrow time, the hosted gate scribbles onto live data and the circuit
+silently returns a wrong answer --- reversibility offers no safety net. The reason the shipped
+circuit still scores $0/0/0$ is that the \textbf{nonce/test island is hunted to dodge exactly those
+inputs}: the 9024 graded inputs are chosen so none trips a bad borrow. So it never breaks on its own
+test set --- because the test set was fitted to the circuit, not because the circuit is universally
+correct.
+
+\textbf{Takeaway.} Gate-hosting is a perfectly sound, standard peak-reduction technique \textbf{when
+the host lane's state is proven}; it becomes an island-overfit assumption the moment the state is
+only \emph{sampled}. The same value-exact vs island-exact split from \S\ref{sec:density} applies
+here at the granularity of a single borrowed $|0\rangle$.
 
 % ===========================================================================
 \section{Toffoli Reduction: The Core Loop}
@@ -1609,6 +1700,7 @@ In-place decode (\S6.L) & varies & codec overhead & Yes \\
 Borrowed-carry fusion (\S6.M) & $k$ & 0 & Yes \\
 HMR ghosting (\S6.N) & 256 & $+1$ modular multiply & Yes \\
 EEA register sharing (\S6.O) & $\sim$97--119 (to 851$\to$829q) & high (irrelevant to low-q objective) & Yes --- low-qubit competition \\
+Gate-hosting (\S6.P) & 1 per hosted gate & 0 (clean) / $+1$ Tof (dirty) & Yes if host-zero \emph{proven}; island-exact if \emph{sampled} \\
 \bottomrule
 \end{tabular}
 \end{center}

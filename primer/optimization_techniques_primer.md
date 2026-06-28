@@ -15,7 +15,7 @@
 3. [The Challenge Circuit — Elliptic Curve Point Addition](#3)
 4. [Measuring Progress — The Peak Qubit Profile and Hot Spots](#4)
 5. [Qubit Reduction: The Core Loop](#5)
-6. [Qubit Reduction Techniques (A–O)](#6)
+6. [Qubit Reduction Techniques (A–P)](#6)
 7. [Toffoli Reduction: The Core Loop](#7)
 8. [Toffoli Reduction Techniques (A–Q)](#8)
 9. [The Qubit ↔ Toffoli Exchange Rate and the Product Race](#9)
@@ -708,18 +708,98 @@ contrast, under the *Q×T product* objective the very same packing would be ~250
 this technique belongs squarely to the low-qubit track, not the score track. The two objectives have
 genuinely different optimal constructions — see §9 for the exchange-rate math behind that statement.)
 
-**A note on rigor.** The very lowest figures (851q, 829q) come from an *analysis-oracle* accounting
-in `register_shared_eea.rs` — it models the achievable qubit count assuming the gate-hosting is
-realizable, then charges the hosting Toffoli separately, rather than emitting one fully-hardened
-reversible op stream end to end. Treat them as the leading **lower-bound witnesses** for the
-pure-qubit frontier; the lowest *fully-validated* circuit witness on this track is the 948q route.
-Either way, the structural mechanism — operand/cofactor packing — is the real and reusable idea.
+**A note on rigor — is 851q a *real* qubit count?** Only partly. It is a **lower-bound witness**,
+not a proven width, and the gap is worth understanding precisely (the source spells it out):
+
+- **The deepest figure is a *classical* oracle, not a circuit.** `register_shared_eea.rs` computes
+  on `U256`/`U512` integers — **there is not a single qubit or gate in it**. Its own header says:
+  *"an analysis oracle, not a reversible circuit implementation. In particular, passing this oracle
+  does not establish a challenge-valid qubit count."* Its job is only to check the packing invariant
+  `l_t + 1 + l_q + bitlen(r) ≤ n + 3` holds at all 1,479 steps — i.e. that operand and cofactor
+  *fit in one word*, proving the packing is **feasible in principle**, classically.
+- **The low count is bought by gate-hosting whose zero-claims are *sampled, not proven*** (see §6.P).
+  The hosting modules disclaim it: `q945_local_hosts.rs` — *"does not certify reachable-state zero
+  claims. Q945 acceptance remains blocked until the Q946 hardening prerequisites … are integrated"*;
+  `q944_gate_host_lifecycle.rs` only checks the host composition *"over every basis state at small
+  widths,"* then extrapolates to 256 bits.
+- **The submission self-reports rejection.** `Q949_ROBUST_ENVELOPE_FRESH_VALIDITY_CLAIMED = false`
+  (with an `assert!` enforcing it), and every artifact carries `"proof_status":"reject"`.
+
+So: passing the `0/0/0` run check certifies the **output values are correct on the hunted island**;
+it does **not** certify that 851 qubits suffices for *all* inputs. The lowest count backed by a
+fully-emitted, island-validated circuit *without* the extra uncertified-hosting assumption is the
+**948q** route. Treat 851q/829q as "this width looks reachable, modulo an uncertified zero-lane
+assumption." The reusable, sound idea underneath is the structural one — operand/cofactor packing.
 
 **The lesson.** Register sharing is *the* route below ~948 qubits, and the Proos–Zalka / Luo-2026
 mechanism is the structural source worth knowing. It is the right tool when your objective is pure
 qubit count. The broader point generalizes both ways: **know which competition you are playing
 before pricing a lever** — a move that is a clear win for the low-qubit objective (trade unlimited
 Toffoli for lanes) can be a clear loss for the Q×T objective, and vice versa.
+
+---
+
+### 6.P Gate-Hosting: Borrowing an Idle Lane Instead of Allocating
+
+**The technique that powers the 948 → 851 drop (§6.O) — and the clearest place to see how a qubit
+lever can quietly become island-overfit at the level of a *single borrowed qubit*.**
+
+**The idea.** Every reversible gadget needs **scratch ancilla**: a multi-controlled-X needs a lane
+to accumulate the AND of its controls; a carry chain needs carry bits; a comparator needs a borrow
+bit. Allocating a fresh `|0⟩` for each one is exactly what drives the peak up. But at the instant
+you need scratch, some lane *elsewhere* is often sitting idle — the high bits of a number that has
+shrunk, a register between its last read and next write, an idle metadata lane. **Gate-hosting
+borrows that idle lane as scratch, then restores it before its owner needs it again** — so the
+ancilla costs no new peak qubit. The gadget's scratch is "hosted" inside a register that belongs to
+something else (hence the name; the codebase has explicit per-step tables saying which `A/B/CA/CB/Q`
+lane+bit hosts each gate). This generalizes §6.M (borrowed-carry fusion) to *any* gate's scratch.
+
+**The hot-desking intuition.** Qubits are desks in a crowded office. Allocating a fresh ancilla =
+renting a new desk (the office gets more crowded). Gate-hosting = doing your hour of work at a
+colleague's empty desk while they're at lunch, then clearing it spotless before they return — no new
+desk, the peak never rose.
+
+**Two flavors:**
+- **Clean hosting** — the borrowed lane is known `|0⟩`. Use it directly, restore it to `|0⟩`.
+- **Dirty hosting** — the borrowed lane holds unknown live data `ψ`. You can still borrow it via a
+  trick that disturbs `ψ` and then exactly un-disturbs it (the Barenco "surrounded" pattern):
+  ```
+  ccx(c0, c1, ψ)        ← scribble onto the borrowed lane
+  ccx(ψ,  c2, target)   ← do the real work using it
+  ccx(c0, c1, ψ)        ← un-scribble: ψ restored to its original value
+  ccx(ψ,  c2, target)
+  ```
+  The two extra gates restore `ψ` perfectly. Cost: 4 Toffoli instead of 3 — a textbook
+  **−1 qubit, +1 Toffoli** trade (great when the objective does not score Toffoli).
+
+**It is a compile-time bet, not a runtime scan.** A quantum circuit is static — you cannot peek at a
+qubit mid-run to check "is this `|0⟩`?" (measuring would collapse it). So nothing searches for zeros
+at runtime. The hosting choices are **frozen into the gate list at build time**: the compiler
+asserts *"at step 437, lane 12 of register B will be `|0⟩`, so host the scratch there,"* and the
+circuit runs that exact plan on every input. The whole question is whether that compile-time claim
+was *true*.
+
+**Proven-zero vs sampled-zero (value-exact vs island-exact, one qubit at a time).** The zero-claims
+come in two grades:
+- **Proven zero (sound, density-neutral):** the lane is zero for a *structural* reason — e.g. the
+  high bits of an operand the GCD has provably shrunk, or a known-constant register. Safe for all
+  inputs.
+- **Sampled zero (island-exact, risky):** the claim "this lane is `|0⟩` here" is established by an
+  **empirical census** — run many sample inputs, observe the lane was always zero, *assume* it
+  always is. This is the grade the aggressive 851q borrows rely on. "The desk was empty every time I
+  checked" is not "the desk is always empty."
+
+**How it breaks.** If an input arrives (one not in the sample) that makes a sampled-zero host lane
+*non-zero* at borrow time, the hosted gate scribbles onto live data and the circuit silently returns
+a wrong answer — reversibility offers no safety net. The reason the shipped circuit still scores
+`0/0/0` is that the **nonce/test island is hunted to dodge exactly those inputs**: the 9024 graded
+inputs are chosen so none trips a bad borrow. So it never breaks on its own test set — because the
+test set was fitted to the circuit, not because the circuit is universally correct.
+
+**Takeaway.** Gate-hosting is a perfectly sound, standard peak-reduction technique **when the host
+lane's state is proven**; it becomes an island-overfit assumption the moment the state is only
+*sampled*. The same value-exact vs island-exact split from §10 applies here at the granularity of a
+single borrowed `|0⟩`.
 
 ---
 
@@ -1528,6 +1608,7 @@ entering — see §6.O and §9.
 | Borrowed-carry fusion (§6.M) | k | 0 | YES |
 | HMR ghosting / passenger ghosting (§6.N) | 256 | +1 modular multiply | YES |
 | EEA register sharing (§6.O) | ~97–119 (to 851→829q) | high (irrelevant to low-qubit objective) | YES — for the low-qubit competition (§1) |
+| Gate-hosting (§6.P) | 1 per hosted gate | 0 (clean) / +1 Tof (dirty) | YES if host-zero *proven*; island-exact if *sampled* |
 
 ### Toffoli reduction techniques
 
