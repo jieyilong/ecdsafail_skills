@@ -457,6 +457,27 @@ whole reason this challenge is approachable is that $p$ is a \textbf{pseudo-Mers
 \[
   p = 2^{256} - c, \qquad c = 2^{32} + 977 \quad\text{(only 33 bits wide)}.
 \]
+
+\textbf{A quick word on the names} (they describe a family of ``reduction-friendly'' primes):
+\begin{itemize}
+  \item \textbf{Mersenne prime} --- $p = 2^k - 1$. Reduction is \emph{trivial}: $2^k \equiv 1$, so you
+    fold the high bits straight onto the low bits with one add. (Too rare to land on a secure 256-bit
+    curve, but the ideal everything else approximates.)
+  \item \textbf{Pseudo-Mersenne prime} --- $p = 2^k - c$ with $c$ \emph{small} (here 33 bits). Now
+    $2^k \equiv c$, so the fold is ``high bits $\times c$, then add.'' \emph{Pseudo-Mersenne}
+    emphasizes that \textbf{$c$ is small}, which keeps the $H\cdot c$ multiply cheap.
+  \item \textbf{Solinas prime} (a.k.a.\ \emph{generalized Mersenne}, Jerome Solinas, 1999) --- $c$ is
+    not just small but a \textbf{sparse signed sum of a few powers of two}. For secp256k1,
+    $c = 2^{32} + 977 = 2^{32} + 2^{10} - 2^{5} - 2^{4} + 1$ (see NAF, \S9.7) --- only $\sim$5 signed
+    terms. \emph{Solinas} emphasizes that \textbf{$c$ is sparse}, so the $H\cdot c$ ``multiply'' is
+    really a handful of \emph{shifted adds/subtracts}, not a general multiplication.
+\end{itemize}
+secp256k1's prime is \textbf{both at once}, and the two properties cut different costs: being
+pseudo-Mersenne (small $c$) means \emph{one} fold suffices; being Solinas (sparse $c$) means that fold
+is a few shift-and-adds. Throughout this primer ``the Solinas fold'' and ``pseudo-Mersenne
+reduction'' refer to the same operation --- folding the top bits down by $+c$ --- and ``Solinas
+constant'' / ``the fold constant'' both mean $c$ (called $f$ in the code).
+
 The one identity everything rests on is
 \[
   2^{256} \equiv c \pmod{p}

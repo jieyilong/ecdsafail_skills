@@ -295,6 +295,25 @@ it sits just below a power of two. Write
 p = 2^256 − c,   where   c = 2^32 + 977   (only 33 bits wide)
 ```
 
+**A quick word on the names** (they describe a family of "reduction-friendly" primes):
+- **Mersenne prime** — `p = 2^k − 1`. Reduction mod a Mersenne prime is *trivial*: `2^k ≡ 1`, so you
+  just fold the high bits straight onto the low bits with one add. (These are too rare to land on a
+  secure 256-bit curve, but they're the ideal everything else approximates.)
+- **Pseudo-Mersenne prime** — `p = 2^k − c` with `c` *small* (here 33 bits). Now `2^k ≡ c`, so the
+  fold is "high bits **× c**, then add." The word *pseudo-Mersenne* emphasizes that **`c` is small**,
+  which is what keeps the `H·c` multiply cheap.
+- **Solinas prime** (a.k.a. *generalized Mersenne*, Jerome Solinas, 1999) — `c` is not just small but
+  a **sparse signed sum of a few powers of two**. For secp256k1, `c = 2^32 + 977 = 2^32 + 2^10 − 2^5
+  − 2^4 + 1` (see NAF, §9.7) — only ~5 signed terms. The word *Solinas* emphasizes that **`c` is
+  sparse**, so the `H·c` "multiply" is really just a handful of *shifted adds/subtracts*, not a
+  general multiplication.
+
+secp256k1's prime is **both at once**, and the two properties cut different costs: being
+pseudo-Mersenne (small `c`) means *one* fold suffices; being Solinas (sparse `c`) means that fold is
+a few shift-and-adds. Throughout this primer "the Solinas fold" and "pseudo-Mersenne reduction" refer
+to the same operation — folding the top bits down by `+c` — and "Solinas constant" / "the fold
+constant" both mean `c` (called `f` in the code).
+
 The one identity that everything rests on:
 
 ```
