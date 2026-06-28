@@ -2026,7 +2026,7 @@ attempt: trimming the active width is a \textbf{graded} correctness lever (\S\re
 push until the residual breaks, then give back one notch (1131$\to$1133) so a clean nonce is
 reachable. The push also introduced a reusable general pass --- \textbf{reset-bounded qubit-id
 compaction} (\S\ref{sec:compact}). Full analysis:
-\texttt{references/pareto-frontier-push-1153-to-1133.md}.
+\href{https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/pareto-frontier-push-1153-to-1133.md}{\texttt{pareto-frontier-push-1153-to-1133.md}}.
 
 % ===========================================================================
 \section{Open Frontiers}
@@ -2173,14 +2173,24 @@ Windowed arithmetic / QROM (\S\ref{sec:frontiers}) & Gidney 2019 (arXiv:1905.076
 \noindent\rule{\textwidth}{0.4pt}
 \vspace{2pt}
 
-\noindent\textit{See also} (all under
-\path{skills/ecdsafail_skills/ecdsafail-circuit-optimization/references/}):
+\noindent\textit{See also} --- these detailed reference docs live in the GitHub repo
+\href{https://github.com/jieyilong/ecdsafail_skills}{\texttt{github.com/jieyilong/ecdsafail\_skills}},
+under \texttt{ecdsafail-circuit-optimization/references/}:
 \begin{itemize}\small
-  \item \texttt{density\_neutral\_tradeoffs.md} --- detailed technique catalog with exchange rate math
-  \item \texttt{gidney-techniques.md} --- Gidney's full lever catalog with blog/paper pointers
-  \item \texttt{external-literature-2000-2026.md} --- broader academic literature map
-  \item \texttt{REPORT\_1168\_wall\_revamp.md} --- the trailmix\_ludicrous introduction
-  \item \texttt{frontier-1211-to-1170.md} --- detailed 1211$\to$1170 step-by-step record
+  \item \href{https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/density_neutral_tradeoffs.md}{\texttt{density\_neutral\_tradeoffs.md}} --- detailed technique catalog with exchange rate math
+  \item \href{https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/gidney-techniques.md}{\texttt{gidney-techniques.md}} --- Gidney's full lever catalog with blog/paper pointers
+  \item \href{https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/external-literature-2000-2026.md}{\texttt{external-literature-2000-2026.md}} --- broader academic literature map
+  \item \href{https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/REPORT_1168_wall_revamp.md}{\texttt{REPORT\_1168\_wall\_revamp.md}} --- the trailmix\_ludicrous introduction
+  \item \href{https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/frontier-1211-to-1170.md}{\texttt{frontier-1211-to-1170.md}} --- detailed 1211$\to$1170 step-by-step record
+  \item \href{https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/pareto-frontier-push-1153-to-1133.md}{\texttt{pareto-frontier-push-1153-to-1133.md}} --- the (Q,T) Pareto-frontier push (\S\ref{sec:paretopush})
+  \item \href{https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/SHRUNKEN_PZ_q948_track.md}{\texttt{SHRUNKEN\_PZ\_q948\_track.md}} --- the low-qubit Shrunken-PZ track (\S\ref{sec:twocomps})
 \end{itemize}
+
+\vspace{4pt}
+\noindent\textbf{Note on code paths.} Source files named in this primer (e.g.\ \texttt{arith.rs},
+\texttt{fused.rs}, \texttt{register\_shared\_eea.rs}) refer to the \textbf{ecdsa.fail challenge
+circuit} --- the \texttt{trailmix\_ludicrous} / \texttt{trailmix\_port} modules --- pulled
+per-submission via the \texttt{ecdsafail} CLI (\texttt{ecdsafail reset <submission>}); they are
+\emph{not} part of this docs repo.
 
 \end{document}

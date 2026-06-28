@@ -1915,7 +1915,7 @@ step 205), the dynamic-width-register idea (§6.6) applied to the ludicrous GCD.
 *value-exact repair* of an over-aggressive 1131 attempt: trimming the active width is a **graded**
 correctness lever (§5) — push until the residual breaks, then give back one notch (1131→1133) so a
 clean nonce is reachable. The push also introduced a reusable general pass — **reset-bounded qubit-id
-compaction** (§6.17). Full analysis: [`pareto-frontier-push-1153-to-1133.md`](references/pareto-frontier-push-1153-to-1133.md).
+compaction** (§6.17). Full analysis: [`pareto-frontier-push-1153-to-1133.md`](https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/pareto-frontier-push-1153-to-1133.md).
 
 ---
 
@@ -2032,9 +2032,18 @@ compaction** (§6.17). Full analysis: [`pareto-frontier-push-1153-to-1133.md`](r
 
 ---
 
-*See also*:
-- [`density_neutral_tradeoffs.md`](references/density_neutral_tradeoffs.md) — detailed technique catalog with exchange rate math
-- [`gidney-techniques.md`](references/gidney-techniques.md) — Gidney's full lever catalog with blog/paper pointers
-- [`external-literature-2000-2026.md`](references/external-literature-2000-2026.md) — broader academic literature map
-- [`REPORT_1168_wall_revamp.md`](references/REPORT_1168_wall_revamp.md) — the trailmix_ludicrous introduction and burst analysis
-- [`frontier-1211-to-1170.md`](references/frontier-1211-to-1170.md) — detailed 1211→1170 step-by-step record
+*See also* — these detailed reference docs live in the GitHub repo
+**[github.com/jieyilong/ecdsafail_skills](https://github.com/jieyilong/ecdsafail_skills)**, under
+`ecdsafail-circuit-optimization/references/`:
+- [`density_neutral_tradeoffs.md`](https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/density_neutral_tradeoffs.md) — detailed technique catalog with exchange rate math
+- [`gidney-techniques.md`](https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/gidney-techniques.md) — Gidney's full lever catalog with blog/paper pointers
+- [`external-literature-2000-2026.md`](https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/external-literature-2000-2026.md) — broader academic literature map
+- [`REPORT_1168_wall_revamp.md`](https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/REPORT_1168_wall_revamp.md) — the trailmix_ludicrous introduction and burst analysis
+- [`frontier-1211-to-1170.md`](https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/frontier-1211-to-1170.md) — detailed 1211→1170 step-by-step record
+- [`pareto-frontier-push-1153-to-1133.md`](https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/pareto-frontier-push-1153-to-1133.md) — the (Q,T) Pareto-frontier push (§13.3)
+- [`SHRUNKEN_PZ_q948_track.md`](https://github.com/jieyilong/ecdsafail_skills/blob/main/ecdsafail-circuit-optimization/references/SHRUNKEN_PZ_q948_track.md) — the low-qubit Shrunken-PZ track (§13.2)
+
+> **Note on code paths.** Source files named in this primer (e.g. `arith.rs`, `fused.rs`,
+> `register_shared_eea.rs`) refer to the **ecdsa.fail challenge circuit** — the `trailmix_ludicrous`
+> / `trailmix_port` modules — which is pulled per-submission via the `ecdsafail` CLI
+> (`ecdsafail reset <submission>`); they are *not* part of this docs repo.
