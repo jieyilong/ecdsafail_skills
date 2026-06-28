@@ -17,7 +17,7 @@
 5. [Qubit Reduction: The Core Loop](#5)
 6. [Qubit Reduction Techniques (1–17)](#6)
 7. [Toffoli Reduction: The Core Loop](#7)
-8. [Toffoli Reduction Techniques (1–17)](#8)
+8. [Toffoli Reduction Techniques (1–18)](#8)
 9. [The Qubit ↔ Toffoli Exchange Rate and the Product Race](#9)
 10. [Density-Neutral vs Island-Exact — Correctness Regimes](#10)
 11. [Pebbling Theory — The Formal Foundation](#11)
@@ -192,6 +192,44 @@ The second point `Q` is a **fixed constant** (the secp256k1 generator point, kno
 compile time). The current SOTA keeps `Q` as classical bit-patterns (`BitId`s) rather than
 quantum registers, eliminating 512 qubits from the peak — the single largest qubit reduction
 in the circuit's history.
+
+### Why secp256k1's prime is cheap: pseudo-Mersenne reduction (the math background)
+
+Every arithmetic step works **modulo** `p = 2^256 − 2^32 − 977`. Doing `mod p` naively means
+dividing by a 256-bit number — a full multiprecision division, expensive in any circuit. The whole
+reason this challenge is even approachable is that `p` is a **pseudo-Mersenne (Solinas) prime**:
+it sits just below a power of two. Write
+
+```
+p = 2^256 − c,   where   c = 2^32 + 977   (only 33 bits wide)
+```
+
+The one identity that everything rests on:
+
+```
+2^256 ≡ c   (mod p)
+```
+
+(because `2^256 − c = p ≡ 0`). In words: **anything that lands at bit position 256 or higher is
+congruent, mod p, to the same thing multiplied by the tiny constant `c` and dropped back into the
+low bits.** So to reduce a wide value `H·2^256 + L` (a high part `H` above bit 256, a low part `L`
+below it):
+
+```
+H·2^256 + L  ≡  L + H·c   (mod p)
+```
+
+You never divide by `p`. You **"fold" the overflow `H` back down** by multiplying it by the 33-bit
+`c` and adding — a couple of short operations instead of a full division. This single fact is the
+source of the entire secp256k1-vs-generic-prime cost gap: in Schrottenloher's accounting the
+constant-adder is **15% of all Toffoli for secp256k1 but 34% for a generic prime**, and modular
+doubling **8% vs 24%** (paper Table 3; secp space-opt 2²¹·¹⁹ vs generic 2²¹·⁷⁸).
+
+The intuition to carry forward: a modular reduction is normally "subtract `p` until you're back in
+range," but for a pseudo-Mersenne prime it becomes **"fold the top bits into the bottom bits,"**
+and the fold is cheap precisely because `c` is small. §8.18 turns this identity into the actual
+reversible-circuit gadgets (mod-double, mod-add, the `+f` fold), and §8.7 (NAF) makes the fold
+constant itself cheaper.
 
 ---
 
@@ -1115,8 +1153,8 @@ For `977`: 4 terms instead of 6, saving ~33% of the Solinas fold cost.
 **Density-neutral**: The identity `977 = 1024 − 32 − 16 + 1` is a mathematical fact, correct
 for all inputs.
 
-Also applied to `c = 2^32 + 977` (the secp256k1 pseudo-Mersenne constant), saving terms in
-the full modular reduction.
+Also applied to `c = 2^32 + 977` (the secp256k1 pseudo-Mersenne fold constant — see §8.18),
+saving terms in every modular reduction fold.
 
 ---
 
@@ -1333,6 +1371,69 @@ choosing what to stack first, prefer this class — it carries none of the dead-
 
 The general principle: **whenever a gadget's cost is quadratic in a window width, ask whether it is
 secretly a standard primitive (increment, compare, prefix-AND) with a known linear construction.**
+
+---
+
+### 8.18 Pseudo-Mersenne (Solinas) Modular Arithmetic
+
+This is the workhorse that makes *every* modular operation cheap. The math background is in §3
+(pseudo-Mersenne reduction): because `p = 2^256 − c` with `c = 2^32 + 977` only 33 bits,
+`2^256 ≡ c (mod p)`, so a reduction is a cheap **fold** of the top bits into the bottom, not a
+division. Here is how that identity becomes actual reversible gadgets (Schrottenloher Algs 7/10/11;
+trailmix `pm_prims.rs` / `arith.rs`). The constant `c` is called `f` in the code.
+
+**Modular doubling — `2x mod p` (Alg 7).** Shift `x` left by one bit (now up to 257 bits). The part
+that spilled past bit 256 has weight `2^256 ≡ c`, so it folds back as `+c`:
+
+```
+2x mod p:
+  1. shift-left by 1                       (a relabel — 0 Toffoli)
+  2. if the top bit overflowed: add c into the LOW limbs   (controlled +f, short)
+  3. one CX to clear the overflow ancilla
+```
+
+**Modular addition — `x + y mod p` (Alg 10).** `x + y` overflows `2^256` by at most one bit; on
+overflow, fold it as `+c` in the low limbs, then erase the overflow flag with a compare:
+
+```
+x + y mod p:
+  1. add y into x                          (a Cuccaro/Gidney adder)
+  2. if overflow (carry-out = 1): add c into the low limbs
+  3. erase the overflow ancilla via a y<x comparison
+```
+
+Alg 11 additionally handles the degenerate case `x + y = p` (all the high bits equal) — needed only
+in the GCD's first `≈c·√n` "empty" padding iterations, so the expensive variant is routed *only*
+there and the cheap Alg-10 used everywhere else.
+
+**The two approximations that make it cheap (and their dials).** Doing these *exactly* would still
+need full-width compares and adds. Two structural facts let you truncate — because `c` is small:
+
+- **`+f` touches only the low limbs (the `lsbs` dial).** Folding `+c` perturbs only the bottom ~33
+  bits plus a short carry ripple, so the `+f` adder is run over a narrow window of width `lsbs`
+  (trailmix uses ~54–63). Too narrow and a long carry ripple is missed; per-call failure
+  ≈ `2^(−padding)` ≈ `2^(−30)` at their settings. *Shipped as* `*_CARRY_TRUNC_W` /
+  `ROUND84_INPLACE_SOLINAS_FOLD` / the low-54-bit `+f` fold (§12).
+- **Overflow/degeneracy is decided from only the top bits (the `msbs` dial).** Whether `x+y ≥ p`
+  (or `2x ≥ p`) is dominated by the high bits, so the comparison scans only the top `msbs` bits
+  (the paper uses 40–50). *Shipped as* `DIALOG_GCD_COMPARE_BITS` / `*_APPLY_CLEAN_COMPARE_BITS`.
+
+Both are **graded / island-exact** levers (§5, §10): tightening a notch is value-exact only on a
+searched nonce-island, because it makes a `2^(−k)`-rare fraction of inputs reduce wrong. They sit on
+exactly the binary-vs-graded line of §5 and are tuned against the 9024-shot `0/0/0` target.
+
+**Borrowed-dirty `+f` window (`gidney_cadd_f_window`).** The `+f` add needs carry scratch; instead
+of fresh ancilla it **borrows the register's own idle high bits** as that scratch (~3 clean ancilla
+instead of ~10), restoring them after — gate-hosting (§6.16) applied to the fold. So the reduction
+adds ~0 clean qubits at the peak, value/phase-identical to the vented path.
+
+**Why it matters.** A generic-prime reduction is a full multiprecision divide (Barrett/Montgomery,
+~n-bit work) on *every* add and double, and the GCD/Bézout reconstruction does thousands of them.
+Pseudo-Mersenne turns each into a short `+f` fold + a top-bits compare. That is the entire
+secp256k1 advantage: constant-adder 15% vs 34% of Toffoli, modular-double 8% vs 24% (§3). **No
+Montgomery form is used** — both the paper and trailmix keep plain integer representation and fold
+directly. NAF recoding (§8.7) is the next layer: it makes the fold constant `c` itself cheaper
+(4 signed terms instead of 6), shaving each fold further.
 
 ---
 
@@ -1774,6 +1875,7 @@ compaction** (§6.17). Full analysis: [`pareto-frontier-push-1153-to-1133.md`](r
 | Witness-first dataflow (§8.5) | ~13M / instance | 0 | YES |
 | Karatsuba square (§8.6) | ~22M (one change) | 0 | YES |
 | NAF recoding (§8.7) | ~5–10% of constant-fold cost | 0 | YES |
+| Pseudo-Mersenne reduction (§8.18) | huge (15% vs 34% of CCX) | 0 | YES (fold); PARTIAL (lsbs/msbs trunc) |
 | Structural dead-gate skip (§8.8) | varies | 0 | YES |
 | Classical constant ops (§8.9) | significant | 0 | YES |
 | Converged-tail elision (§8.10) | ~hundreds/iter × K iters | 0 | NO |
