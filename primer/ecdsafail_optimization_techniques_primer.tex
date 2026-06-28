@@ -1533,14 +1533,28 @@ carry over unchanged:
   \underbrace{2^9 + 2^8 + 2^7 + 2^6}_{\text{the run}} + 2^4 + 2^0
   \;=\; \underbrace{2^{10} - 2^6}_{\text{collapsed}} + 2^4 + 2^0 .
 \]
-So $\mathbf{NAF(977) = +2^{10} - 2^6 + 2^4 + 2^0}$ (check: $1024 - 64 + 16 + 1 = 977$). Note the
-exponents $10, 6, 4, 0$ are \emph{not} a free choice and each sign is glued to its own power: the
-run-collapse \emph{produces} $+2^{10}$ and $-2^6$, and the untouched bits stay at $+2^4$ and $+2^0$.
-(That is why it is not, say, ``signs $+,-,+,+$ on $9,8,5,1$'' --- those powers don't come out of the
-derivation and wouldn't sum to 977.) A $-2^k$ digit simply means \emph{that} fold step is a
-\textbf{shifted subtraction} instead of an addition --- and in a reversible circuit a controlled
-modular subtract costs exactly the same as a controlled add (it is the adder run backwards), so a
-signed digit is as cheap as a binary one.
+So $\mathbf{NAF(977) = +2^{10} - 2^6 + 2^4 + 2^0}$ (check: $1024 - 64 + 16 + 1 = 977$).
+
+\textbf{Why ``$+,-,+,+$'' alone can't tell you the powers --- and isn't supposed to.} A NAF number is
+\textbf{positional}, exactly like ordinary binary except each position may hold $-1$ as well as $0$ or
+$+1$. So the real object is a digit \emph{string}, one digit per bit position:
+\begin{center}
+\begin{tabular}{l ccccccccccc}
+position: & 10 & 9 & 8 & 7 & 6 & 5 & 4 & 3 & 2 & 1 & 0 \\
+digit:    & $+1$ & 0 & 0 & 0 & $-1$ & 0 & $+1$ & 0 & 0 & 0 & $+1$ \\
+\end{tabular}
+\end{center}
+The signs ``$+,-,+,+$'' are just the four \textbf{non-zero} digits read off top-to-bottom --- a
+summary, not the representation. The powers $10, 6, 4, 0$ are simply \emph{where those non-zero digits
+sit}, intrinsic to the number, not inferred from the signs. ``Signs $+,-,+,+$ on $9,8,5,1$'' would be
+a \textbf{different digit string} --- a different number entirely (it sums to $512 - 256 + 32 + 2 =
+290$, not 977). Which positions are non-zero is decided when you \emph{compute} the NAF (the
+run-collapse above, or the standard greedy algorithm), and the value 977 has exactly \textbf{one} NAF
+--- so there is nothing to ``choose.''
+
+A $-2^k$ digit means \emph{that} fold step is a \textbf{shifted subtraction} instead of an addition ---
+and in a reversible circuit a controlled modular subtract costs exactly the same as a controlled add
+(it is the adder run backwards), so a signed digit is as cheap as a binary one.
 
 \textbf{The payoff.} 6 non-zero digits $\to$ 4: \textbf{four shifted add/subtracts per fold instead of
 six, $\approx33\%$ off the 977 part of every Solinas reduction.} That reduction runs on essentially

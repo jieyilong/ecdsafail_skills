@@ -1413,13 +1413,26 @@ unchanged:
             └──── the run ─────┘
   NAF:        2^10  −  2^6        +   2^4   +   2^0          (positions 10, 6, 4, 0)
 ```
-so **`NAF(977) = +2^10 − 2^6 + 2^4 + 2^0`** (check: 1024 − 64 + 16 + 1 = 977). Note the exponents
-`10, 6, 4, 0` are not a free choice and each sign is glued to its own power: the run-collapse *produces*
-`+2^10` and `−2^6`, and the untouched bits stay at `+2^4` and `+2^0`. (That is why it is not, say,
-"signs +,−,+,+ on 9,8,5,1" — those powers don't come out of the derivation and wouldn't sum to 977.)
-A `−2^k` digit simply means *that* fold step is a **shifted subtraction** instead of an addition — and
-in a reversible circuit a controlled modular subtract costs exactly the same as a controlled add (it
-is the adder run backwards), so a signed digit is as cheap as a binary one.
+so **`NAF(977) = +2^10 − 2^6 + 2^4 + 2^0`** (check: 1024 − 64 + 16 + 1 = 977).
+
+**Why "+, −, +, +" alone can't tell you the powers — and isn't supposed to.** A NAF number is
+**positional**, exactly like ordinary binary except each position may hold −1 as well as 0 or +1. So
+the real object is a digit *string*, one digit per bit position:
+```
+position:  10   9   8   7   6   5   4   3   2   1   0
+digit:     +1   0   0   0   −1   0   +1   0   0   0   +1
+```
+The signs "+, −, +, +" are just the four **non-zero** digits read off top-to-bottom — a summary, not
+the representation. The powers `10, 6, 4, 0` are simply *where those non-zero digits sit*, and that is
+intrinsic to the number, not inferred from the signs. "Signs +,−,+,+ on 9,8,5,1" would be a
+**different digit string** — a different number entirely (it sums to `512 − 256 + 32 + 2 = 290`, not
+977). Which positions are non-zero is decided when you *compute* the NAF (the run-collapse above, or
+the standard greedy algorithm), and the value 977 has exactly **one** NAF — so there is nothing to
+"choose."
+
+A `−2^k` digit means *that* fold step is a **shifted subtraction** instead of an addition — and in a
+reversible circuit a controlled modular subtract costs exactly the same as a controlled add (it is the
+adder run backwards), so a signed digit is as cheap as a binary one.
 
 **The payoff.** 6 non-zero digits → 4: **four shifted add/subtracts per fold instead of six, ~33% off
 the 977 part of every Solinas reduction.** That reduction runs on essentially every modular
