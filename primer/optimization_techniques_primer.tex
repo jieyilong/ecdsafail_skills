@@ -165,7 +165,7 @@ from circuit-level first principles, with concrete examples from actual research
 \newpage
 
 % ===========================================================================
-\section{What We Are Optimizing}
+\section{What We Are Optimizing --- The Score and Why Toffoli Gates Are Expensive}
 \label{sec:score}
 % ===========================================================================
 
@@ -269,7 +269,7 @@ objectives separate in your head: many ``is this worth it?'' questions only have
 know \emph{which} track you are on.
 
 % ===========================================================================
-\section{The Reversibility Constraint}
+\section{The Reversibility Constraint --- Why Quantum Circuits Are Hard to Optimize}
 \label{sec:reversibility}
 % ===========================================================================
 
@@ -314,7 +314,7 @@ every logical AND operation normally costs $2\times$ --- once forward, once back
 This is the central pain point that Measurement-Based Uncomputation (\S\ref{sec:mbu}) solves.
 
 % ===========================================================================
-\section{The Challenge Circuit}
+\section{The Challenge Circuit --- Elliptic Curve Point Addition}
 \label{sec:circuit}
 % ===========================================================================
 
@@ -434,7 +434,7 @@ precisely because $c$ is small. \S\ref{sec:pmarith} turns this into the actual r
 (mod-double, mod-add, the $+f$ fold); \S8.7 (NAF) makes the fold constant itself cheaper.
 
 % ===========================================================================
-\section{Measuring Progress}
+\section{Measuring Progress --- The Peak Qubit Profile and Hot Spots}
 \label{sec:measuring}
 % ===========================================================================
 
@@ -544,7 +544,7 @@ near-misses.
 \end{tcolorbox}
 
 % ===========================================================================
-\section{Qubit Reduction Techniques}
+\section{Qubit Reduction Techniques (1--17)}
 \label{sec:qubittech}
 % ===========================================================================
 
@@ -1128,7 +1128,7 @@ Adjacent algebraic stages (add/negate/subtract chains) & Algebraic fusion (\S\re
 \end{center}
 
 % ===========================================================================
-\section{Toffoli Reduction Techniques}
+\section{Toffoli Reduction Techniques (1--18)}
 \label{sec:toftech}
 % ===========================================================================
 
@@ -1569,7 +1569,7 @@ keep plain integer representation and fold directly. NAF recoding (\S8.7) is the
 the fold constant $c$ itself cheaper (4 signed terms instead of 6).
 
 % ===========================================================================
-\section{The Qubit $\leftrightarrow$ Toffoli Exchange Rate}
+\section{The Qubit $\leftrightarrow$ Toffoli Exchange Rate and the Product Race}
 \label{sec:exchange}
 % ===========================================================================
 
@@ -1634,7 +1634,7 @@ looks ``irreducible'' (structured data) but is often the cheap lever. The scratc
 ``wasteful'' but is often the expensive lever.
 
 % ===========================================================================
-\section{Density-Neutral vs Island-Exact}
+\section{Density-Neutral vs Island-Exact --- Correctness Regimes}
 \label{sec:density}
 % ===========================================================================
 
@@ -1673,7 +1673,7 @@ A correct circuit shows \texttt{0/0/0}. Measurement-based uncompute fails in \ph
 checks miss). Truncation failures typically show in \cls. Missed uncompute shows in \anc.
 
 % ===========================================================================
-\section{Pebbling Theory}
+\section{Pebbling Theory --- The Formal Foundation}
 \label{sec:pebbling}
 % ===========================================================================
 

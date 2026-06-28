@@ -10,25 +10,25 @@
 
 ## Table of Contents
 
-1. [What We Are Optimizing — The Score and Why Toffoli Gates Are Expensive](#1)
-2. [The Reversibility Constraint — Why Quantum Circuits Are Hard to Optimize](#2)
-3. [The Challenge Circuit — Elliptic Curve Point Addition](#3)
-4. [Measuring Progress — The Peak Qubit Profile and Hot Spots](#4)
-5. [Qubit Reduction: The Core Loop](#5)
-6. [Qubit Reduction Techniques (1–17)](#6)
-7. [Toffoli Reduction: The Core Loop](#7)
-8. [Toffoli Reduction Techniques (1–18)](#8)
-9. [The Qubit ↔ Toffoli Exchange Rate and the Product Race](#9)
-10. [Density-Neutral vs Island-Exact — Correctness Regimes](#10)
-11. [Pebbling Theory — The Formal Foundation](#11)
-12. [The SOTA Circuit: How trailmix_ludicrous Works](#12)
-13. [The Three Tracks: Score, Low-Qubit, and Pareto Frontier](#13)
-14. [Open Frontiers](#14)
-15. [Quick-Reference Summary Tables](#15)
+1. [What We Are Optimizing — The Score and Why Toffoli Gates Are Expensive](#1-what-we-are-optimizing--the-score-and-why-toffoli-gates-are-expensive)
+2. [The Reversibility Constraint — Why Quantum Circuits Are Hard to Optimize](#2-the-reversibility-constraint--why-quantum-circuits-are-hard-to-optimize)
+3. [The Challenge Circuit — Elliptic Curve Point Addition](#3-the-challenge-circuit--elliptic-curve-point-addition)
+4. [Measuring Progress — The Peak Qubit Profile and Hot Spots](#4-measuring-progress--the-peak-qubit-profile-and-hot-spots)
+5. [Qubit Reduction: The Core Loop](#5-qubit-reduction-the-core-loop)
+6. [Qubit Reduction Techniques (1–17)](#6-qubit-reduction-techniques-117)
+7. [Toffoli Reduction: The Core Loop](#7-toffoli-reduction-the-core-loop)
+8. [Toffoli Reduction Techniques (1–18)](#8-toffoli-reduction-techniques-118)
+9. [The Qubit ↔ Toffoli Exchange Rate and the Product Race](#9-the-qubit-↔-toffoli-exchange-rate-and-the-product-race)
+10. [Density-Neutral vs Island-Exact — Correctness Regimes](#10-density-neutral-vs-island-exact--correctness-regimes)
+11. [Pebbling Theory — The Formal Foundation](#11-pebbling-theory--the-formal-foundation)
+12. [The SOTA Circuit: How trailmix_ludicrous Works](#12-the-sota-circuit-how-trailmix_ludicrous-works)
+13. [The Three Tracks: Score, Low-Qubit, and Pareto Frontier](#13-the-three-tracks-score-low-qubit-and-pareto-frontier)
+14. [Open Frontiers](#14-open-frontiers)
+15. [Quick-Reference Summary Tables](#15-quick-reference-summary-tables)
 
 ---
 
-## 1. What We Are Optimizing
+## 1. What We Are Optimizing — The Score and Why Toffoli Gates Are Expensive
 
 ### The score
 
@@ -116,7 +116,7 @@ know *which* track you are on.
 
 ---
 
-## 2. The Reversibility Constraint
+## 2. The Reversibility Constraint — Why Quantum Circuits Are Hard to Optimize
 
 ### You cannot delete information
 
@@ -158,7 +158,7 @@ This is the central pain point that Measurement-Based Uncomputation (§8.1) solv
 
 ---
 
-## 3. The Challenge Circuit
+## 3. The Challenge Circuit — Elliptic Curve Point Addition
 
 ### What it computes
 
@@ -280,7 +280,7 @@ constant itself cheaper.
 
 ---
 
-## 4. Measuring Progress
+## 4. Measuring Progress — The Peak Qubit Profile and Hot Spots
 
 ### The live-qubit-vs-time profile
 
@@ -376,7 +376,7 @@ width cut that's not value-exact will produce all-dirty garbage on every input, 
 
 ---
 
-## 6. Qubit Reduction Techniques
+## 6. Qubit Reduction Techniques (1–17)
 
 ### 6.1 Live-Range Holes: Uncompute Early, Recompute Later
 
@@ -975,7 +975,7 @@ true peak.)
 
 ---
 
-## 8. Toffoli Reduction Techniques
+## 8. Toffoli Reduction Techniques (1–18)
 
 ### 8.1 Measurement-Based Uncomputation (MBU) — The Most Important Technique
 
@@ -1490,7 +1490,7 @@ directly. NAF recoding (§8.7) is the next layer: it makes the fold constant `c`
 
 ---
 
-## 9. The Qubit ↔ Toffoli Exchange Rate
+## 9. The Qubit ↔ Toffoli Exchange Rate and the Product Race
 
 ### The fundamental arithmetic
 
@@ -1551,7 +1551,7 @@ looks "irreducible" (structured data) but is often the cheap lever. The scratch 
 
 ---
 
-## 10. Density-Neutral vs Island-Exact
+## 10. Density-Neutral vs Island-Exact — Correctness Regimes
 
 ### The fundamental distinction
 
@@ -1593,7 +1593,7 @@ checks miss). Truncation failures typically show in `cls`. Missed uncompute show
 
 ---
 
-## 11. Pebbling Theory
+## 11. Pebbling Theory — The Formal Foundation
 
 ### The reversible pebble game
 
