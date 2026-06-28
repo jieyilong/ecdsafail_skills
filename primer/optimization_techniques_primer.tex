@@ -303,10 +303,14 @@ counterproductive --- for another:
     additions plus overhead --- whereas the scored circuit here is \textbf{one} point addition, so
     the per-point-addition figure is the correct reference.)} A point is Pareto-optimal if you cannot
     lower one of Q or T without raising the other. The goal here is not a single score but a
-    \emph{clean, reusable basis curve}: a value-exact circuit at each qubit count that others can fork
-    and improve (see the 1153q$\to$1133q clean Pareto bases, \S\ref{sec:paretopush}). This track
-    deliberately avoids island-overfit tricks (\S\ref{sec:density}) so the curve stays a sound
-    reference.
+    \emph{clean, forkable basis curve} at each qubit count (see the 1153q$\to$1133q Pareto bases,
+    \S\ref{sec:paretopush}). To stay reusable, these circuits \textbf{deliberately disable the most
+    overfit lever --- dead-CCX deletion} (\S\ref{sec:density}), whose hard-coded gate-index lists are
+    tied to one exact op stream. They are \emph{not} fully value-exact, though: they still use the
+    route's calibrated \textbf{approximations} (comparator-width narrowing, carry truncation, and at
+    the lowest rungs active-width trimming --- all island-exact, \S\ref{sec:density}), so each still
+    needs its own nonce hunt. The point is a \emph{cleaner, more forkable} reference than a
+    dead-CCX-stacked SOTA --- not an all-inputs-provable one.
 \end{enumerate}
 
 These are genuinely different games. Most of this primer optimizes track 1, but several techniques
@@ -2226,8 +2230,17 @@ is ``best'' depends entirely on which competition you are entering --- see \S\re
 \subsection{The Pareto-frontier track: clean (Q, T) basis circuits 1153q $\to$ 1133q (\S\ref{sec:twocomps}, track 3)}
 \label{sec:paretopush}
 
-The third track (\S\ref{sec:twocomps}, objective 3) maps the \textbf{value-exact Pareto frontier}
-below the 1153q SOTA as a sequence of \textbf{clean, dead-CCX-free basis circuits} others can fork.
+The third track (\S\ref{sec:twocomps}, objective 3) maps the \textbf{(Q, T) Pareto frontier} below the
+1153q SOTA as a sequence of \textbf{clean, dead-CCX-free basis circuits} others can fork.
+``Dead-CCX-free'' is the precise claim: every rung hard-sets \texttt{DROP\_DEAD\_ROBUST\_DISABLE=1},
+omitting the most overfit lever (whose hard-coded gate-index \texttt{.idx} lists are tied to one exact
+op stream, \S\ref{sec:density}) --- that omission is what keeps the basis \emph{reusable}. They are
+\textbf{not fully value-exact}, however: each still carries the route's standard calibrated
+\textbf{approximations} (comparator-width narrowing \S9.18, carry truncation \S7.4, and at the lowest
+rungs \textbf{active-width trimming} \S\ref{sec:density}) that are island-exact and require a per-rung
+nonce hunt. So treat the curve as a \emph{cleaner, more forkable} reference than a dead-CCX-stacked
+SOTA, not as an all-inputs-provable bound.
+
 Unlike the low-qubit witness track above, these stay in the \textbf{useful corner} --- every point
 beats the published \emph{single point-addition} estimate on \emph{both} axes: $q < 1175$ and
 $T \approx$ 1.37--1.46M, comfortably under the $\sim$2.69M ($2^{21.36}$) Toffoli of the Babbush

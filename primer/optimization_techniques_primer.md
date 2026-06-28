@@ -148,10 +148,13 @@ counterproductive — for another:
    ECDLP/Shor run — ~28 windowed point additions plus overhead — whereas the scored circuit here is
    **one** point addition, so the per-point-addition figure is the correct reference.)* A point is
    Pareto-optimal if you cannot lower one of Q or T without raising the other. The goal here is not a
-   single score but a *clean, reusable basis curve*: a value-exact circuit at each qubit count that
-   others can fork and improve (see the 1153q→1133q clean Pareto bases, §14.3). This track deliberately
-   avoids island-overfit tricks (§11)
-   so the curve stays a sound reference.
+   single score but a *clean, forkable basis curve* at each qubit count (see the 1153q→1133q Pareto
+   bases, §14.3). To stay reusable, these circuits **deliberately disable the most overfit lever —
+   dead-CCX deletion** (§11), whose hard-coded gate-index lists are tied to one exact op stream. They
+   are *not* fully value-exact, though: they still use the route's calibrated **approximations**
+   (comparator-width narrowing, carry truncation, and at the lowest rungs active-width trimming — all
+   island-exact, §11), so each still needs its own nonce hunt. The point is a *cleaner, more forkable*
+   reference than a dead-CCX-stacked SOTA — not an all-inputs-provable one.
 
 These are genuinely different games. Most of this primer optimizes track 1, but several techniques
 (register sharing, the clean Pareto bases) only make sense under tracks 2 and 3. Keep the three
@@ -2115,14 +2118,22 @@ entering — see §7.15 and §10.
 
 ### The Pareto-frontier track: clean (Q, T) basis circuits 1153q → 1133q (§2, track 3)
 
-The third track (§2, objective 3) maps the **value-exact Pareto frontier** below the 1153q SOTA as a
-sequence of **clean, dead-CCX-free basis circuits** others can fork. Unlike the low-qubit witness
-track above, these stay in the **useful corner** — every point beats the published *single
-point-addition* estimate on *both* axes: **q < 1175** and **T ≈ 1.37–1.46M, comfortably under the
-~2.69M (2²¹·³⁶) Toffoli** of the Babbush space-optimized secp256k1 point-add (Schrottenloher 2026,
-Table 1). So the whole curve clears the bar with ~20–40 qubits and roughly 2× Toffoli to spare. They
-are "rejected" on the Q×T product *by construction* (they trade qubits down for Toffoli up); the
-deliverable is the exchange *curve*, not a score.
+The third track (§2, objective 3) maps the **(Q, T) Pareto frontier** below the 1153q SOTA as a
+sequence of **clean, dead-CCX-free basis circuits** others can fork. "Dead-CCX-free" is the precise
+claim: every rung hard-sets `DROP_DEAD_ROBUST_DISABLE=1`, omitting the most overfit lever (whose
+hard-coded gate-index `.idx` lists are tied to one exact op stream, §11) — that omission is what keeps
+the basis *reusable*. They are **not fully value-exact**, however: each still carries the route's
+standard calibrated **approximations** (comparator-width narrowing §9.18, carry truncation §7.4, and
+at the lowest rungs **active-width trimming** §11) that are island-exact and require a per-rung nonce
+hunt. So treat the curve as a *cleaner, more forkable* reference than a dead-CCX-stacked SOTA, not as
+an all-inputs-provable bound.
+
+Unlike the low-qubit witness track above, these stay in the **useful corner** — every point beats the
+published *single point-addition* estimate on *both* axes: **q < 1175** and **T ≈ 1.37–1.46M,
+comfortably under the ~2.69M (2²¹·³⁶) Toffoli** of the Babbush space-optimized secp256k1 point-add
+(Schrottenloher 2026, Table 1). So the whole curve clears the bar with ~20–40 qubits and roughly 2×
+Toffoli to spare. They are "rejected" on the Q×T product *by construction* (they trade qubits down for
+Toffoli up); the deliverable is the exchange *curve*, not a score.
 
 | q | T_clean | clean exchange vs prev | new lever introduced |
 |---|---------|------------------------|----------------------|

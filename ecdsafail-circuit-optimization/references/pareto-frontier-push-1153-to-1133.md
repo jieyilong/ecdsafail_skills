@@ -1,9 +1,14 @@
-# The (Q, T) Pareto-Frontier Push: 1153q → 1133q (clean, value-exact basis)
+# The (Q, T) Pareto-Frontier Push: 1153q → 1133q (clean, dead-CCX-free basis)
 
 **Author/agent:** jieyilong (with GPT-5 / GPT-5-Codex sub-agents). **Dates:** 6/23–6/27/26.
-**What this is:** a deliberate mapping of the **value-exact (qubits, Toffoli) Pareto frontier**
-below the 1153q SOTA, published as a sequence of **clean, dead-CCX-free basis circuits** others can
-fork. This is **objective 3** of the challenge (explore the (Q,T) frontier — especially the *useful
+**What this is:** a deliberate mapping of the **(qubits, Toffoli) Pareto frontier** below the 1153q
+SOTA, published as a sequence of **clean, dead-CCX-free basis circuits** others can fork. *"Dead-CCX-
+free" (every rung hard-sets `DROP_DEAD_ROBUST_DISABLE=1`) is the precise claim — it omits the most
+overfit lever, whose absolute-position `.idx` lists tie a circuit to one exact op stream, which is
+what keeps the basis reusable. These are **not fully value-exact**: each still carries the route's
+calibrated approximations (comparator-width narrowing, carry truncation, and at the lowest rungs
+active-width trimming) that are island-exact and need a per-rung nonce hunt. Treat the curve as a
+cleaner, more forkable reference than a dead-CCX-stacked SOTA, not an all-inputs-provable bound.* This is **objective 3** of the challenge (explore the (Q,T) frontier — especially the *useful
 corner* where both Q and T beat the published estimate for a **single secp256k1 point addition**:
 **≤1175q / ~2.69M Toffoli** (2²¹·³⁶), the Babbush et al. space-optimized figure in Schrottenloher
 2026 Table 1, arXiv:2606.02235 — *not* the full-ECDLP ≤1200q/≤90M Toffoli, which is the whole Shor
@@ -55,8 +60,8 @@ product-competitive.
 
 ## 2. The lever taxonomy (what *kind* of move each qubit costs)
 
-Every rung trades **qubits ↓ for Toffoli ↑**, value-exactly, by one of four mechanisms. They sort
-cleanly by exchange rate:
+Every rung trades **qubits ↓ for Toffoli ↑** by one of four mechanisms — the first three value-exact,
+the fourth (active-width trimming) an island-exact approximation. They sort cleanly by exchange rate:
 
 1. **Fold-vent clamping (the cheap qubits).** `TLM_FOLD_CALL_CODE_OVERRIDES` clamps each peak-defining
    fold's measured-vent-window count: `nv = min(code, headroom − reserve)`. Each window dropped is
@@ -137,9 +142,10 @@ trimming **shrinks the live operand width per step** in the late tail (−3 bits
 the **dynamic-width-register idea** (see primer §7.6) applied per-step to the ludicrous GCD tail —
 the structural source of the deepest qubits on the frontier.
 
-**Why 1133 and not lower — a value-exact repair.** The team first pushed to a **1131** "PairRaw1
-codec-wall" route, but it *over-trimmed* the post-205 active width — clipping late GCD/carry state
-inflated the classical/phase residual so no clean Fiat-Shamir island could be found. The 1133
+**Why 1133 and not lower — relaxing an over-aggressive approximation.** The team first pushed to a
+**1131** "PairRaw1 codec-wall" route, but it *over-trimmed* the post-205 active width (active-width
+trimming is a graded, island-exact approximation) — clipping late GCD/carry state inflated the
+classical/phase residual so no clean Fiat-Shamir island could be found. The 1133
 submission **gives back two qubits** (relax the late-tail trim: 3 generally, 4 held at 254–257) to
 reduce the residual just enough that a clean island (nonce `12846838`, 0/0/0 over 9024 shots) becomes
 reachable — while keeping the rest of the low-qubit structure and adding **no** dead-CCX deletion.
@@ -178,7 +184,9 @@ promising drop-in for any future rung whose reported count exceeds its measured 
 
 ## 5. How to use this frontier
 
-- **As a fork target.** Each rung is a clean, reproducible, value-exact circuit at its qubit count.
+- **As a fork target.** Each rung is a clean, reproducible, dead-CCX-free circuit at its qubit count
+  (its calibrated approximations are baked, nonce included) — minus the position-tied dead-CCX lever,
+  so a forker can layer their own dead-CCX screen / arithmetic / codec on top and measure the gain.
   A future designer layers their own (better) dead-CCX screen / arithmetic / codec on top and measures
   the gain against a sound reference — no island-overfit contamination.
 - **As a budget.** At each q, the gap `T_clean(q) − (SOTA_score / q)` is exactly how much Toffoli a
