@@ -15,7 +15,7 @@
 3. [The Challenge Circuit — Elliptic Curve Point Addition](#3)
 4. [Measuring Progress — The Peak Qubit Profile and Hot Spots](#4)
 5. [Qubit Reduction: The Core Loop](#5)
-6. [Qubit Reduction Techniques (A–P)](#6)
+6. [Qubit Reduction Techniques (A–Q)](#6)
 7. [Toffoli Reduction: The Core Loop](#7)
 8. [Toffoli Reduction Techniques (A–Q)](#8)
 9. [The Qubit ↔ Toffoli Exchange Rate and the Product Race](#9)
@@ -101,7 +101,7 @@ counterproductive — for another:
    (≤1200q / ≤90M Toffoli, arXiv:2603.28846). A point is Pareto-optimal if you cannot lower one of
    Q or T without raising the other. The goal here is not a single score but a *clean, reusable basis
    curve*: a value-exact circuit at each qubit count that others can fork and improve (see the
-   1147→1141q clean Pareto bases, §13). This track deliberately avoids island-overfit tricks (§10)
+   1153q→1133q clean Pareto bases, §13). This track deliberately avoids island-overfit tricks (§10)
    so the curve stays a sound reference.
 
 These are genuinely different games. Most of this primer optimizes track 1, but several techniques
@@ -814,6 +814,44 @@ test set was fitted to the circuit, not because the circuit is universally corre
 lane's state is proven**; it becomes an island-overfit assumption the moment the state is only
 *sampled*. The same value-exact vs island-exact split from §10 applies here at the granularity of a
 single borrowed `|0⟩`.
+
+---
+
+### 6.Q Reset-Bounded Qubit-ID Compaction (Register Allocation for Qubits)
+
+**A free, value-exact post-pass that closes the gap between the *true* peak and the *scored* peak.**
+
+Here is a subtlety in how the score is computed: the benchmark charges **the largest qubit *id* that
+appears in the circuit**, not the true count of simultaneously-live qubits. The circuit builder
+reuses freed lanes, but if its lane-numbering is even slightly loose — a temporary gets a high id
+when a lower one was already free — the *max id* can sit above the real concurrent peak. That slack
+is pure wasted score.
+
+**The fix is classic register allocation, applied to qubit ids.** After the whole op stream is
+built, run a compaction pass (`compact.rs`, introduced in the 1133 Pareto push):
+
+1. Cut the timeline at every **unconditional reset** (`R`) or measurement (`Hmr`) — these mark where
+   a lane's value is destroyed, so its id is free to reuse from that point.
+2. Build the **lifetime interval** of every non-IO temporary lane (first use → last use within a
+   reset-bounded segment).
+3. **Interval-color** those intervals onto the fewest possible ids (a min-heap of free colors keyed
+   by lifetime end — the textbook interval-graph coloring), while **pinning the four IO registers**
+   (R.x, R.y, Q.x, Q.y) so the evaluator still finds its inputs/outputs.
+
+The result is the same circuit (every gate identical) renumbered so that `max qubit-id` equals the
+true coloring optimum. It is **value-exact and density-neutral** — it changes only the *labels* on
+wires, never the computation — so it stacks freely with everything else and needs no nonce re-hunt.
+
+**Why this is the right mental model.** A qubit id is exactly a *register* in a compiler: lanes that
+are never live at the same time can share one id, just as non-overlapping variables share a machine
+register. Lifetime-coloring is how compilers minimize register pressure, and it is the *provably
+optimal* way to minimize `max id` for a fixed gate schedule. Whenever a circuit's reported qubit
+count exceeds its measured concurrent peak (check with `TRACE_PEAK`), this pass recovers the
+difference for free.
+
+(In the 1133 push this lever is present but gated off — the 1133 count came from active-width trimming,
+not compaction — so it remains an untapped drop-in for any future rung whose `max id` exceeds its
+true peak.)
 
 ---
 
@@ -1627,6 +1665,36 @@ the lowest fully-validated circuit on the track. This is a *different game* from
 different constructions, and which one is "best" depends entirely on which competition you are
 entering — see §6.O and §9.
 
+### The (Q, T) Pareto-frontier push (objective 3) — clean basis circuits 1153q → 1133q
+
+The third track (§1, objective 3) maps the **value-exact Pareto frontier** below the 1153q SOTA as a
+sequence of **clean, dead-CCX-free basis circuits** others can fork. Unlike the low-qubit witness
+track above, these stay in the **useful corner** — every point beats Google's secp256k1 estimate on
+*both* axes (q < 1200, and T ≈ 1.37–1.46M is ~60× under the ≤90M Toffoli budget). They are "rejected"
+on the Q×T product *by construction* (they trade qubits down for Toffoli up); the deliverable is the
+exchange *curve*, not a score.
+
+| q | T_clean | clean exchange vs prev | new lever introduced |
+|---|---------|------------------------|----------------------|
+| 1153 | 1,392,603 | — (anchor, dead-CCX off) | — |
+| 1147 | 1,396,769 | −694 T/q | fold-vent clamp (`TLM_FOLD_CALL_CODE_OVERRIDES`) |
+| 1146 | 1,408,582 | −11,813 T/q | graduated→dirty carry-in (`TLM_GRAD_DISABLE`) |
+| 1143 | 1,411,643 | −1,020 T/q | codec scratch reuse + direct-dirty fold ctl |
+| 1142 | 1,415,790 | −4,147 T/q | pair-raw codec last-k + tighter layout search |
+| 1141 | 1,423,723 | −7,933 T/q | no-ancilla/dirty body + constant-lane loan family |
+| **1133** | **1,460,511** | **−4,599 T/q** | **GCD active-width trimming** + fold-cout drop |
+
+The qubits sort by exchange rate into four lever classes: **fold-vent clamping** (the cheap qubits —
+clamp a peak fold's measured-vent windows, §8.B), **no-ancilla / dirty-borrow substitution** (convert
+a carry ancilla into Toffoli, cf. §6.M), **constant-lane loan + recompute** (the Bennett pebble move
+on provably-constant GCD low bits, §6.A/§11), and — new at 1133 — **GCD active-width trimming**: per-step
+shrinking of the live GCD operand width in the convergence tail (`TLM_GCD_ACTIVE_WIDTH_TRIM=3` after
+step 205), the dynamic-width-register idea (§6.F) applied to the ludicrous GCD. The 1133 rung is a
+*value-exact repair* of an over-aggressive 1131 attempt: trimming the active width is a **graded**
+correctness lever (§5) — push until the residual breaks, then give back one notch (1131→1133) so a
+clean nonce is reachable. The push also introduced a reusable general pass — **reset-bounded qubit-id
+compaction** (§6.Q). Full analysis: [`pareto-frontier-push-1153-to-1133.md`](references/pareto-frontier-push-1153-to-1133.md).
+
 ---
 
 ## 14. Open Frontiers
@@ -1685,6 +1753,8 @@ entering — see §6.O and §9.
 | HMR ghosting / passenger ghosting (§6.N) | 256 | +1 modular multiply | YES |
 | EEA register sharing (§6.O) | ~97–119 (to 851→829q) | high (irrelevant to low-qubit objective) | YES — for the low-qubit competition (§1) |
 | Gate-hosting (§6.P) | 1 per hosted gate | 0 (clean) / +1 Tof (dirty) | YES if host-zero *proven*; island-exact if *sampled* |
+| Reset-bounded id compaction (§6.Q) | gap (max-id − true peak) | 0 | YES (relabels wires only) |
+| GCD active-width trim (§6.F applied) | varies (deep tail) | small | PARTIAL (graded; nonce-hunted) |
 
 ### Toffoli reduction techniques
 

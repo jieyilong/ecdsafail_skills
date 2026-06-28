@@ -253,7 +253,7 @@ counterproductive --- for another:
     estimates for secp256k1 ($\leq$1200q / $\leq$90M Toffoli, arXiv:2603.28846). A point is
     Pareto-optimal if you cannot lower one of Q or T without raising the other. The goal here is not
     a single score but a \emph{clean, reusable basis curve}: a value-exact circuit at each qubit
-    count that others can fork and improve (see the 1147$\to$1141q clean Pareto bases,
+    count that others can fork and improve (see the 1153q$\to$1133q clean Pareto bases,
     \S\ref{sec:history}). This track deliberately avoids island-overfit tricks (\S\ref{sec:density})
     so the curve stays a sound reference.
 \end{enumerate}
@@ -969,6 +969,40 @@ correct.
 the host lane's state is proven}; it becomes an island-overfit assumption the moment the state is
 only \emph{sampled}. The same value-exact vs island-exact split from \S\ref{sec:density} applies
 here at the granularity of a single borrowed $|0\rangle$.
+
+\subsection{Reset-Bounded Qubit-ID Compaction (Register Allocation for Qubits)}
+\label{sec:compact}
+
+\textbf{A free, value-exact post-pass that closes the gap between the \emph{true} peak and the
+\emph{scored} peak.} The benchmark charges \textbf{the largest qubit \emph{id} that appears in the
+circuit}, not the true count of simultaneously-live qubits. The builder reuses freed lanes, but if
+its numbering is even slightly loose --- a temporary gets a high id when a lower one was already free
+--- the \emph{max id} can sit above the real concurrent peak. That slack is pure wasted score.
+
+\textbf{The fix is classic register allocation, applied to qubit ids.} After the whole op stream is
+built, run a compaction pass (\lstinline{compact.rs}, introduced in the 1133 Pareto push):
+\begin{enumerate}
+  \item Cut the timeline at every \textbf{unconditional reset} (\texttt{R}) or measurement
+    (\texttt{Hmr}) --- these destroy a lane's value, freeing its id for reuse from that point.
+  \item Build the \textbf{lifetime interval} of every non-IO temporary lane (first use $\to$ last use
+    within a reset-bounded segment).
+  \item \textbf{Interval-color} those intervals onto the fewest ids (a min-heap of free colors keyed
+    by lifetime end --- textbook interval-graph coloring), while \textbf{pinning the four IO
+    registers} so the evaluator still finds its inputs/outputs.
+\end{enumerate}
+
+The result is the same circuit (every gate identical) renumbered so $\texttt{max id}$ equals the
+coloring optimum. It is \textbf{value-exact and density-neutral} --- it changes only the \emph{labels}
+on wires, never the computation --- so it stacks freely and needs no nonce re-hunt.
+
+\textbf{Why this is the right mental model.} A qubit id is exactly a \emph{register} in a compiler:
+lanes never live at the same time can share one id, just as non-overlapping variables share a machine
+register. Lifetime-coloring is how compilers minimize register pressure, and it is the provably
+optimal way to minimize $\texttt{max id}$ for a fixed gate schedule. Whenever a circuit's reported
+qubit count exceeds its measured concurrent peak (check with \texttt{TRACE\_PEAK}), this pass recovers
+the difference for free. (In the 1133 push the lever is present but gated off --- 1133 came from
+active-width trimming, not compaction --- so it is an untapped drop-in for any future rung whose
+\texttt{max id} exceeds its true peak.)
 
 % ===========================================================================
 \section{Toffoli Reduction: The Core Loop}
@@ -1723,6 +1757,46 @@ $\sim$340$\times$ fewer Toffoli. The two minima are reached by different constru
 is ``best'' depends entirely on which competition you are entering --- see \S\ref{sec:regshare} and
 \S\ref{sec:exchange}.
 
+\subsection{The (Q, T) Pareto-frontier push (objective 3) --- clean basis 1153q $\to$ 1133q}
+
+The third track (\S\ref{sec:twocomps}, objective 3) maps the \textbf{value-exact Pareto frontier}
+below the 1153q SOTA as a sequence of \textbf{clean, dead-CCX-free basis circuits} others can fork.
+Unlike the low-qubit witness track above, these stay in the \textbf{useful corner} --- every point
+beats Google's secp256k1 estimate on \emph{both} axes ($q < 1200$, and $T \approx$ 1.37--1.46M is
+$\sim$60$\times$ under the $\leq$90M Toffoli budget). They are ``rejected'' on the Q$\times$T product
+\emph{by construction} (they trade qubits down for Toffoli up); the deliverable is the exchange
+\emph{curve}, not a score.
+
+\begin{center}
+\begin{tabular}{p{1.1cm}p{2.2cm}p{2.6cm}p{6.0cm}}
+\toprule
+\textbf{q} & \textbf{$T_{\text{clean}}$} & \textbf{exch.\ vs prev} & \textbf{new lever introduced} \\
+\midrule
+1153 & 1,392,603 & --- (anchor) & dead-CCX off baseline \\
+1147 & 1,396,769 & $-694$ T/q & fold-vent clamp (\texttt{TLM\_FOLD\_CALL\_CODE\_OVERRIDES}) \\
+1146 & 1,408,582 & $-11{,}813$ T/q & graduated$\to$dirty carry-in (\texttt{TLM\_GRAD\_DISABLE}) \\
+1143 & 1,411,643 & $-1{,}020$ T/q & codec scratch reuse $+$ direct-dirty fold ctl \\
+1142 & 1,415,790 & $-4{,}147$ T/q & pair-raw codec last-k $+$ tighter layout search \\
+1141 & 1,423,723 & $-7{,}933$ T/q & no-ancilla/dirty body $+$ constant-lane loan family \\
+\textbf{1133} & \textbf{1,460,511} & $-4{,}599$ T/q & \textbf{GCD active-width trimming} $+$ fold-cout drop \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The qubits sort by exchange rate into four lever classes: \textbf{fold-vent clamping} (the cheap
+qubits --- clamp a peak fold's measured-vent windows, \S8.B), \textbf{no-ancilla / dirty-borrow
+substitution} (convert a carry ancilla into Toffoli, cf.\ \S\ref{sec:borrowcarry}),
+\textbf{constant-lane loan $+$ recompute} (the Bennett pebble move on provably-constant GCD low bits,
+\S6.A/\S\ref{sec:pebbling}), and --- new at 1133 --- \textbf{GCD active-width trimming}: per-step
+shrinking of the live GCD operand width in the convergence tail
+(\texttt{TLM\_GCD\_ACTIVE\_WIDTH\_TRIM=3} after step 205), the dynamic-width-register idea (\S6.F)
+applied to the ludicrous GCD. The 1133 rung is a \emph{value-exact repair} of an over-aggressive 1131
+attempt: trimming the active width is a \textbf{graded} correctness lever (\S\ref{sec:qubitloop}) ---
+push until the residual breaks, then give back one notch (1131$\to$1133) so a clean nonce is
+reachable. The push also introduced a reusable general pass --- \textbf{reset-bounded qubit-id
+compaction} (\S\ref{sec:compact}). Full analysis:
+\texttt{references/pareto-frontier-push-1153-to-1133.md}.
+
 % ===========================================================================
 \section{Open Frontiers}
 \label{sec:frontiers}
@@ -1793,6 +1867,8 @@ Borrowed-carry fusion (\S6.M) & $k$ & 0 & Yes \\
 HMR ghosting (\S6.N) & 256 & $+1$ modular multiply & Yes \\
 EEA register sharing (\S6.O) & $\sim$97--119 (to 851$\to$829q) & high (irrelevant to low-q objective) & Yes --- low-qubit competition \\
 Gate-hosting (\S6.P) & 1 per hosted gate & 0 (clean) / $+1$ Tof (dirty) & Yes if host-zero \emph{proven}; island-exact if \emph{sampled} \\
+Reset-bounded id compaction (\S6.Q) & gap (max-id $-$ true peak) & 0 & Yes (relabels wires only) \\
+GCD active-width trim (\S6.F applied) & varies (deep tail) & small & Partial (graded; nonce-hunted) \\
 \bottomrule
 \end{tabular}
 \end{center}

@@ -481,6 +481,26 @@ peak** (the FFG `cy0` carry during the square suffix, free-and-recomputed since 
 reached an **851→829q** *analysis-oracle* witness — ~400–500M Toffoli, rejected +3000–3700% — see
 `references/SHRUNKEN_PZ_q948_track.md` §8–§9.)
 
+### The (Q,T) Pareto-frontier push: 1153q → 1133q clean basis (objective 3, value-exact)
+
+A separate deliberate effort maps the **value-exact (qubits, Toffoli) Pareto frontier** below the
+1153 SOTA as a sequence of **clean, dead-CCX-free basis circuits** (objective 3 — the *useful corner*
+where both Q and T beat Google/Babbush–Gidney's ≤1200q / ≤90M Toffoli; every point here is ~60× under
+that Toffoli budget). These are "rejected" on the Q×T product **by construction** — do not judge them
+by the score. Frontier: `da51a48` (1153) → `3e3966b` (1147) → `e64cdfd` (1146) → `48e6c23` (1143) →
+`0cbc2d7` (1142) → `370fc31` (1141) → **`765ef38` (1133 × 1,460,511)**. The cheap qubits come from
+**fold-vent clamping** (`TLM_FOLD_CALL_CODE_OVERRIDES`); the medium ones from **no-ancilla /
+dirty-borrow** substitution and **constant-lane loan+recompute** (`TLM_DIRTY_BODY_*_NOANC`,
+`TLM_LOAN_ODD_U0/EVEN_V0/GCD_Y0`); the deep tail (new at 1133) from **GCD active-width trimming**
+(`TLM_GCD_ACTIVE_WIDTH_TRIM=3/_AFTER=205` — per-step dynamic operand-width shrink of the post-205
+convergence tail) plus fold-cout dropping, borrow-cin folds/comparators, and comparator carry
+narrowing (`TLM_CMP_CARRY_K_DELTA=-6`). 1133 is a **value-exact repair** of an over-aggressive 1131
+(over-trimmed active width → no clean island; gave back 2q). Also introduced (flag-gated, unused by
+1133): **`compact.rs` reset-bounded qubit-id compaction** — interval-colors temp lifetimes after
+resets/HMRs to minimize `max qubit-id` (the scored width), a reusable general lever. **Full analysis:
+`references/pareto-frontier-push-1153-to-1133.md`.** Next-qubit hunt (1133→1132 cy0/u[0] lever
+EXHAUSTED on this base; fold consumer has `free_pool=0`): memory `ecdsafail-q1133-resident-cyl0-hunt.md`.
+
 ### BitWonka's q1152 — recompute-to-free a held carry + off-peak vents (current SOTA `71f5115`/`d44cad3`, 2026-06-26)
 
 The 1153 base matured then broke 1152: jieyilong `da51a48` (1153 × 1,368,487, **empirical** dead-CCX `.idx`) →
@@ -1195,6 +1215,14 @@ involves `trailmix_port/inversion`, the PZ divstep state machine, the q948/952/9
 records, the "q949 robust envelope" / CLZ-context width packing, or whether to chase the
 low-qubit route for *score* (answer: no — it is a qubit-witness, ~33× over the product
 break-even). Do NOT conflate it with the ludicrous arithmetic.
+
+For the **(Q,T) Pareto-frontier push** (objective 3 — the clean value-exact basis circuits below
+1153q, in the *useful corner* under Google's ≤1200q/≤90M Toffoli), read
+`references/pareto-frontier-push-1153-to-1133.md` when the task involves the 1153→1147→1146→1143→
+1142→1141→1133 clean basis ladder, the lever taxonomy (fold-vent clamp → no-ancilla/dirty-borrow →
+constant-lane loan → active-width trim), `TLM_GCD_ACTIVE_WIDTH_TRIM`, the `compact.rs` reset-bounded
+qubit-id compaction pass, or forking a dead-CCX-free basis at a target qubit count. These are
+"rejected" on the product **by construction** — do not judge them by the score.
 
 ### Verified provenance (read directly from the sources)
 
