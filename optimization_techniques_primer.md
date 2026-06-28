@@ -1,638 +1,1392 @@
-# Qubit & Toffoli Reduction Techniques: A Practitioner's Primer
+# Qubit & Toffoli Reduction Techniques: A Comprehensive Primer
 
-> **Target audience**: Undergrad who has learned the basics of quantum computing (superposition,
-> entanglement, Toffoli/CNOT gates, quantum circuits). This document explains the optimization
-> techniques used in the ecdsa.fail quantum circuit challenge from first principles — no
-> prior exposure to circuit optimization or Shor's algorithm required.
+> **Audience**: An undergrad who has learned the basics of quantum computing — superposition,
+> entanglement, Toffoli/CNOT/Hadamard gates, quantum circuits, and the idea of reversible
+> computation. This document explains every optimization technique used in the ecdsa.fail
+> quantum circuit challenge from circuit-level first principles, with concrete examples from
+> the actual research.
 
 ---
 
-## 0. What Are We Optimizing, and Why?
+## Table of Contents
 
-### The challenge in one sentence
+1. [What We Are Optimizing — The Score and Why Toffoli Gates Are Expensive](#1)
+2. [The Reversibility Constraint — Why Quantum Circuits Are Hard to Optimize](#2)
+3. [The Challenge Circuit — Elliptic Curve Point Addition](#3)
+4. [Measuring Progress — The Peak Qubit Profile and Hot Spots](#4)
+5. [Qubit Reduction: The Core Loop](#5)
+6. [Qubit Reduction Techniques (A–N)](#6)
+7. [Toffoli Reduction: The Core Loop](#7)
+8. [Toffoli Reduction Techniques (A–P)](#8)
+9. [The Qubit ↔ Toffoli Exchange Rate and the Product Race](#9)
+10. [Density-Neutral vs Island-Exact — Correctness Regimes](#10)
+11. [Pebbling Theory — The Formal Foundation](#11)
+12. [The SOTA Circuit: How trailmix_ludicrous Works](#12)
+13. [The 1211→1152 Historical Journey](#13)
+14. [Open Frontiers](#14)
+15. [Quick-Reference Summary Tables](#15)
 
-We are building a reversible quantum circuit that computes an elliptic-curve point addition
-on the secp256k1 curve (the same math used in Bitcoin), and we want to minimize the cost of
-running it on a fault-tolerant quantum computer.
+---
 
-### The cost score
+## 1. What We Are Optimizing
+
+### The score
 
 ```
 score = peak_qubits × avg_executed_Toffoli
 ```
 
-Lower score = better. The score is a product of two factors:
+Lower score is better. This is the ecdsa.fail benchmark's cost function for a quantum circuit
+that computes an affine elliptic-curve point addition on secp256k1 (Bitcoin's curve). The two
+factors penalize two different resources:
 
-- **Peak qubits**: the maximum number of qubits that are simultaneously in use at any point
-  during the circuit. Think of this as the "width" of the circuit.
-- **Average executed Toffoli**: the average number of Toffoli (CCX / AND) gates that fire
-  during a single run, averaged over the 9024 inputs the challenge evaluates.
+- **Peak qubits**: the maximum number of qubits simultaneously in use at any instant. This is
+  the "width" of the circuit, not the total number ever allocated. On real hardware, idle qubits
+  still occupy physical space on the quantum processor.
+
+- **Average executed Toffoli**: the Toffoli (CCX) gate count, *weighted by how often each gate
+  fires*, averaged over the 9024 test inputs the challenge uses. Not just the count of gates in
+  the circuit, but gates × firing_rate.
 
 ### Why Toffoli gates specifically?
 
-In a fault-tolerant quantum computer (the kind that could actually break Bitcoin), regular
-gates (CNOT, Hadamard, Pauli X/Y/Z) are nearly free — they can be implemented with very
-low overhead using the surface code. But **Toffoli gates** (CCX — "if both A and B are 1,
-flip C") require **magic states**: specially prepared ancilla qubits that take a long time and
-many physical qubits to distill. Each Toffoli consumes one magic state. So in this regime,
-the Toffoli count is the dominant cost, roughly like "dollars" while qubits are "desk space."
+On a **fault-tolerant** quantum computer (the kind needed to break Bitcoin-scale cryptography),
+gates fall into two classes:
 
-The product `qubits × Toffoli` captures the spacetime volume: more qubits means you need more
-idle storage, and more Toffoli means more factory time. Both matter.
+- **Clifford gates** (CNOT, Hadamard H, Phase S, Pauli X/Y/Z): these can be implemented
+  efficiently using the surface error-correcting code at very low physical-qubit overhead.
+- **Non-Clifford gates** (Toffoli / T-gate): these require **magic states** — specially prepared
+  ancilla qubits that take a long time and many physical qubits to distill via "magic state
+  distillation." Each Toffoli gate consumes one distilled magic state.
 
----
+The rough conversion: 1 Toffoli = exactly 7 T-gates (Gosset et al. 2013, tight lower bound).
 
-## 1. A Mental Model: The Reversibility Constraint
+So in this regime, **Toffoli gates are like currency**: each one costs approximately the same
+fixed price (one magic state), regardless of context. The peak qubit count is like "desk space"
+— idle qubits still occupy factory floor. The product `peak_qubits × Toffoli` captures the
+spacetime volume of running the circuit.
 
-### Why reversibility is the whole game
+> **Common confusion**: This challenge uses `avg_executed_Toffoli`, NOT:
+> - T-count (= 7× Toffoli, a different metric)
+> - T-depth (Selinger 2013 — a depth trick with 4 ancilla per Toffoli; irrelevant here)
+> The distinction matters: average-executed rewards conditional execution (replay), emitted
+> T-count does not.
 
-Quantum circuits must be reversible. This means:
+### The current SOTA
 
-- **You cannot erase a qubit.** Every qubit you allocate must eventually return to a known
-  `|0⟩` state (be "uncomputed") before the circuit ends.
-- **You cannot just overwrite a value.** If you want to replace the value in a qubit with
-  something new, you first have to clear the old value (uncompute it) — which usually costs
-  the same Toffoli gates as computing it did.
-
-This is the central constraint that makes circuit optimization hard. In classical computing, you
-can just overwrite memory. In a reversible quantum circuit, every intermediate value you don't
-need must be "undone" to clean up.
-
-### The consequence: intermediate values cost qubits
-
-Every time the circuit needs to compute an intermediate result — a carry bit, a comparison flag,
-a partial product — it allocates a fresh qubit to hold that value. That qubit is **live** from
-the moment it's computed until the moment it's uncomputed. If many intermediate values overlap
-in time, many qubits are live simultaneously, which drives up the peak.
-
-**The core insight of almost every qubit-reduction technique is:** make intermediate values die
-sooner (so they're not live at the peak), or make them not need to exist at all.
-
----
-
-## 2. Qubit Reduction Techniques
-
-### 2.1 The Peak Is a Maximum, Not a Sum
-
-**First, understand what you're actually measuring.** The peak qubit count is the maximum
-simultaneous live qubit count over the entire circuit timeline, not the total number of qubits
-ever used. Optimizing a qubit register that's only ever live when the circuit is *not* at its
-peak is a waste of effort — it changes nothing.
-
-**Implication**: Before doing any optimization, find the *binder* — the exact phase of the
-circuit where the peak occurs — and only attack the qubits alive at that instant.
-
-In our circuit, the peak occurs during the GCD-based modular inversion. Specifically, the
-transcript (the log of GCD decisions) and the inversion's working registers are simultaneously
-live.
-
----
-
-### 2.2 Live-Range Holes: Uncompute Early, Recompute Later
-
-**The idea**: If a value V is live across the peak but isn't *used* at the peak (it's just
-"passing through"), we can:
-1. Uncompute V before the peak (run the circuit backwards to return it to `|0⟩`).
-2. Let the freed qubit be reused for peak-time work.
-3. Recompute V after the peak (run the circuit forwards again) before V's first post-peak use.
-
-**Analogy**: Imagine you have a stack of books on your desk while you're trying to work on
-a big project. Some books you won't need until later. You can put them in a box to free up
-desk space during the project crunch, then bring them back out when you need them.
-
-**The cost**: The recompute uses Toffoli gates (same cost as the original computation). So you
-trade qubits for Toffoli. The trade-off is favorable when the value is cheap to recompute (few
-gates) and the freed qubit is genuinely at the peak.
-
-**Real example** (1211q → 1193q drop in our circuit): A large GCD-apply scratch block was
-freed during a shift sub-phase that didn't use it, then reacquired afterwards. That 18-qubit
-hole at the peak cost some extra Toffoli (the recompute), but improved the score.
-
----
-
-### 2.3 Transcript Compression: Compress the Decision Log
-
-**Background**: The GCD-based inversion (which is the heart of our circuit) runs ~530 steps.
-At each step, it makes a binary decision: "did I swap?" and "did I subtract?". These decisions
-are recorded in a **transcript** (a log) because they'll be needed later to run the GCD backwards
-during uncomputation.
-
-With one qubit per decision, that's ~530 qubits — all live simultaneously during the forward
-pass and the backward pass.
-
-**The compression insight**: Not all 2^530 bit patterns of decisions are reachable. The GCD
-process has structure: certain sequences of swap/subtract decisions are impossible because the
-algorithm would have converged earlier. This means the reachable patterns have fewer bits of
-entropy than 530.
-
-**Solution**: Encode the transcript more densely. Our "all-triple base-5 codec" looks at
-consecutive 3-step windows and notices that only 5 out of 8 (2^3) patterns can actually occur.
-So you can encode each window in `log₂(5) ≈ 2.32` bits instead of 3 raw bits — a ~23%
-compression. Across 603 steps, this saves meaningful qubits.
-
-**The hard constraint**: The encoding must be a **bijection** — a perfect one-to-one mapping.
-If two different decision histories map to the same code, you lose information needed for
-uncomputation, and the circuit gives wrong answers. Lossy compression is impossible; it's
-Shannon source coding, but reversible.
-
----
-
-### 2.4 Passenger Ghosting / HMR Ghosting
-
-**What is a "passenger"?** A value allocated early in the circuit that won't be used again
-until late in the circuit. During the peak, it just sits there — "riding" through the circuit
-without contributing to the computation at the peak.
-
-**Example**: The value `dy` (the y-coordinate difference) is computed early for the division
-`λ = dy/dx`. After the inversion completes, `dy` isn't needed until the very end to finalize
-the output coordinates. Meanwhile, it occupies a 256-bit register across the inversion peak.
-
-**The ghosting trick**: If `dy` can be *reconstructed* later from values still live at that time,
-you can erase it early and defer reconstruction. In our circuit:
-- `dy = λ × dx` (because `λ = dy/dx` by definition).
-- After the inversion, `λ` and `dx` are still live.
-- So we can reconstruct `dy = λ × dx` when needed.
-
-**Cost**: A modular multiplication to reconstruct `dy` (~several hundred Toffoli). But if `dy`
-is ~256 qubits and it's at the peak, that tradeoff can be favorable.
-
-**HMR ghosting** is a more aggressive version using measurement: measure the passenger qubit in
-the Hadamard (X) basis, freeing it immediately. When you need its value back, reconstruct it
-from other live data, and use a classically-controlled Z correction to fix up the phase. This is
-the quantum-native version of "store a receipt instead of the full object."
-
----
-
-### 2.5 Free-and-Recompute a Single Cheap Value (The d44cad3 Breakthrough)
-
-**The 1153→1152 qubit drop** (BitWonka's submission `d44cad3`) used a beautifully targeted version
-of this idea.
-
-**Setup**: During the peak-binding phase, the circuit holds a carry qubit called `cy0`. A standard
-dead-qubit scan found **zero** unused qubits — every qubit at the peak was holding a value needed
-somewhere. Dead-qubit elimination failed.
-
-**The right question**: Instead of asking "is any qubit DEAD (never used again)?", ask: "is any
-qubit's VALUE a cheap function of other values still live?"
-
-**Discovery**: `cy0 = ctrl AND (NOT final_a0)`. Why? Because the secp256k1 prime constant
-`f` has bit 0 equal to 1 (`f[0] = 1`). This makes the carry-in at bit 0 deterministically
-computable from just the control wire and `final_a0` — both already live.
-
-**The trick**:
-1. Before the peak phase: uncompute `cy0` (2 gates, just CNOT operations).
-2. "Loan" the freed cy0 lane to the peak phase (it uses that slot temporarily).
-3. After the peak phase: recompute `cy0` from `ctrl` and `final_a0` (2 gates again).
-
-Cost: ~4 CNOT-equivalent gates for 40 binding calls. Savings: 1 qubit at the peak. At the
-exchange rate of ~1,184 Toffoli per qubit (break-even for the score at this frontier), spending
-4 gates to save 1 qubit is massively favorable.
-
-**Generalized lesson**: When a dead-qubit scan fails, don't conclude "the floor is structural."
-Re-ask: "Is any held value a cheap function of the live qubits?" If yes, free-and-recompute it.
-
----
-
-### 2.6 Dynamic-Width Registers (For the PZ Track)
-
-This applies to the Shrunken-PZ (Proos-Zalka) inversion method used in the low-qubit track.
-
-**The GCD runs a bit-shrinking process.** As the GCD computation proceeds over ~530 steps,
-the operands `A` and `B` shrink: their high bits become provably zero as the algorithm converges.
-In a naive circuit, you'd allocate full 256-bit registers for all 530 steps, even though early
-steps need the full width but later steps need only a few bits.
-
-**Dynamic width**: Measure "how many active bits does this register currently have?" and only
-allocate that many qubits. As bits become provably zero, free them. The peak qubit count then
-reflects the true maximum "simultaneous active bits," not a worst-case allocation.
-
-**Implementation**: `reg_widths(i)` is called at each step `i` to determine the correct width
-for registers `A`, `B`, `ca`, `cb`, `q`. A "thin schedule" pre-computes these widths by
-sampling many inputs and finding the actual maximum needed at each step.
-
-**Quantitative result**: The ablation ladder showed:
+The best known result as of 2026-06-27 (BitWonka, commit `d44cad3`, trailmix_ludicrous family):
 ```
-Source-level dynamic PZ (universal schedule):  1027 qubits
-+ thin support-tuned schedule:                  990 qubits (−37q)
-+ counter/rotation metadata trimming:           983 qubits (−7q)
-+ quotient cap:                                 980 qubits (−3q)
+1152 qubits × 1,364,230 avg Toffoli = 1,571,592,960 score
 ```
 
 ---
 
-### 2.7 Known-Constant Teardown
+## 2. The Reversibility Constraint
 
-**The GCD terminates at a known state.** After ~530 steps, the GCD has converged and the
-registers hold specific known values: `A = 0`, `B = 1`, `ca = p` (the modulus), `q = 0`.
+### You cannot delete information
 
-**These are classical constants.** A quantum register holding a known classical value is
-essentially wasted space — it doesn't carry quantum information. You can "tear it down"
-(zero it and free the qubits) before the peak computation begins.
+Quantum circuits must be reversible. This is not a convention — it is required by quantum
+mechanics. Every gate in a quantum circuit must have an inverse (you can always "run it
+backwards"). This means:
 
-**Process**:
-1. CNOT the known constant out of the register (restoring it to `|0⟩`).
-2. Free the register (it returns to the qubit pool).
-3. Allocate fresh qubits for the peak computation.
-4. After the peak, recreate the constants (CNOT them back) for uncomputation.
+- **You cannot overwrite a qubit.** If qubit A holds value `x` and you want to compute
+  `f(x)` into A, you cannot just replace it. You'd lose `x` forever, which breaks reversibility.
+- **You cannot erase a qubit.** If a qubit is entangled with the rest of the system (as
+  intermediate results in a quantum computation always are), setting it to `|0⟩` forcibly
+  would violate unitarity.
 
-**Quantum intuition**: A qubit holding a value you could write on a piece of paper is a qubit
-being wasted. You could throw it away (classically: just erase it) but reversibility means you
-can't erase — you can, however, XOR a register to `|0⟩` using its known classical content,
-which zeroes it without consuming Toffoli gates (XOR/CNOT are free).
+The only way to "free" a qubit is to **uncompute** it — run the computation that created its
+value in reverse, returning it exactly to `|0⟩`. Once it's `|0⟩`, it can be freed from the
+live set.
+
+### Consequence: intermediate values cost qubits until uncomputed
+
+Every time your circuit computes an intermediate result (a carry bit, a partial product, a
+comparison flag), it must allocate a fresh qubit. That qubit remains **live** — occupying a
+slot in the peak count — from the moment it's computed until the moment it's uncomputed.
+
+**Example**: An n-bit addition `a + b` computes n carry bits, one per bit position. Each
+carry qubit is live from when it's computed until the carry chain is reversed. If you compute
+the addition at step 100 and uncompute it at step 200, those n carry qubits are live across
+the entire steps 100–200, contributing to the peak at any instant in that range.
+
+This is why almost every qubit-reduction technique boils down to: **make intermediate values
+die sooner** (so they aren't live at the peak) **or don't materialize them at all**.
+
+### Reversibility also doubles Toffoli counts
+
+In a classical circuit, you compute X, use X, then discard X. In a reversible circuit, you
+compute X (costs Toffoli), use X, then *uncompute* X (costs the same Toffoli again). So every
+logical AND operation normally costs 2× — once forward, once backward.
+
+This is the central pain point that Measurement-Based Uncomputation (§8.A) solves.
 
 ---
 
-## 3. Toffoli Reduction Techniques
+## 3. The Challenge Circuit
 
-### 3.1 Measurement-Based Uncomputation (MBU) — "Free Erasing"
+### What it computes
 
-**This is the single most important technique in the whole catalog.**
+The circuit computes one **affine elliptic curve point addition**: given quantum register
+`P = (Px, Py)` and classical constant `Q = (Qx, Qy)`, compute `P + Q = R` in place, where
+the arithmetic is modulo the secp256k1 prime `p = 2^256 − 2^32 − 977`.
 
-**Normal Toffoli lifecycle**:
+The mathematical operations, in order:
 ```
-1. Compute: ccx(a, b, out)  → costs 4 T-gates (1 Toffoli)
-2. Use the result in 'out'
-3. Uncompute: ccx(a, b, out) → costs 4 T-gates (1 Toffoli) again
-Total: 8 T-gates = 2 Toffoli per logical AND
+dx = Px − Qx              (mod p subtraction)
+dy = Py − Qy
+λ = dy / dx               (modular inverse + multiply: the expensive GCD-based step)
+new_Px = λ² − Px − Qx    (modular square + subtracts)
+new_Py = λ(Px − new_Px) − Py
 ```
 
-**With MBU** (Jones 2013, applied to adders by Gidney 2018):
+### Why modular inverse is the bottleneck
+
+Computing `dy/dx mod p` requires computing `dx⁻¹ mod p`, the modular inverse of `dx`. There
+is no simple formula — it requires running the **Extended Euclidean Algorithm (EEA)** or
+equivalent, which takes ~530 steps of binary GCD (divstep) operations. Each step involves:
+- A comparison (swap decision: is |u| > |v|?)
+- A conditional swap of two 256-bit registers
+- A conditional subtraction of two 256-bit registers
+
+This accounts for roughly 90% of the circuit's Toffoli count.
+
+### The key design choice: Q is classical
+
+The second point `Q` is a **fixed constant** (the secp256k1 generator point, known at circuit
+compile time). The current SOTA keeps `Q` as classical bit-patterns (`BitId`s) rather than
+quantum registers, eliminating 512 qubits from the peak — the single largest qubit reduction
+in the circuit's history.
+
+---
+
+## 4. Measuring Progress
+
+### The live-qubit-vs-time profile
+
+To reduce the peak, you first need to know **where** the peak occurs. Plot how many qubits
+are live at each moment in the circuit timeline:
+
 ```
-1. Compute: ccx(a, b, out)       → costs 4 T-gates (1 Toffoli)
-2. Use the result in 'out'
-3. Uncompute: measure out in X-basis
-   - 50% chance: measurement result is 0 → done, no cost
-   - 50% chance: measurement result is 1 → apply CZ(a, b) phase fixup → 0 T-gates
-Total: 4 T-gates = 1 Toffoli. Uncomputation is FREE.
+qubits  |
+live    |         ████████████
+        |    ████████████████████
+        |  █████████████████████████
+        |████████████████████████████████
+        +--+----+--+------+--+----+--+----> time
+                    ^
+                    peak = 1152 here (the "binder")
+```
+
+The highest point is the **peak**, and the phase executing at that height is the **binder**.
+Only operations alive at the binder instant matter for qubit reduction. Optimizing anything
+else changes nothing about the peak.
+
+**Key tool**: `TRACE_PEAK=1 TRACE_PHASE_ACTIVE=1` in the build flags. This instruments every
+`alloc_qubit` / `free_qubit` call and prints the name of the phase executing when the maximum
+is hit.
+
+### The plateau problem
+
+After shaving the single tallest binder, you often discover the peak hasn't moved — because
+several *independent* phases all reach the same height. This is a **co-binder plateau**:
+
+```
+qubits  |
+live    |    █████   █████     ████
+        |  █████████████████████████
+        |  █████████████████████████    ← plateau at 1152 (Phase A, B, C all tie here)
+        +----+--+----+---+--+---+-----> time
+```
+
+The reported peak doesn't drop until **every** plateau member is individually pushed below the
+current height. This changes the strategy fundamentally: you must work in "plateau mode" —
+find a local qubit reduction for each co-binder, then combine them.
+
+### Emitted vs average-executed Toffoli
+
+**Emitted**: the raw count of CCX gates in the circuit, regardless of whether they fire.
+
+**Average-executed**: each CCX gate's contribution weighted by `Pr[control fires]`, averaged
+over all 9024 test inputs. A CCX gate that only fires 5% of the time contributes only 0.05.
+
+This distinction is critical because **conditional replay** (§8.C) can dramatically reduce
+average-executed without changing emitted at all.
+
+---
+
+## 5. Qubit Reduction: The Core Loop
+
+Before diving into individual techniques, understand the general loop:
+
+1. **Measure** — get the live-qubit-vs-time trace; find the peak height and the binder phase.
+2. **Inventory** — list every qubit alive at the binder instant.
+3. **Classify** — label each qubit by category (below).
+4. **Brainstorm** — for each non-essential qubit at the binder, propose a shave.
+5. **Cost** — compute how many Toffoli gates the proposed shave adds vs how many qubits it
+   saves. Compare to the break-even exchange rate (§9).
+6. **Re-measure** — apply the cheapest safe shave. The peak moves to a new binder. Repeat.
+
+### Qubit classification at the binder
+
+| Class | What it holds | Shrinkable? |
+|-------|---------------|-------------|
+| **Essential data** | Inputs/outputs the binder reads or writes | Rarely |
+| **Scratch** | Temporary arithmetic results (carries, partial products) | Often |
+| **Transcript / log** | GCD branch decisions recorded for reversibility | Often — compress the log |
+| **Passenger** | Allocated before the peak, consumed after, *idle at binder* | Yes — relocate its endpoints |
+| **Alias-candidate** | Restorable duplicate of a value already live elsewhere | Yes — borrow as dirty scratch |
+| **Truncatable** | Bits provably zero or provably irrelevant to the final output | Yes |
+
+### Binary vs graded failure modes
+
+A critical distinction before applying any technique:
+
+- **Graded-failure levers** (carry truncation, comparator narrowing): Correctness degrades
+  *continuously* with aggressiveness. A small fraction of inputs go wrong. You can iterate
+  on the parameter and search for a nonce where all 9024 test inputs avoid the failures.
+
+- **Binary-failure levers** (register live-range holes, transcript compression, structural
+  reuse): Correctness is all-or-nothing. Either the circuit is value-exact on all inputs, or
+  it's wrong on essentially all inputs. There is no graded near-miss ladder to climb. You must
+  get the implementation mathematically correct before searching for nonces.
+
+**The trap**: applying the "tweak-and-triage" loop to a binary-failure lever. A structural
+width cut that's not value-exact will produce all-dirty garbage on every input, not near-misses.
+
+---
+
+## 6. Qubit Reduction Techniques
+
+### 6.A Live-Range Holes: Uncompute Early, Recompute Later
+
+**The headline move.** If a qubit holds a value V that the peak instant does NOT need (it
+was computed before the peak and will be consumed after), free it before the peak and rebuild
+it after.
+
+```
+Timeline view:
+Before:  ···[V computed]=====[V held live across peak]=====[V consumed]···
+After:   ···[V computed][uncompute V]   (peak happens)   [recompute V][V consumed]···
+                                         ^^^^^^^^^^^
+                                   V is absent at peak
+```
+
+**Mechanics**: Emit the reverse of the gates that built V (returning its qubits to `|0⟩` and
+freeing them), run the peak-owning phase with that freed headroom, then re-emit the forward
+gates to restore V for its later consumer.
+
+**Cost**: The recompute adds Toffoli (same cost as the original computation). For a value
+that cost C₀ Toffoli to compute:
+- You save k qubits at the peak
+- You spend 2C₀ extra Toffoli (one uncompute + one recompute)
+- The trade wins if `2C₀ < k × (avgT / peak_q)` (the break-even rate)
+
+**Real examples**:
+- **1211→1193**: A GCD-apply scratch block was uncomputed during a shift sub-phase that didn't
+  use it, then reacquired after. Saved 18 qubits.
+- **1166→1165** (`TLM_PARK_ODD_U0`): `u[0]` is provably 1 (GCD odd-u invariant). Apply
+  `X → |0⟩` to zero it, `loan_zero_qubit` to return the lane, then `restore_known_one`
+  (apply X again) to restore. Near-zero Toffoli cost, −1 qubit.
+
+**The keep-alive dual**: Sometimes the uncompute+recompute round-trip creates a wider transient
+intermediate than just holding the value. In that case, *keep* the value live across the middle
+operation. Choose whichever is narrower: holding footprint vs recompute peak transient.
+
+---
+
+### 6.B Passenger Relocation: Shorten Live Ranges Without Recomputing
+
+A **passenger** is a qubit that was allocated early and consumed late, but does nothing at the
+peak — it just sits idle.
+
+**The cheaper fix**: Don't uncompute and recompute. Just **allocate later** (right before
+first use) and **free earlier** (right after last use). If both endpoints fall outside the
+peak window, the passenger vanishes from the binder count at zero Toffoli cost.
+
+**Example**: In the PZ inversion track (§6.F), the value `dy` (y-coordinate difference
+computed before the inversion) is needed only at the very end. After computing `λ = dy/dx`,
+the GCD runs for ~530 steps with `dy` riding along occupying 256 qubits. HMR ghosting (§6.N)
+eliminates it from the peak window.
+
+**Check passengers first** before resorting to live-range holes — relocation is free.
+
+---
+
+### 6.C Range-Bound a Register to Drop a Guard Bit
+
+Some registers need an extra "guard bit" (sign or overflow indicator) only because an
+intermediate could transiently go negative or overflow. If you can prove the value always
+stays in a non-negative range by reordering operations, delete the guard bit entirely.
+
+**Example** (benhuang Lever B): The fold quotient register had bit 33 (a sign guard) because
+Solinas reduction terms `[(0,+),(4,−),(5,−),(10,+),(32,+)]` could make the partial sum
+dip below zero. Reorder to apply positives first:
+`[(0,+),(10,+),(32,+),(4,−),(5,−)]`. Now the sum is always in `[0, 2^33)`. Allocate 33 bits
+instead of 34. **Net: −1 qubit at zero Toffoli cost.** This produced the 1221→1220 drop.
+
+**General rule**: In `+A − B` sequences, applying positives first and subtracting last keeps
+partial sums non-negative, eliminating sign-guard bits.
+
+---
+
+### 6.D Truncation: Keep Only the Bits That Matter
+
+Carry chains, high words of partial sums, and intermediate registers often hold more bits than
+actually affect the final result.
+
+**Example**: An n-bit adder computes n+1 bits (including carry-out). If you know the result
+is always at most n bits, the carry-out is always 0. Don't allocate it — save 1 qubit at
+0 Toffoli cost.
+
+More aggressive: Drop high bits of intermediates if subsequent modular reduction makes those
+bits irrelevant. The risk is that dropped bits sometimes aren't 0, silently corrupting results.
+
+**Per-step scheduling**: In a 530-step loop (the GCD), a single constant truncation width must
+be set safe for the worst iteration. A per-step schedule `width(step)` lets each iteration be
+exactly as tight as it can tolerate — saving qubits only at the steps that are actually at the
+peak, without weakening the others.
+
+**Two truncation flavors**:
+- Structural truncation (density-neutral): prove from circuit analysis that the dropped bits
+  are always zero on all inputs.
+- Empirical truncation (island-exact): verify the dropped bits are never 1 on the 9024
+  challenge inputs specifically. Requires re-hunting a nonce after each change.
+
+---
+
+### 6.E Free-and-Recompute a Cheap Value (The 1153→1152 Breakthrough)
+
+When a dead-qubit scan finds **no** unused qubits at the peak, don't conclude "the floor is
+structural." Ask instead:
+
+> Is any held value a cheap function of the other values already live at the peak?
+
+If yes, **free** that qubit, let the peak phase use its slot, then **recompute** the value
+from the live qubits afterward for negligible cost.
+
+**The cy0 trick** (d44cad3, BitWonka): The qubit `cy0` holds the carry-in at bit 0. No dead
+qubits found by scan. But because the secp256k1 prime constant `f[0] = 1`:
+
+```
+cy0 = control_bit AND (NOT final_a0)
+```
+
+Both `control_bit` and `final_a0` are already live at the peak. So:
+
+1. Uncompute `cy0` using 2 CNOT-equivalent gates (~0 Toffoli)
+2. Return the freed lane via `loan_zero_qubit`
+3. After the peak phase: recompute `cy0` from `control_bit` and `final_a0` (2 gates)
+
+Applied 40 times (once per binding fold iteration): 40 × 4 CNOTs = 0 Toffoli. Saves 1 qubit.
+The 1153→1152 drop.
+
+**Generalized lesson**: After a dead-qubit scan fails, scan again for "whose value is a CHEAP
+FUNCTION of other live qubits?" The second question catches what the first misses.
+
+---
+
+### 6.F Dynamic-Width Registers: Size Registers Per Step
+
+In a GCD algorithm, operands naturally shrink as computation proceeds. After k steps of binary
+GCD, the operands `u` and `v` have lost at most k bits from their high ends. A naive circuit
+allocates full 256-bit registers for all 530 steps.
+
+**Dynamic-width registers**: At each step `i`, determine the actual live bit-width and only
+allocate that many qubits. Free the high bits as they become known-zero.
+
+**Ablation results** (from the Shrunken-PZ q980 track):
+```
+Source-level dynamic PZ (universal schedule):     1027 qubits
++ thin support-tuned schedule (per-step widths):   990 qubits  (−37q)
++ counter/rotation metadata trimming:              983 qubits  (−7q)
++ quotient cap:                                    980 qubits  (−3q)
+```
+
+**Thin schedule (island-exact)**: An even tighter version samples actual GCD widths over many
+random inputs and builds per-step bounds tight to that distribution. This is island-exact — the
+thin schedule may be too narrow for inputs outside the sampled set. Requires nonce hunting.
+
+---
+
+### 6.G Known-Constant Teardown Before the Peak
+
+When the GCD terminates, certain registers are in known, predetermined states: `A = 0`, `B = 1`,
+`ca = p`, `q = 0`. These are **classical constants** — not quantum information.
+
+**What to do**: XOR the known constant *out of* the register (zeroing it) before the peak
+computation, then XOR it *back in* afterward.
+
+**Example**:
+- Register `ca` holds `p = 2^256 − 2^32 − 977` at termination.
+- Before the lambda multiply: XOR `p` out of `ca`, returning it to `|0⟩`. Free the register.
+- Run the lambda multiply with the freed headroom.
+- After the lambda multiply: XOR `p` back in for uncomputation.
+
+**Toffoli cost**: XOR (CNOT) operations are Clifford gates — free. The teardown and recreation
+cost 0 Toffoli. This is a pure qubit win.
+
+**Why this is allowed**: You're not erasing quantum information. You're applying a known unitary
+(XOR-with-p) to a known classical state, which is equivalent to zeroing it. The reverse operation
+(XOR-with-p again) restores the value exactly. Reversibility is preserved.
+
+---
+
+### 6.H Transcript / Log Compression
+
+**The GCD must record its decisions.** At each of the 530 divstep iterations, the algorithm
+makes data-dependent decisions: did we swap? did we subtract? These decisions are recorded in
+a **transcript** (also called "dialog tape") because they're needed to run the GCD backward
+during uncomputation. With one qubit per decision, the raw transcript is ~772 bits long.
+
+**Why transcripts compress**: Not all 2^530 patterns are reachable. The GCD dynamics forbid
+certain sequences, leaving fewer bits of entropy.
+
+**Compression techniques**:
+
+**1. Base-5 codec** (trailmix_ludicrous): Each 3-step window of `(subtracted, swap, s₂)` has
+8 possible bit patterns, but only 5 are reachable. Encode each 3-step window in
+`⌈log₂(5³)⌉ = 7` bits instead of 9 raw bits.
+```
+Raw:        1 + 3×257 = 772 qubits
+Compressed: 1 Step0 (2b) + 85 Triples (7b ea.) + 1 Pair tail (5b) + t1 flag (1b) = 603 qubits
+```
+The SAT-synthesized reversible codec maps 25 valid 2-symbol pairs to 25 distinct 5-bit codes.
+
+**2. K5 exact 11-bit codec**: Enumerate all reachable 5-step transcript windows exhaustively.
+If there are exactly 2^11 = 2048 reachable patterns, encode each in 11 bits. This is
+information-theoretically optimal — no further compression possible. Implemented via a
+borrowed-ancilla 17-CCX reversible codec. Converts 1203q → 1193q.
+
+**3. Three-step tail codec** (32 symbols): The last few GCD steps are heavily constrained.
+Enumerate the exact reachable set (32 symbols), encode in 5 bits. The 1185q → 1170q drop.
+
+**4. Streaming decompression**: Instead of decompressing the entire transcript before use,
+decompress one window at a time, use it, then immediately clear that window. Only one window
+is "open" at a time, reducing the peak overhead from the codec.
+
+**The hard constraint**: The codec must be a **bijection** — a perfect 1-to-1 map between
+reachable patterns and codes. If two distinct transcripts mapped to the same code, the
+information needed to run the GCD backward is destroyed, and the circuit gives wrong answers.
+Every codec must include a self-test proving bijectivity over the full reachable support.
+
+---
+
+### 6.I Plateau Decomposition: Lower Every Co-Binder Together
+
+When multiple independent phases all tie at the same peak height, you're in plateau mode.
+Lowering one phase alone doesn't change the global peak.
+
+**The protocol**:
+1. List ALL phases tied at the current peak (not just the first one). Build a "co-binder ledger."
+2. Find a **local** qubit reduction for each binder independently.
+3. Verify each local reduction doesn't accidentally raise a neighboring phase.
+4. Combine all compatible local reductions in one package.
+5. Re-measure the combined package.
+
+**The mental model**: Each local reduction is a **lemma**. The combined package is the
+**theorem**. A single lemma that leaves the global peak unchanged is still progress — mark
+that binder as "locally lowered" and move to the next.
+
+**Real example — the q1170 plateau** (9-way co-bind, all tied):
+| Phase | Local fix | Effect |
+|-------|-----------|--------|
+| Solinas square | smaller square segment notch | square peak 1170→1169 |
+| apply final ripple | low-qubit final ripple variant | ripple 1170→1162 |
+| apply double/reverse halve | fold carry parking + per-step map | 1170→1169 |
+| special overflow/underflow folds | fold parking + per-step map | 1170→1169 |
+| non-final apply ripple | source-as-carry suffix for one lane | 1170→1169 |
+
+Each was independently developed, then combined into a package. Only when all binders were
+locally reduced did the global peak drop to 1169.
+
+---
+
+### 6.J Dynamic Headroom Clamp: A Circuit-Wide Peak Governor
+
+Define a **circuit-wide qubit ceiling** and have every arithmetic primitive clamp its
+carry/chunk width to stay under it:
+
+```rust
+fn target_qubit_headroom(circ: &Circuit) -> usize {
+    TLM_TARGET_Q - circ.active_qubits()
+}
+
+fn varchunk_adder(circ: &mut Circuit, bits: usize) -> ... {
+    let k = min(scheduled_k, target_qubit_headroom(circ));
+    // ... use k as the carry chunk width ...
+}
+```
+
+**Effect**: No single call can exceed `TLM_TARGET_Q` total qubits. **Lower `TLM_TARGET_Q`
+by 1 → peak drops by 1**, as long as the narrower adder is still correct.
+
+This is the structural generalization of a static per-step carry-cap (`TLM_GCD_K_ADJUST`) into
+a dynamic per-call clamp. Instead of finding a specific qubit to shave, the runtime governor
+finds it automatically on every call.
+
+**The tradeoff**: Tighter ceilings force narrower carries → more carry-chunk splits → more
+Toffoli. The break-even exchange rate governs when to tighten.
+
+---
+
+### 6.K Lazy Carry Liveness
+
+A specific instance of live-range shortening for carry-in qubits. The carry-in qubit was being
+allocated before a chunk loop and held live across all N iterations, even though it was only
+needed at the loop boundaries.
+
+Fix (`TLM_FOLD_CHUNK_LAZY_CIN0`):
+```
+Before: carry_in allocated → live across all N chunk iterations → used only at boundaries
+After:  carry_in allocated inside boundary_erase() → used → freed inside boundary_erase()
+```
+
+The carry-in qubit's liveness is reduced to just the boundary operation. Peak saved: 1 qubit
+per chunk at 0 Toffoli cost.
+
+---
+
+### 6.L In-Place Decode: Hold Blocks Compressed
+
+For persistent register blocks that live across the peak, encode them compressed and decode
+*in place* only at the single use site.
+
+**Before**: Full-width raw K2-pair block (6 lanes) held live across the whole peak.
+**After**: 5 compressed cells + one zero lane stored at rest; decode in place only at the use
+site (allocate the 6 lanes transiently, use them, re-encode to 5 cells). During the rest of
+the circuit, only 5 cells are allocated. This is `DIALOG_GCD_K2_APPLY_INPLACE_RAW_BLOCK=1`,
+the 1218→1215 qubit drop.
+
+The principle: any persistent multi-lane block (raw GCD blocks, K2 pairs, materialized
+operands) can live compressed and reconstruct transiently at its single use site.
+
+---
+
+### 6.M Borrowed-Carry Fusion
+
+Standard carry/borrow vectors allocate fresh qubits. But if an adjacent scratch register is
+currently known `|0⟩`, borrow its qubits as the carry vector instead:
+
+```rust
+borrowed_const_fold_carries(circ, need, borrowed_carries);
+// Uses borrowed[..need] as carry vector; no fresh allocation
+// At exit: borrowed restored to |0⟩
+```
+
+**Net effect**: No fresh qubits allocated for the carry prefix. The peak doesn't rise.
+
+**Hard requirement**: The borrowed qubits must be genuinely `|0⟩` at the borrow point and
+restored to `|0⟩` before the borrower reads them again as data. Getting this wrong causes
+silent data corruption. (`DIALOG_GCD_SPECIAL_FOLD_BORROW_CARRIES=1`, the `461a4a3` commit.)
+
+---
+
+### 6.N Passenger Ghosting via HMR (Shrunken-PZ Track)
+
+**Standard passenger relocation**: Free before peak; recompute after. Requires the value to
+be recomputable from live data (costs Toffoli).
+
+**HMR ghost** (more aggressive): Measure the passenger qubit in the Hadamard (X-basis). The
+qubit is freed. The measurement result (a classical bit `m`) is recorded. Later, reconstruct
+the value algebraically and apply a classically-conditioned Z correction to fix the phase.
+
+**Why this works**: An X-basis measurement of `|ψ⟩` projects it into `|+⟩` or `|−⟩`. The
+measurement outcome `m` tells you which. If `m = 1` (got `|−⟩`), a phase `(−1)` was applied
+to the computational-basis components — the CZ correction cancels this exactly. After the
+correction, the measured qubit is factored out from the rest of the system and can be freed
+without information loss.
+
+**In the q980 EC point addition**:
+- `dy` (256-bit) computed before the GCD inversion. After GCD, `λ` and `dx` are live.
+- The identity `dy = λ × dx` holds by construction.
+- HMR-ghost `dy` before the GCD peak (measure it, record `m`).
+- At the end: reconstruct `dy = λ × dx`, apply phase correction via `m`.
+- Freed 256 qubits across the peak at the cost of one modular multiply for reconstruction.
+
+---
+
+## 7. Toffoli Reduction: The Core Loop
+
+1. **Measure** — get the Toffoli count; find the **hot-spot** (the phase emitting or executing
+   the most CCX gates). Note emitted vs average-executed.
+2. **Classify** — identify what *kind* of Toffoli these are (table below).
+3. **Pick the matching move** — the kind determines the technique.
+4. **Cost it** — depth-neutral? qubit cost? worth it at the exchange rate?
+5. **Re-measure** — the hot-spot migrates; repeat.
+
+### Classifying Toffoli by kind
+
+| Kind of Toffoli at the hot-spot | The matching move |
+|----------------------------------|-------------------|
+| **Carry-uncompute** (reverse carry chain returning scratch to `|0⟩`) | **Vent** via MBU (§8.A) |
+| **Self-uncomputing scratch** (comparators built then cleanly reversed) | **Conditional replay** (§8.C) |
+| **Data-controlled arithmetic** (`cadd`, fold-sub on live data) | Fusion / avoid materialization |
+| **Majority gadgets** (3-CCX majority in carry logic) | **Ancilla-free majority** (§8.L) |
+| **Redundant final cleanup** (top-clean made unnecessary by structure) | **Skip it** (§8.N) |
+| **Full intermediate products / wide rows** | **Avoid materialization** (§8.E) |
+| **Adjacent algebraic stages** (add/negate/subtract chains) | **Algebraic fusion** (§8.D) |
+
+---
+
+## 8. Toffoli Reduction Techniques
+
+### 8.A Measurement-Based Uncomputation (MBU) — The Most Important Technique
+
+**The Toffoli lifecycle problem**: An AND gate costs 4 T-gates (1 Toffoli) to compute.
+The uncomputation normally costs another 4 T-gates. Computing + uncomputing one AND = 2 Toffoli.
+
+**MBU** (Jones 2013, applied to adder carry chains by Gidney 2018):
+
+```
+1. Forward: ccx(a, b, out)       → 4 T-gates (1 Toffoli)
+2. Use 'out' in downstream logic
+3. Uncompute: measure 'out' in X-basis (Hadamard, then Z-basis measure)
+   Result is classical bit m ∈ {0, 1}
+   - If m = 0: done, free 'out'  → 0 Toffoli
+   - If m = 1: apply CZ(a, b)    → 0 Toffoli (CZ is a Clifford gate)
+Total uncompute cost: 0 Toffoli
 ```
 
 **Why does this work?** When you compute `out = a AND b` into a clean `|0⟩` ancilla, the system
-is in the state `|a, b, a·b⟩`. Measuring `out` in the X-basis (Hadamard then measure) projects
-the ancilla into `|+⟩` or `|−⟩`. The 50% of the time you get `|−⟩`, a phase kick `(−1)` has
-been applied to the `|a=1,b=1⟩` component of the quantum state. The CZ gate applied to `a` and `b`
-corrects that phase. After correction, the ancilla is no longer entangled with `a,b` and can be freed.
+is in state `|a, b, a·b⟩`. Measuring `out` in the X-basis either succeeds cleanly (m=0) or
+applies a phase kick `(−1)` to the `|a=1, b=1⟩` component (m=1). The CZ gate corrects exactly
+that phase. After correction, `out` is disentangled from `(a,b)` and can be freed.
 
-**The key**: You're paying 4 T for the forward computation, and 0 T for the reverse. The "uncomputing"
-is done by the physical act of measurement, which is free in the fault-tolerant model.
+The key insight: **measurement collapses entanglement for free**. Coherent uncomputation must
+undo entanglement gate-by-gate; measurement does it in one shot.
 
-**The cost**: The ancilla `out` must be held **live** from when you compute it to when you measure it.
-This is typically a short window (between the forward and reverse carry chains in an adder), but it
-costs +1 peak qubit during that window.
+**The tradeoff**: The `out` qubit must remain live from when it's computed to when it's measured
+(typically between the forward and reverse carry chains). This costs +1 peak qubit during that window.
 
-**Practical result for carry-chain adders**: An n-bit adder normally costs ~2n Toffoli (n for the
-forward carry chain, n for the reverse). With MBU, the reverse carry is 0 Toffoli. So the total
-drops to ~n Toffoli — halving the cost.
+**Practical effect on adders**: An n-bit ripple-carry adder normally costs ~2n Toffoli
+(n forward, n reverse). With MBU on every carry-uncompute:
+```
+Total adder cost = n Toffoli (forward only) + 0 (measured uncompute) = n Toffoli
+```
+This halves the adder cost — the most important constant-factor improvement in the SOTA.
 
 ---
 
-### 3.2 The Vent Dial
+### 8.B The Vent Dial
 
-The MBU mechanism gives us a precise dial: in a hybrid adder, each "vent" converts one carry-uncompute
-Toffoli into a measurement + phase correction. Precisely:
+MBU gives a precise, tunable dial. In a hybrid carry adder with `k` vents:
 
 ```
-A hybrid carry adder with k vents:
-- Toffoli cost = (3n − 2 − k) Toffoli
-- Extra peak qubits = k  (held during the forward↔reverse window)
+Toffoli cost = 3n − 2 − k
+Peak qubits  = baseline + k  (held only during forward↔reverse window)
 ```
 
-So each vent trades **−1 Toffoli for +1 temporary peak qubit**.
+So each vent is exactly: **−1 Toffoli, +1 temporary peak qubit**.
 
-**When to vent**: Vent aggressively during phases that are NOT at the qubit peak (off-peak phases have
-headroom, so the +1 qubit doesn't matter). Don't vent during the peak-binding phase (adding qubits
-there directly costs score).
+**When to vent**:
+- **Off-peak phases**: vent aggressively. The +1 qubit is off-peak, no score impact. Pure savings.
+- **On-peak phases**: don't vent, or only if the Toffoli savings outweigh the qubit cost at the
+  current exchange rate.
+
+In `trailmix_ludicrous`, the schedule bakes vent budgets per call: each call's vent count is set
+to exactly `TLM_TARGET_Q − active_qubits`, spending every spare qubit below the ceiling on
+Toffoli savings. Calls at the ceiling get 0 vents.
+
+**Gidney 2025 streaming vented adder** (arXiv:2507.23079): Uses 2 clean + (n−2) dirty ancilla
+for ~3n Toffoli. Partially implemented in `venting.rs` but **currently leaks phase** — the dirty
+ancilla phase correction logic is incomplete. Expected ~n/4 Toffoli savings per adder once fixed.
 
 ---
 
-### 3.3 Structural Dead Gate Skipping
+### 8.C Conditional / Measured Replay (Average-Executed Only)
 
-**Some Toffoli gates never fire.** In our circuit, there are CCX gates whose target bit is provably
-never flipped — because a carry bit is always zero due to a compile-time constant bound.
+**The idea**: If a comparator flag is `|0⟩` on most inputs, measure the flag instead of keeping
+it coherent. Then replay the dependent computation conditionally on the measurement outcome.
 
-**Example**: The secp256k1 prime `p = 2^256 − 2^32 − 977`. When computing `x + p`, the carry at bit
-position 256 can only arise if `x > 0`. But at certain circuit points, we know `x = 0` exactly
-(because we just computed that). So the carry-out Toffoli at position 256 never fires, and we can skip it.
+```
+1. Compute flag F into scratch ancilla (costs C Toffoli)
+2. Measure F in X-basis → classical bit m
+3. If m = 0: dependent block is a no-op on this shot  → 0 Toffoli from the block
+4. If m = 1: replay the block classically conditioned on m  → full cost
+Average cost = C + Pr[F=1] × (block cost)
+```
 
-**The d44cad3 pivot** (commit `6dafa07`): The previous approach used empirical sampling — run 9 million
-random inputs, find which CCX targets never flipped, and skip those. Problem: this is only correct for
-the specific 9024 test inputs, not all inputs.
+When F fires on fraction f of inputs: average-executed drops from `(block cost)` to
+`f × (block cost)`. If `f = 0.05`, you pay only 5% on average.
 
-The new approach: mathematically derive which carries are always zero from circuit structure alone.
-This gives ~15 named predicates (`TLM_FFG_SKIP_STRUCTURAL_DEAD_*`, etc.) that correctly identify
-dead CCX gates for ALL inputs, not just the test ones.
+**The hard constraint**: This ONLY works on **self-uncomputing scratch** — a comparator you
+compute, read under the condition, and cleanly reverse. It does NOT work on:
+- Data-controlled operations (where the control is live quantum data, not a measurable scratch bit)
+- Predicates reused downstream (you can't measure-and-discard them)
 
-**Why this matters for correctness**: The empirical approach was technically a cheat — the circuit
-would give wrong answers on some inputs (just not the 9024 the challenge uses). The structural
-approach is provably correct everywhere.
+**Named implementations** in the SOTA:
+- `DIALOG_GCD_REVERSE_BRANCH_CONDITIONAL_REPLAY`
+- `DIALOG_GCD_SPECIAL_CLEAN_CONDITIONAL_REPLAY`
+- `DIALOG_GCD_APPLY_BOUNDARY_CONDITIONAL_REPLAY`
+- `MOD_FAST_FLAG_CONDITIONAL_REPLAY`
+
+The key primitive: `cmp_lt_phase_conditioned()` in `compare.rs`. It: (1) HMRs the comparison
+flag, (2) replays the predicate classically (CZ/CX conditioned on the measurement), (3) the
+comparison's Toffoli collapses to near 0 on most shots at zero peak qubit cost.
 
 ---
 
-### 3.4 Algebraic Fusion: Karatsuba Square
+### 8.D Algebraic Fusion: Collapse Add/Negate Chains
 
-**The biggest single Toffoli reduction: −22.4 million** (from a single algorithmic change).
+Adjacent modular-arithmetic stages that are algebraically equivalent to a simpler single
+operation can be collapsed to eliminate intermediate carry chains.
 
-**Context**: Our circuit must compute `λ²` (lambda squared) as part of the elliptic-curve formula
-`new_x = λ² − x₁ − x₂`. This is a 256-bit modular square. The naive schoolbook algorithm
-multiplies every pair of bit-chunks:
-
+**Example (`DIALOG_FUSE_C_FORM`)**:
 ```
-For a 256-bit number split as hi·2^128 + lo:
-  (hi·2^128 + lo)² = hi²·2^256 + 2·hi·lo·2^128 + lo²
-                    = hi²·2^256 + (hi+lo)²·2^128 − hi²·2^128 − lo²  (Karatsuba trick)
+Old:
+  tx += 2*Qx    (mod add)
+  tx = -tx      (mod negate)
+  tx -= Qx      (mod sub)
+  tx = -tx      (mod negate)
+
+Algebraically (two negations cancel, constants combine):
+  tx += 3*Qx    (one mod add)
 ```
 
-**Schoolbook**: needs n² multiply-add operations for n-bit numbers.
-**Karatsuba**: recursively splits and reduces to 3 sub-squares instead of 4:
+**Example (`DIALOG_FUSE_X_RESTORE`)**:
+```
+Old:
+  tx = -tx      (mod negate)
+  tx += Qx      (mod add)
+
+Algebraically:
+  tx = Qx - tx  (one operation)
+```
+
+Each removed negate/add/subtract eliminates a carry chain, a modular reduction fold, and a
+cleanup phase — saving significant Toffoli.
+
+**Checklist before applying**:
+1. Prove the algebra holds modulo p, including underflow/overflow behavior.
+2. Confirm the intermediate value is not used as a control, measured, or needed by an uncompute
+   step between the original operations.
+3. Implement behind a default-off knob; verify the off path is byte-identical to the original.
+4. Run component self-tests for value, phase, and ancilla cleanliness.
+5. Re-measure peak qubits AND average Toffoli — a fusion should be peak-neutral but check.
+
+---
+
+### 8.E Witness-First / Deferred-Output Dataflow
+
+Sometimes a cancellation only needs a *witness relation*, not the final output value.
+Computing the output early and then cleaning it is wasteful when the witness is cheaper.
+
+**The 4352cfb Toffoli cut** (−10.8M Toffoli at fixed 980 qubits):
+
+Old EC dataflow for slope cancellation:
+```
+1. Compute dx_diff = tx_orig - new_x    (allocates temp register)
+2. Compute new_y = dy + λ × dx_diff - oy  (uses expensive multiply + constants)
+3. Derive new_dy = new_y + oy           (the witness numerator)
+4. Cancel λ using new_dy / new_dx
+5. Use new_y as output later
+```
+
+New route (zero-dy/newdx):
+```
+Key identity: new_dy = λ × new_dx  (from the curve equation, no new_y needed)
+
+1. Erase dy using: dy = λ × dx  (subtract λ×dx from dy → zero)
+2. Reuse the zeroed dy register as scratch
+3. Compute new_x
+4. Compute new_dx = ox - new_x
+5. Compute new_dy = λ × new_dx  (the witness, not the output)
+6. Cancel λ using new_dy / new_dx
+7. Materialize new_y = new_dy - oy  (only NOW compute the output)
+```
+
+The old route built `dx_diff`, ran a full multiply, added constants, then converted to the
+witness form. The new route skips the expensive early `new_y` materialization and computes
+only what the cancellation actually needs (the ratio `new_dy/new_dx`).
+
+**Ablation**:
+```
+zero-dy disabled, defer-y disabled:   110,227,695 emitted ops
+defer-y materialization only:         105,573,887 emitted ops  (−4.6M)
+both zero-dy + defer-y:                92,105,748 emitted ops  (−18.1M total)
+```
+
+**General principle**: Before materializing any output, ask: "does the next operation NEED the
+output, or just a function of it that's cheaper to compute directly?"
+
+---
+
+### 8.F Karatsuba Modular Square (−22.4 Million Toffoli)
+
+The largest single Toffoli reduction in the project's history.
+
+**The schoolbook problem**: Computing `λ²` for a 256-bit number using schoolbook multiplication
+visits every pair of bit-chunks, costing O(n²) multiplications.
+
+**Karatsuba**: For a 256-bit number split as `λ = hi × 2^128 + lo`, use the identity:
+```
+λ² = (hi × 2^128 + lo)²
+   = hi² × 2^256 + 2(hi × lo) × 2^128 + lo²
+   = hi² × 2^256 + [(lo+hi)² − lo² − hi²] × 2^128 + lo²
+```
+
+So instead of computing 4 products (lo², hi², lo×hi twice), compute only 3 squares:
 - `lo²` (128-bit square)
 - `hi²` (128-bit square)
-- `(hi + lo)²` (128-bit square)
+- `(lo + hi)²` (128-bit square)
 
-Then reconstructs via additions: `(lo + hi)² − lo² − hi²` = `2·lo·hi`, the cross-term.
+Then reconstruct the cross-term via additions (which are cheap Clifford operations).
 
-**Why this helps so much**: The 256-bit square runs at EVERY step of the GCD (258 steps × 2 passes).
-Any O(n²) → O(n^1.585) improvement in the core multiply scales to the whole circuit. The −22.4M
-Toffoli came from restructuring the 256-bit squarer: instead of 4 schoolbook cross-products between
-4 64-bit chunks, compute 3 sums-of-squares (using Karatsuba) and reconstruct. The 64-bit sub-squares
-also decompose further.
+**Why −22.4M Toffoli**: The squaring operation runs at EVERY GCD step (258 steps × 2 passes).
+Any O(n²) → O(n^1.585) improvement compounds massively across all those calls.
 
----
+**Density-neutral**: The Karatsuba identity `(lo+hi)² = lo² + hi² + 2·lo·hi` is a pure
+algebraic identity, correct for all integers. No approximation.
 
-### 3.5 NAF Recoding: Fewer Operations for the Same Constant
-
-**Context**: We frequently compute `x + 977·c` (adding a multiple of 977, the secp256k1 constant).
-
-The constant `977` in binary is `1111010001₂` — 6 "1" bits. Adding `977·c` means 6 separate
-additions (one for each bit position where 977 has a 1).
-
-**NAF (Non-Adjacent Form)**: Represent 977 using signed digits (−1, 0, +1):
-```
-977 = 2^10 − 2^5 − 2^4 + 1   (4 signed terms)
-```
-
-Each "+1" becomes an addition and each "−1" becomes a subtraction. With 4 terms instead of 6,
-we do 4 modular operations instead of 6 — saving ~33% of the Toffoli for this constant multiplication.
-
-**Density-neutral**: The algebraic identity `977 = 2^10 − 2^5 − 2^4 + 1` holds for ALL inputs.
-No approximation.
+**Recursive Karatsuba**: Tested on 128-bit sub-squares → net Toffoli LOSS (the overhead of the
+additions outweighs the sub-square savings at that level). Dead end.
 
 ---
 
-### 3.6 Conditional / Measured Replay
+### 8.G NAF Recoding of Constants
 
-**Key insight**: We measure the Toffoli count as **average-executed**, not emitted. If a gate fires
-only on a fraction of inputs, it only costs that fraction of a Toffoli on average.
+**The problem**: The secp256k1 constant `977 = 1111010001₂` has 6 set bits. Each Solinas
+reduction fold involving `977` requires 6 modular additions.
 
-**The mechanism**: Wrap a block of gates under a measurable predicate:
-1. Compute a comparator flag (e.g., "is bit K of the GCD carry set?") into a clean ancilla.
-2. Measure the flag in the X-basis.
-3. If the flag was 0 on this shot: the comparison-controlled block doesn't need to run — 0 Toffoli.
-4. If the flag was 1: replay the block classically-conditioned on the measurement — full cost.
+**NAF (Non-Adjacent Form)** uses signed digits `{−1, 0, +1}`:
+```
+977 = 2^10 − 2^5 − 2^4 + 1   (4 signed terms vs 6 unsigned)
+```
 
-**Averaging**: If the predicate is 1 on only 30% of inputs, the block costs 0.3× its full Toffoli.
-On the other 70% of inputs, it costs 0.
+In NAF, no two adjacent digits are both non-zero, and the number of non-zero digits is minimal.
+For `977`: 4 terms instead of 6, saving ~33% of the Solinas fold cost.
 
-**Where this applies**: The GCD reverse-branch comparator (`DIALOG_GCD_REVERSE_BRANCH_CONDITIONAL_REPLAY`),
-overflow-flag checks, and similar predicates that are often 0 over the Fiat-Shamir input distribution.
+**Density-neutral**: The identity `977 = 1024 − 32 − 16 + 1` is a mathematical fact, correct
+for all inputs.
 
-**The constraint**: Only works on **recomputed, self-uncomputing scratch** — a comparator you compute,
-read under the condition, then cleanly reverse. It does NOT work on data-controlled operations (where
-the control is live quantum data, not a measurable flag).
+Also applied to `c = 2^32 + 977` (the secp256k1 pseudo-Mersenne constant), saving terms in
+the full modular reduction.
 
 ---
 
-### 3.7 Classical Constants Are Free
+### 8.H Structural Dead Gate Skipping
 
-**When one operand is classical, the Toffoli disappears.**
+Some CCX gates provably never fire because their control condition is structurally always zero.
 
-In our circuit, the point `Q = (Qx, Qy)` being added is a **fixed classical constant** (the generator
-point in Bitcoin's secp256k1). This means all operations of the form `x ← x + Qx` or `y ← y − Qy`
-have one classical operand.
+**Example**: In a Cuccaro adder computing `x + f` where `f = 2^32 + 977`, the carry-out at
+certain high bit positions is always 0 when the operands are in the known range from the GCD
+convergence. The CCX gate for that carry can be omitted.
 
-For a CNOT: `ctrl | classical_target ← 0` if we know `classical_target = 0`, the gate is just "apply
-X if ctrl=1 and target is the right bit" — which becomes a compile-time XOR of the bit pattern, not
-a runtime gate. The operations become free `BitId` flips with 0 Toffoli.
+**Two flavors** (with very different correctness profiles):
 
-In practice: `coord_add3x` (dst += 3·Qx mod p) is implemented entirely on the classical `BitId` tier
-(zero Toffoli) because Qx is known at compile time.
+1. **Empirical dead-CCX** (REMOVED from SOTA): Sample ~9 million inputs; find CCX gates
+   whose target never flips; skip them. Problem: these gates might fire on inputs not in the
+   sample. This was removed in commit `6dafa07`.
 
----
+2. **Structural dead-CCX** (CURRENT SOTA): Prove mathematically that a CCX gate never fires
+   on ANY input using circuit structure alone (known-constant carries, exact-remainder
+   conditions, call-site bit patterns). Named predicates in `trailmix_ludicrous`:
+   - `TLM_FFG_SKIP_STRUCTURAL_DEAD_*` (specific bit positions in FFG adders)
+   - `TLM_CUCCARO_SKIP_STRUCTURAL_DEAD_*` (carry positions in Cuccaro adders)
+   - `TLM_COMPARE_SKIP_STRUCTURAL_DEAD_*` (always-zero comparator outputs)
+   - `TLM_GIDNEY_SKIP_STRUCTURAL_DEAD_*`, `TLM_CONST_CHUNK_SKIP_STRUCTURAL_DEAD_*`
 
-## 4. The Qubit↔Toffoli Exchange Rate
-
-### The fundamental tradeoff
-
-Almost every optimization involves trading one resource for the other. The question is always:
-**Is this particular trade favorable at the current frontier?**
-
-The **break-even rate** at the current SOTA (d44cad3, 1152q × 1,364,230 avgT):
-```
-break-even = avgT / peak_qubits = 1,364,230 / 1152 ≈ 1,184 Toffoli per qubit
-```
-
-If a technique saves 1 qubit at the cost of fewer than 1,184 Toffoli, the score improves.
-If it costs more than 1,184 Toffoli per qubit, the score worsens.
-
-**This rate is per-base and changes with every optimization.** An important lesson:
-- The 1156→1157 qubit expansion (`6ba606a`) cost only ~1,127 Toffoli per qubit (clearing break-even).
-- But the parallel Toffoli-only optimization track improved the base simultaneously, so by the time
-  the qubit drop landed, the score was already beaten by the pure-Toffoli route.
-- **Always compare products (score), not just break-even rates.**
-
-### The classical vs quantum pebbling gap
-
-Bennett (1989) showed that classically, the cost of computing a T-step function using S space in a
-reversible way is roughly:
-```
-T' = ε × 2^(1/ε) × T^(1+ε) / S^ε  extra gates
-```
-This is exponentially expensive as ε → 0 (as you try to save more space).
-
-But quantum circuits with mid-circuit measurements (like MBU/spooky pebbling) do much better:
-```
-T' = O(T/ε) gates,   O(T^ε × S^(1-ε)) qubits
-```
-The quantum constant is O(1/ε) — **polynomially small**, not exponentially large.
-
-This is the theoretical reason MBU and measurement-based techniques are so powerful: they exploit
-a fundamentally different space-time tradeoff than classical reversible computation allows.
+These are keyed by call-site and bit-index, not by sampled data. Density-neutral.
 
 ---
 
-## 5. Density-Neutral vs Island-Exact Techniques
+### 8.I Classical Constant Folding (Zero-Toffoli Operations)
 
-### Two types of optimization, very different risk profiles
+When one operand of an arithmetic operation is a **classical constant** (known at compile time),
+the operation can often be implemented with 0 Toffoli gates.
 
-**Density-neutral**: The technique is correct for ALL inputs. The circuit produces the same output
-regardless of which input is fed in.
+**The mechanism**: A `BitId` register holds a constant pattern as compile-time information.
+Operations with one classical operand:
+- `qubit XOR 0` = identity (no gate)
+- `qubit XOR 1` = Pauli X (free Clifford gate)
+- `qubit + classical_constant mod p` = a series of CNOT-like operations on specific bit
+  positions — 0 Toffoli.
 
-**Island-exact (distribution-specific)**: The technique is only correct for the 9024 specific
-inputs the challenge evaluates. It might produce wrong answers on other inputs — but the challenge
-only checks those 9024.
+**In trailmix_ludicrous**: `Q = (Qx, Qy)` is classical. So:
+```rust
+coord_add3x(circ, x2, ox, qubits);  // x2 += 3·Qx mod p
+```
+Since `Qx` is fixed at compile time, `3 × Qx mod p` is also fixed. The addition becomes a
+series of `x_if_bit` (CNOT-like) operations — **0 Toffoli**.
 
-| Property | Density-neutral | Island-exact |
-|----------|-----------------|-------------|
-| Correct on all inputs | YES | NO |
-| Correct on challenge inputs | YES | YES (by design) |
-| Safe to combine | YES — stack freely | RISK — interact with each other |
-| Needs nonce re-hunt | Only if op-stream changes | YES — always changes density |
-| Examples | MBU vents, Karatsuba, structural dead-skip | Carry truncation, GAP_J2, empirical dead-CCX |
-
-### The density issue explained
-
-The challenge finds a "clean nonce" — a 48-byte seed such that, when used to generate test inputs,
-all 9024 inputs produce a correct answer (0 classical errors, 0 phase errors, 0 ancilla errors).
-
-Density-neutral techniques preserve the pool of valid nonces: if a nonce worked before, it still
-works after (modulo the op-stream changing its hash). Island-exact techniques shrink the pool: some
-inputs that previously gave correct answers now might give wrong answers, making certain nonces
-invalid.
-
-**The empirical dead-CCX approach** (used before d44cad3): Sample 9 million inputs, find CCX gates
-that never fire, skip them. Valid only if those CCX gates also never fire on the 9024 challenge
-inputs — but on other inputs they might fire, and skipping them gives wrong answers.
-
-**The structural-dead approach** (d44cad3): Use circuit analysis to prove a CCX never fires on ANY
-input. Unconditionally correct. No re-hunting needed.
+The zero-Toffoli negate (step 15 in the point-add): `ox − x2 = −(x2 − ox)`. Load classical
+`ox`, subtract, free, then `mod_neg` (a const-add of `f−1`). All X / const-add gates, 0 Toffoli.
 
 ---
 
-## 6. Pebbling Theory: The Formal Foundation
+### 8.J Converged-Tail Gate Elision (`TLM_APPLY_CSWAP_SKIP_LASTK`)
 
-### What is pebbling?
+In the last K iterations of the 530-step GCD, the algorithm has converged and the apply-phase
+`cswap` (which swaps u and v based on the swap decision) has a control that is deterministically
+0 on all but rare inputs.
 
-The **reversible pebble game** is an abstract model for analyzing space-time tradeoffs in reversible
-computation. Think of it as a graph (nodes = values, edges = dependencies) where you can:
-- Place a pebble on a node if all its predecessors have pebbles (compute it).
-- Remove a pebble from a node if you run the computation backwards (uncompute it).
+**The optimization**: Skip the cswap for those last K iterations. On the overwhelming majority
+of inputs, this is exact. The rare input that actually needs the swap is caught by the nonce-hunting
+process (find a nonce where all 9024 test inputs happen to not trigger the swap in those iterations).
 
-The "peak qubits" = maximum number of pebbles on the graph simultaneously.
-
-### Bennett pebbling (classical)
-
-Bennett (1989) showed: to simulate a T-step computation using S extra pebbles reversibly:
-```
-Time cost = ε × 2^(1/ε) × T^(1+ε) / S^ε  (for any ε > 0)
-```
-Special case ε=1: T² / S time — quadratic. This grows exponentially worse as ε→0.
-
-For our 530-step GCD: halving the transcript (from 740q to 370q) via classical pebbling would
-cost `2 × 530² / 370 ≈ 1,518` additional GCD passes. At ~2,500 Toffoli per pass, that's
-~3.8M extra Toffoli — a 280% increase. Not worth it.
-
-### Spooky pebbling (quantum advantage)
-
-Gidney (2019) introduced the **spooky pebble game**: you can also "remove a pebble early" by
-measuring it in the X-basis. This leaves a 50% chance of a phase error ("ghost"), which is
-corrected later using a classical bit from the measurement result.
-
-Kornerup, Sadun, Soloveichik (2021) proved tight bounds: with quantum measurements:
-```
-Time cost = O(T/ε)   (constant factor 1/ε)
-vs Classical: O(2^(1/ε) × T)  (constant factor exponentially large)
-```
-
-**The quantum advantage is exponential**: for the same qubit savings, quantum circuits using
-measurements need far fewer extra gates than classical reversible circuits.
-
-**Parallel spooky pebbling** (Kahanamoku-Meyer et al. 2025): For a length-ℓ sequential chain,
-only `2.47 × log(ℓ)` qubits suffice to evaluate in depth `2ℓ`. For our 530-step chain:
-`2.47 × log(530) ≈ 23 qubits`. Notably, our current GCD state machine already uses ~22 qubits
-— we're already near the theoretical minimum!
+**Cost**: Island-exact. Requires re-hunting the tail nonce after applying.
 
 ---
 
-## 7. The Structural Techniques in Context: The 1211→1152 Journey
+### 8.K GAP_J2 Comparator Window Narrowing (−1.33M Toffoli)
 
-Here's the historical arc showing which technique solved which bottleneck:
+The swap decision comparator at each GCD step checks whether `|u| > |v|`. A full 256-bit
+comparison would be expensive, but the GCD ensures that `u` and `v` typically differ somewhere
+in their top bits.
 
+**The schedule `GAP_J2[i]`** (258-element table) sets the comparator window width per GCD step.
+The comparator scans only the top `GAP_J2[i]` bits. If the highest differing bit is below the
+window, the swap decision might be wrong (probability ~`2^(−k)` per step, calibrated against the
+challenge's input distribution).
+
+**Effect**: A 22-line edit to the `GAP_J2` table to shave ~1 bit per step across 258 steps:
 ```
-1211q — dead-qubit GCD scratch removed via live-range hole (uncompute during shift)
-  ↓  −18q, +34 avgT
-1193q — modular square truncation (one segment width tighter)
-  ↓  −1q, ~0 avgT
-1192q — fold-phase denser transcript codec (head-11 encoding, bijection self-test)
-  ↓  −7q, +6,604 avgT
-1185q — combined: finite-support tail codec + streaming apply + square rebalance
-  ↓  −15q, ??
-1170q — all four binders lowered together (plateau decomposition)
-  ↓  Toffoli improvements: Karatsuba square (−22.4M), NAF, fold fast-adds
-  ↓  Structural: GAP_J2 comparator narrowing (−1.33M), converged-tail cswap skip
-1159q — dynamic headroom clamp (TLM_TARGET_Q governor)
-  ↓
-1156q — [eventually returned as SOTA after Toffoli matured sufficiently]
-  ↓
-1153q — density-neutral fold increments (cinc), structural dead-CCX suite
-  ↓  6dafa07: structural dead pivot (removes empirical dead-CCX, adds ~15 structural predicates)
-1152q — FFG cy0 free-and-recompute + off-peak square vents (d44cad3, current SOTA)
+Toffoli saved = 1 bit × 516 comparator calls ≈ 1.33M Toffoli
 ```
 
-Each step reflects a different technique attacking the current bottleneck.
+This is one of the highest-leverage edits in the project: 22 lines, 1.33M Toffoli savings.
+**Island-exact** — requires nonce hunting.
 
 ---
 
-## 8. Open Frontiers
+### 8.L Ancilla-Free Majority
+
+Standard carry logic uses a 3-input majority gate with 3 Toffoli and an ancilla. The identity:
+```
+maj(a, k, c) = c XOR ((a XOR c) AND (k XOR c))
+```
+
+implements the same majority with **2 Toffoli and no ancilla** (XOR = CNOT, AND = CCX).
+Peak-neutral, value-identical, pure count reduction wherever majority gates appear.
+
+Applied to every carry position in every adder in the circuit.
+
+---
+
+### 8.M Exact-Adder Recovery (Removing a Truncation Can REDUCE Toffoli)
+
+Counter-intuitive: Sometimes a truncated adder costs **more** Toffoli than the exact
+full-carry adder, because the truncation requires an expensive correction to handle the rare
+carry-escape cases.
+
+**The rule**: If the correction overhead of a truncated adder exceeds its savings from
+dropping bits, revert to the exact adder:
+- Saves Toffoli (no correction overhead)
+- Reduces hard inputs (fewer inputs where truncation would fail, so easier nonce hunting)
+
+Named: `DIALOG_GCD_APPLY_FINAL_TOPCLEAN=0` — removes the truncated top-clean adder, replacing
+with the exact variant → ~−2,597 avg-Toffoli, value-exact.
+
+---
+
+### 8.N Skip Redundant Final Cleanup
+
+A folded/structured computation sometimes makes a final "top-clean" pass redundant — the
+structure ensures the cleanup bits are already zero by construction. Dropping the cleanup
+removes its Toffoli.
+
+**This is the highest-risk move**. If the cleanup is not actually redundant, you get silent
+phase/classical dirt on some inputs. Always pair with strong `cls/pha/anc` validation before
+enabling.
+
+---
+
+### 8.O Off-Peak Loosening (The Dual Move)
+
+When a phase falls **off** the qubit peak (another phase is now the binder), you can WIDEN
+that phase's arithmetic to recover Toffoli for free:
+
+```
+Phase A: was binder at 1170q → locally reduced to 1162q
+Phase B: now binder at 1170q (unchanged)
+Action: widen Phase A's carry width back toward the old value
+Effect: Phase A's Toffoli drops; Peak stays at 1170 (Phase B is binding)
+```
+
+**The rule**: Shrinking an off-peak phase is a pure-Toffoli play (no qubit cost). Widening
+an off-peak phase is a free Toffoli refund. Govern both on gates alone, not qubits.
+
+---
+
+### 8.P Constprop: Automated Static Gate Elimination
+
+The constraint-propagation pass (`CONSTPROP_MAX_ITERS`) analyzes the circuit statically and
+eliminates:
+- **Provably-constant CCX gates**: control always 0 → remove; control always 1 → replace with CNOT
+- **Inverse-pair cancellation**: consecutive `CCX(a,b,c)` gates that cancel algebraically
+- **Affine simplification**: sequences simplifying to an affine function, implementable with fewer gates
+
+Setting `CONSTPROP_MAX_ITERS=256` (vs default 16) runs to a deeper fixpoint, finding more
+opportunities: −377k Toffoli in one version.
+
+---
+
+## 9. The Qubit ↔ Toffoli Exchange Rate
+
+### The fundamental arithmetic
+
+At the current SOTA (1152q × 1,364,230 avgT = 1,571,592,960 score):
+
+```
+break-even rate = avgT / peak_q = 1,364,230 / 1152 ≈ 1,184 Toffoli per qubit
+```
+
+A lever that saves 1 qubit at the cost of fewer than 1,184 Toffoli **improves the score**.
+A lever that costs more than 1,184 Toffoli per qubit saved **worsens the score** — even though
+it reduced qubits.
+
+This rate **changes with every optimization**:
+- After a large Toffoli reduction: the rate drops (qubits become more valuable). Previously-marginal
+  qubit cuts are now worth trying.
+- After a large qubit reduction: the rate rises. Previously-marginal Toffoli cuts might now dominate.
+
+### The product-race caveat: always compare products, not just break-even
+
+A qubit drop that clears break-even can STILL lose the product race if the Toffoli-grinding
+track moves faster in parallel.
+
+**Concrete example** (June 2026):
+- A 1157q clamp cost ~1,127 Toffoli/qubit — below break-even at landing, won SOTA.
+- But the 1159q Toffoli-grind reached 1,378,242 avgT.
+- Score comparison: `1159 × 1,378,242 = 1,597,506,378 < 1157 × 1,380,890 = 1,598,290,330`
+- The 2-qubit savings was overtaken by the parallel Toffoli-cutting track.
+
+**Lesson**: Always run both tracks and compare products. Never minimize qubit count in isolation.
+
+### The shelved-lever rule
+
+A qubit lever that **failed break-even on one Toffoli base** can become favorable on a
+cheaper Toffoli base.
+
+**Example**: The dynamic headroom clamp (`TLM_TARGET_Q`) cost ~1,514 Toffoli/qubit on the
+schoolbook-square base. After Karatsuba reduced the square cost, the same clamp cost only ~20
+Toffoli/qubit on the new base — well below break-even. It won.
+
+**Rule**: After any major arithmetic win (Karatsuba, algebraic fusion, structural rewrite),
+re-test **all previously-shelved qubit levers** at the new exchange rate.
+
+### Different peak layers have different exchange rates
+
+At any peak, there are typically two layers:
+
+1. **Persistent floor**: long-lived state held across the whole peak (transcript, passenger
+   values, GCD state). Often **cheap** to reduce — a denser codec or transcript streaming costs
+   few gates to save many qubits.
+
+2. **Transient working registers**: the current step's carry bits, arithmetic scratch. Often
+   **expensive** to reduce — freeing them requires recompute/dirty-borrow, adding many Toffoli.
+
+Counter-intuitively: **compress the transcript before freeing the scratch**. The transcript
+looks "irreducible" (structured data) but is often the cheap lever. The scratch looks
+"wasteful" but is often the expensive lever.
+
+---
+
+## 10. Density-Neutral vs Island-Exact
+
+### The fundamental distinction
+
+**Density-neutral (value-exact)**: The circuit produces the same output on ALL inputs.
+The optimization is grounded in mathematical identity or circuit structure.
+
+**Island-exact (distribution-specific)**: The circuit is correct only on the specific 9024
+test inputs. On other inputs, it may give wrong answers.
+
+### Why this matters
+
+When you apply an island-exact optimization, some inputs that were previously "clean" (pass
+the validator) may now fail. You need to find a new **nonce** — a 48-byte seed for the test
+input generator — such that all 9024 generated inputs happen to be in the safe zone.
+
+Stacking multiple island-exact optimizations makes the safe zone smaller. After enough
+stacking, no valid nonce exists. You've optimized yourself into a corner.
+
+Density-neutral optimizations preserve the valid nonce pool. They can be stacked freely.
+
+### The 6dafa07 pivot: empirical → structural dead-CCX
+
+Before the current SOTA, the circuit used **empirical dead-CCX elimination**: sample 9M inputs,
+find CCX gates that never fire, skip them. Island-exact — those CCX might fire on other inputs.
+
+The 6dafa07 commit replaced this with **structural dead-CCX skipping**: prove from circuit
+structure which CCX gates can never fire on any input. These predicates are keyed by call-site
+and bit-index, not sampled data. Density-neutral.
+
+### The correctness check triple: `cls / pha / anc`
+
+Every validation run checks three error types:
+- `cls`: classical mismatch (the output value is wrong on some input)
+- `pha`: phase error (the output is correct but entangled with extra phase — kills interference)
+- `anc`: ancilla mismatch (a qubit failed to uncompute back to `|0⟩`)
+
+A correct circuit shows `0 / 0 / 0`. Measurement-based uncompute fails in `pha` (which value
+checks miss). Truncation failures typically show in `cls`. Missed uncompute shows in `anc`.
+
+---
+
+## 11. Pebbling Theory
+
+### The reversible pebble game
+
+The **pebble game** models space-time tradeoffs in reversible computation. The computation is
+a directed graph (nodes = values, edges = dependencies). A "pebble" = a qubit holding that
+value. Rules:
+- Place a pebble on a node if all predecessors have pebbles (compute it)
+- Remove a pebble by running computation backward (uncompute it)
+
+Peak qubits = maximum pebbles simultaneously.
+
+### Bennett pebbling: classical reversibility is expensive
+
+Bennett (1989) showed that reversibly simulating a T-step computation using S extra pebbles costs:
+```
+Time = ε × 2^(1/ε) × T^(1+ε) / S^ε   (for any ε > 0)
+```
+
+The hidden constant `c(ε) = ε × 2^(1/ε)` grows **exponentially** as ε → 0 (Levine-Sherman 1990).
+
+**Concrete example**: Halving the GCD transcript (S halved, ε = 1):
+```
+Time blowup ≈ 1 × 2 × 530² / 370 ≈ 1,518 extra GCD passes
+```
+At ~2,500 Toffoli per pass: 3.8M extra Toffoli for ~370q savings.
+Break-even needs: 3.8M / 1,184 ≈ 3,200 qubits. Actual saving: 370. Not worth it.
+
+### Quantum (spooky) pebbling: exponentially better
+
+**Gidney (2019)** introduced **spooky pebbling**: also allow removing a pebble by measuring it
+in the X-basis, recording the measurement outcome as a classical bit. When the value is needed
+again, recompute it and apply a classically-conditioned phase correction.
+
+**Kornerup, Sadun, Soloveichik (2021)** proved tight bounds:
+```
+Quantum: Time = O(T/ε)        [constant factor 1/ε — polynomial]
+Classical: Time = O(2^(1/ε) × T)  [constant factor exponential in 1/ε]
+```
+
+The quantum advantage is exponential. This is the theoretical backbone of why MBU and
+measurement-based techniques dominate — they exploit a space-time tradeoff physically impossible
+for purely classical reversible computation.
+
+### Parallel spooky pebbling (Kahanamoku-Meyer et al. 2025)
+
+For a length-ℓ sequential computation chain:
+```
+qubits needed = 2.47 × log(ℓ)  at depth 2ℓ
+```
+
+For our 530-step GCD: `2.47 × log(530) ≈ 23 qubits`. Our current GCD state machine uses ~22
+qubits — already near the theoretical minimum. The remaining qubit costs (1152 total) come
+from the transcript, passengers, and arithmetic scratch — not the GCD control logic itself.
+
+---
+
+## 12. The SOTA Circuit: How trailmix_ludicrous Works
+
+### The decisive architectural choice: Q is classical
+
+The second point `Q = (Qx, Qy)` is kept as classical `BitId` values, not quantum registers.
+Materialized into a transient quantum temp **only** at off-peak coordinate steps, then freed.
+This eliminates 512 qubits from the peak — by far the biggest single qubit reduction ever.
+
+A naive design that kept `Q` as resident quantum registers would add 512 qubits live across
+the entire GCD peak.
+
+### Two GCD passes sharing one tape
+
+The affine point addition needs:
+1. `λ = dy × dx⁻¹ mod p` — inverse GCD (drive `(p, dx)` → `(1, 0)`)
+2. `new_y_component = λ × (Px − new_Px) mod p` — forward GCD (drive `(p, new_dx)` backward)
+
+Both share **one** modular-inverse engine and **one** dialog tape (transcript). The forward
+and reverse GCD passes are the same circuit running in opposite directions.
+
+This avoids having two separate inversion circuits, saving both qubits (one shared tape) and
+Toffoli (shared codec overhead).
+
+### The base-5 codec: 772 → 603 qubits live
+
+At each of 257 divstep steps, the algorithm records `(subtracted, swap, s₂)` — 3 bits raw.
+But only 5 of 8 possible 3-bit patterns are reachable from the GCD dynamics. Triple windows
+of 3 consecutive symbols have `5³ = 125` reachable states, encoded in `7` bits instead of `9`:
+
+```
+Layout: 1 Step0 (2b) + 85 Triples (7b each) + 1 Pair tail (5b) + 1 t1 flag (1b) = 603 qubits
+```
+
+The SAT-synthesized reversible codec maps the 25 valid 2-symbol pairs to 25 distinct 5-bit
+codes, with the terminal AND-uncompute vented (0 Toffoli). Triple codec adds via affine normalization.
+
+### The vented-adder zoo
+
+Every adder in `trailmix_ludicrous` vents its carry-uncompute via MBU:
+```rust
+hmr(carry, bit);       // X-basis measurement, 0 Toffoli
+cz_if_bit(a, b, bit);  // phase correction conditioned on measurement
+```
+
+The adder family dispatches per-call by baked schedule tables:
+- Plain Gidney AND-carry
+- Variable-chunk (varchunk)
+- Headroom-adaptive (√n-chunk → chunked-then-Cuccaro tail)
+- Fused `double+cdouble` combining `y := 2(1+s₂)·y mod p` with one shared reduction
+
+Each call's vent budget: exactly `TLM_TARGET_Q − active_qubits`, spending every spare qubit
+below the ceiling on Toffoli savings.
+
+### The deliberate island-exact components
+
+trailmix_ludicrous includes calibrated island-exact approximations:
+- **Low-54-bit +f fold** (`LSBS = 54`): reduction folds touch only low 54 bits; carry beyond
+  bit 53 is dropped with probability ~`2^(−21)` per fire.
+- **Narrow-top-window comparators** (`MSBS = PAD = 21`): swap predicates scan only the top 21
+  bits. Mis-decision probability ~`2^(−21)` per call.
+
+`PAD = 21` is the master knob for these. These are safe under the 9024-shot verifier because
+independent ~`2^(−21)` per-fire divergences keep the expected failing-shot count under tolerance.
+
+### Where 1152q comes from
+
+At the SOTA (d44cad3):
+- **603q**: compressed base-5 GCD transcript (live during both GCD passes)
+- **512q**: two 256-bit coordinate registers (quantum P.x, P.y)
+- **~37q**: transient carry/vent ancilla at the peak-binding fold operations
+
+The co-binder plateau at 1152q spans the forward-multiply GCD apply, the inverse GCD apply,
+and boundary-carry phases at the peak.
+
+---
+
+## 13. The 1211→1152 Historical Journey
+
+Each qubit drop used the technique that fit its specific bottleneck:
+
+| Transition | Technique | What was released |
+|-----------|-----------|-------------------|
+| 1211→1193 (−18q) | Live-range hole (§6.A) | GCD-apply scratch block freed during shift sub-phase; reacquired after |
+| 1193→1192 (−1q) | Truncation / segmentation (§6.D) | Square segment one notch tighter |
+| 1192→1185 (−7q) | Transcript codec (§6.H) | Per-step fold carry scheduling + exact 11-bit head codec |
+| 1185→1170 (−15q) | Plateau decomposition (§6.I) + 5 techniques | Coordinated: tail codec, streaming apply, square rebalance, 5 co-binders |
+| 1170→1169 | MBU vent on fold carry (§8.A/B) | `hmr+cz_if` on the −f fold peak owner: 0 Toffoli to vent it |
+| 1167→1166 | Step-0 swap_flag elimination | `swap_flag` becomes `Option<QubitId>`, lazy-alloc; freed one tape lane |
+| 1166→1165 | Odd-u0 parking (§6.A) | `u[0]` is provably 1; park+loan the lane, restore in 2 gates |
+| 1164→1163 | Source-as-carry suffix | Paid drop: surrendered apply-phase vents to free one carry lane |
+| Toffoli: −22.4M | Karatsuba square (§8.F) | 3 sub-squares instead of 4 |
+| Toffoli: −1.33M | GAP_J2 narrowing (§8.K) | 22-line per-step comparator table edit |
+| Toffoli: −377k | Constprop deeper (§8.P) | `CONSTPROP_MAX_ITERS` 16→256 |
+| **1153→1152** | Free-and-recompute cy0 (§6.E) | `cy0 = ctrl & !a0`; loan lane for 40 binding folds |
+| Structural | 6dafa07 pivot (§8.H/§10) | Replaced empirical dead-CCX with ~15 structural predicates |
+
+**Key meta-lessons**:
+
+1. **Every "floor" fell to a better encoding or a better question.** Not always a new algorithm —
+   often a denser codec or the question "whose value is a cheap function of live qubits?"
+
+2. **The shelved-lever rule is real.** The 1157q clamp tried early and lost; won after Karatsuba.
+
+3. **Plateau mode is the endgame.** The final qubit drops each required coordinated packages of
+   4–9 independent local reductions applied simultaneously.
+
+4. **Structural correctness wins over island-exact tricks.** The 6dafa07 pivot to structural dead-CCX
+   eliminated the empirical approach entirely — correct for all inputs, not just the 9024.
+
+---
+
+## 14. Open Frontiers
 
 ### Density-neutral Toffoli cuts not yet applied
 
-1. **Gidney 2025 streaming vented adder** (arXiv:2507.23079): Uses 2 clean + (n-2) dirty ancilla
-   to implement an n-bit adder with ~3n Toffoli (vs current ~4n). Partially implemented in
-   `venting.rs` but has a phase leak bug — fixing it could save ~n/4 Toffoli per adder call.
+1. **Gidney 2025 streaming vented adder** (arXiv:2507.23079): Uses 2 clean + (n−2) dirty
+   ancilla for ~3n Toffoli. Partially implemented in `venting.rs` but **leaks phase** — dirty
+   ancilla phase corrections are incomplete. Expected ~n/4 Toffoli savings per adder once fixed.
 
-2. **Apply-swap involutory pair cancellation**: The forward GCD-swap and the immediately following
-   GCD-cswap on the same registers may cancel algebraically (swapping twice = identity). Not yet
+2. **Apply-swap structural dead-CCX**: The GCD apply-step `cswap` block (~256 cswap per iter ×
+   258 iters × 2 passes) has NO per-bit structural-dead skip — only whole-iteration skip. Porting
+   the structural-dead analysis to these operations is a high-priority open lever.
+
+3. **Extended Cuccaro structural dead-carry**: Currently checked for call indices 13–37 only.
+   Extending to ALL Cuccaro adder call sites would save proportionally more.
+
+4. **Apply-swap involutory pair cancellation**: The forward GCD-swap and the immediately following
+   GCD-cswap on the same (u/v) lanes may cancel algebraically (swap twice = identity). Not yet
    checked structurally.
-
-3. **Extended Cuccaro structural dead-carry**: Currently checked for call indices 13-37 only.
-   Extending to all adder call sites would save proportionally.
 
 ### Density-neutral qubit cuts not yet applied
 
-1. **More cy0-style free-and-recompute values**: The current 1152q peak is a co-bind plateau —
-   multiple phases all hitting 1152q simultaneously. Finding additional trivially-recomputable values
-   in each co-binder could drop the plateau, but ALL must be lowered together.
+1. **The co-bind plateau at 1152q**: Multiple independent phases all tie at 1152q. Each needs a
+   local reduction before the global peak drops. Challenge: finding compatible local reductions for
+   all co-binders simultaneously.
 
-2. **Spooky-pebble the GCD state machine** (−22q): Replacing the 22-qubit quantum step counter
-   with classical measurement tracking + phase corrections. Tight at break-even but theoretically
-   viable if the per-step phase correction cost is small enough.
+2. **FFG cy0-style recompute on other binders**: The cy0 trick (§6.E) worked because `cy0` was
+   a cheap function of live qubits. Other binder qubits may have similar cheap-function properties
+   not yet identified.
 
----
-
-## 9. Quick-Reference Summary Table
-
-| Technique | What it does | Qubit impact | Toffoli impact | Density-neutral? |
-|-----------|-------------|-------------|----------------|-----------------|
-| MBU / carry vent | Replace uncompute Toffoli with X-basis measurement | +1/vent (off-peak: free) | −1/vent | YES |
-| Live-range hole | Uncompute early, recompute later | −k (at peak) | +recompute cost | YES |
-| Transcript compression | Encode GCD decisions more densely | −k qubits | +small decode | YES |
-| Passenger ghosting | Erase a value you can reconstruct; carry a receipt | −N qubits | +N-mul reconstruction | YES |
-| Free-and-recompute cheap value | Clear a qubit whose value = f(live qubits); loan lane | −1 | +~0 (2 CNOTs) | YES |
-| Dynamic-width registers | Only allocate bits actually needed each step | −varies | neutral | PARTIAL (thin schedule: island-exact) |
-| Known-constant teardown | XOR register to 0 using known value; free lane | −k | +k XOR (free) | YES |
-| Karatsuba square | 3 sub-squares instead of 4 for 256-bit squaring | neutral | −22.4M | YES |
-| NAF recoding | Signed-digit repr of constant → fewer modular ops | neutral | −~5-10% | YES |
-| Structural dead-gate skip | Provably skip CCX whose target never flips | neutral | −varies | YES |
-| Conditional/measured replay | Average Toffoli by fraction predicate is set | neutral | −(1 − firing_rate)× | YES |
-| Carry truncation | Drop carry bits provably zero on the island | neutral | −small | NO (island-exact) |
-| Empirical dead-CCX | Skip CCX empirically never observed to fire | neutral | −small | NO (removed in 6dafa07) |
-| Classical constant ops | One operand is compile-time constant → 0 Toffoli | neutral | −significant | YES |
+3. **SumHiLo/shifted vents** (`TLM_SQUARE_SUMHILO_VENT`, `TLM_SQUARE_VENT_SHIFTED`): Exist in
+   the codebase as default-OFF options. Off-peak phases could enable these for free Toffoli savings.
 
 ---
 
-## 10. Key References
+## 15. Quick-Reference Summary Tables
 
-- Jones 2013 — Original MBU source (Phys. Rev. A 87.2)
-- Gidney 2018 (arXiv:1709.06648) — Applied MBU to adder carry chains
-- Khattar & Gidney 2024 (arXiv:2407.17966) — Conditionally clean ancilla taxonomy
-- Nie, Zi & Sun 2024 (arXiv:2402.05053) — Independent co-discovery of conditionally clean ancilla
-- Bennett 1989 (SIAM J. Comput. 18:4) — Reversible pebbling time-space tradeoff
-- Kornerup, Sadun & Soloveichik 2021 (arXiv:2110.08973) — Quantum spooky pebble tight bounds
-- Kahanamoku-Meyer et al. 2025 (arXiv:2510.08432) — Parallel spooky pebbling
-- Karatsuba & Ofman 1962 — Fast multiplication via divide-and-conquer
-- Gosset et al. 2013 (arXiv:1308.4134) — 1 Toffoli = exactly 7 T-gates (tight lower bound)
-- Selinger 2013 (arXiv:1210.0974) — T-depth 1 per Toffoli with 4 ancilla (depth trick, not count)
+### Qubit reduction techniques
 
-**Internal references**:
-- `density_neutral_tradeoffs.md` — detailed technique catalog with exchange rates
-- `REPORT_1168_wall_revamp.md` — historical account of the 1168→1152q journey
-- `gidney-techniques.md` — Gidney's full lever catalog
-- `external-literature-2000-2026.md` — broader academic literature map
+| Technique | Qubits saved | Toffoli cost | Density-neutral |
+|-----------|-------------|-------------|-----------------|
+| Live-range hole (§6.A) | k qubits | +2 × compute(V) | YES |
+| Passenger relocation (§6.B) | k qubits | 0 | YES |
+| Range-bound guard removal (§6.C) | 1 per register | 0 | YES |
+| Truncation (§6.D) | varies | 0 | PARTIAL |
+| Free-and-recompute cheap value (§6.E) | 1 | ~0 (CNOTs only) | YES |
+| Dynamic-width registers (§6.F) | varies | small | PARTIAL |
+| Known-constant teardown (§6.G) | k | 0 (CNOT = Clifford) | YES |
+| Transcript compression (§6.H) | varies | decode overhead | YES |
+| Plateau decomposition (§6.I) | 1 (global) | combined cost | YES |
+| Dynamic headroom clamp (§6.J) | 1 per ceiling drop | small | YES |
+| Lazy carry liveness (§6.K) | 1/chunk | 0 | YES |
+| In-place decode (§6.L) | varies | codec overhead | YES |
+| Borrowed-carry fusion (§6.M) | k | 0 | YES |
+| HMR ghosting / passenger ghosting (§6.N) | 256 | +1 modular multiply | YES |
+
+### Toffoli reduction techniques
+
+| Technique | Toffoli saved | Qubit cost | Density-neutral |
+|-----------|--------------|------------|-----------------|
+| MBU / carry vent (§8.A/B) | 1 per vent | +1 temporary | YES |
+| Conditional replay (§8.C) | (1−f) × block cost | 0 | YES |
+| Algebraic fusion (§8.D) | varies | 0 | YES |
+| Witness-first dataflow (§8.E) | ~13M / instance | 0 | YES |
+| Karatsuba square (§8.F) | ~22M (one change) | 0 | YES |
+| NAF recoding (§8.G) | ~5–10% of constant-fold cost | 0 | YES |
+| Structural dead-gate skip (§8.H) | varies | 0 | YES |
+| Classical constant ops (§8.I) | significant | 0 | YES |
+| Converged-tail elision (§8.J) | ~hundreds/iter × K iters | 0 | NO |
+| GAP_J2 narrowing (§8.K) | ~1.33M / 22-line change | 0 | NO |
+| Ancilla-free majority (§8.L) | 1 per majority | 0 | YES |
+| Exact-adder recovery (§8.M) | ~2,600 / call | 0 | YES |
+| Redundant cleanup skip (§8.N) | varies | 0 | RISKY |
+| Off-peak loosening (§8.O) | free refund | 0 | YES |
+| Constprop deeper (§8.P) | ~377k | 0 | YES |
+
+### Key theoretical results
+
+| Result | Source | Insight |
+|--------|--------|---------|
+| MBU: uncompute AND for 0 T-gates | Jones 2013 (Phys Rev A), Gidney 2018 (arXiv:1709.06648) | X-measurement + CZ = free uncompute |
+| 1 Toffoli = exactly 7 T-gates | Gosset et al. 2013 (arXiv:1308.4134) | Tight lower bound |
+| Bennett classical pebbling | Bennett 1989 (SIAM J. Comput. 18:4) | Classical: exponential constant in space savings |
+| Quantum spooky pebbling | Kornerup, Sadun, Soloveichik 2021 (arXiv:2110.08973) | Quantum: polynomial constant (exponential advantage) |
+| Parallel spooky pebbling | Kahanamoku-Meyer et al. 2025 (arXiv:2510.08432) | 2.47×log(ℓ) qubits for ℓ-step chain |
+| Conditionally-clean ancilla | Khattar & Gidney 2024 (arXiv:2407.17966) | 3n Toffoli MCX with log*n clean ancilla |
+| Conditionally-clean (co-discovery) | Nie, Zi & Sun 2024 (arXiv:2402.05053) | Independent discovery, Feb 2024 (5 months earlier) |
+| secp256k1 ECDLP frontier | Babbush, Gidney et al. 2026 (arXiv:2603.28846) | ≤1200q / ≤90M Toffoli for 256-bit ECDLP |
+| Karatsuba algorithm | Karatsuba & Ofman 1962 | O(n^1.585) vs O(n²) for multiplication |
+
+---
+
+*See also*:
+- [`density_neutral_tradeoffs.md`](references/density_neutral_tradeoffs.md) — detailed technique catalog with exchange rate math
+- [`gidney-techniques.md`](references/gidney-techniques.md) — Gidney's full lever catalog with blog/paper pointers
+- [`external-literature-2000-2026.md`](references/external-literature-2000-2026.md) — broader academic literature map
+- [`REPORT_1168_wall_revamp.md`](references/REPORT_1168_wall_revamp.md) — the trailmix_ludicrous introduction and burst analysis
+- [`frontier-1211-to-1170.md`](references/frontier-1211-to-1170.md) — detailed 1211→1170 step-by-step record
