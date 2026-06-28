@@ -12,13 +12,13 @@ reversible (`0 classical / 0 phase / 0 ancilla` violations). A free 96-gate iden
 
 ## 📘 Start here: the Optimization Techniques Primer
 
-New to this work? Read the **[Qubit & Toffoli Reduction Techniques Primer](primer/optimization_techniques_primer.md)**
-([**PDF**](primer/optimization_techniques_primer.pdf)) first. It's a self-contained, undergrad-level
+New to this work? Read the **[Qubit & Toffoli Reduction Techniques Primer](primer/ecdsafail_optimization_techniques_primer.md)**
+([**PDF**](primer/ecdsafail_optimization_techniques_primer.pdf)) first. It's a self-contained, undergrad-level
 tour of *every* optimization technique used in the challenge, explained from quantum-circuit first
 principles with concrete examples and ablation numbers from real submissions:
 
 - **What the challenge is** and why one elliptic-curve point addition is the thing being optimized.
-- **19 qubit-reduction techniques** and **19 Toffoli-reduction techniques** — live-range holes, MBU /
+- **20 qubit-reduction techniques** and **19 Toffoli-reduction techniques** — live-range holes, MBU /
   measurement-based uncompute, venting, Karatsuba squaring, gate-hosting, pseudo-Mersenne (Solinas)
   reduction, structural dead-gate skipping, and more.
 - The **theory** (Bennett vs. spooky pebbling), the **density-neutral vs. island-exact** correctness
@@ -229,8 +229,8 @@ the concrete knobs and the GPU search.
 
 ## References
 
-**Primer (start here):** [`primer/optimization_techniques_primer.md`](primer/optimization_techniques_primer.md)
-· [PDF](primer/optimization_techniques_primer.pdf) — a comprehensive, undergrad-level explanation of
+**Primer (start here):** [`primer/ecdsafail_optimization_techniques_primer.md`](primer/ecdsafail_optimization_techniques_primer.md)
+· [PDF](primer/ecdsafail_optimization_techniques_primer.pdf) — a comprehensive, undergrad-level explanation of
 every qubit/Toffoli reduction technique used in the challenge (see the callout near the top).
 
 Deep-dive analyses backing the circuit-optimization skill (under

@@ -1,6 +1,6 @@
 % ===========================================================================
 %  Qubit & Toffoli Reduction Techniques: A Comprehensive Primer
-%  LaTeX source — generated from optimization_techniques_primer.md
+%  LaTeX source — generated from ecdsafail_optimization_techniques_primer.md
 % ===========================================================================
 \documentclass[11pt,a4paper]{article}
 
@@ -448,8 +448,9 @@ absorbs. The SOTA runs \texttt{jump=2} (258 steps).
 
 The second point $Q$ is a \textbf{fixed constant} (the secp256k1 generator point, known at circuit
 compile time). The current SOTA keeps $Q$ as classical bit-patterns (\texttt{BitId}s) rather than
-quantum registers, eliminating \textbf{512 qubits} from the peak --- the single largest qubit
-reduction in the circuit's history.
+quantum registers --- \emph{and} materializes it into a transient quantum temp only at off-peak steps
+--- eliminating \textbf{512 qubits} from the peak: the single largest qubit reduction in the circuit's
+history, developed as a technique in \S\ref{sec:qclassical}.
 
 \subsection{Why secp256k1's prime is cheap: pseudo-Mersenne reduction (the math background)}
 \label{sec:pmmath}
@@ -615,7 +616,7 @@ near-misses.
 \end{tcolorbox}
 
 % ===========================================================================
-\section{Qubit Reduction Techniques (1--19)}
+\section{Qubit Reduction Techniques (1--20)}
 \label{sec:qubittech}
 % ===========================================================================
 
@@ -1217,6 +1218,40 @@ freed qubits (\texttt{KARA\_SOL\_SHIFT22\_DOUBLES}, the 1558q drop). The lesson:
 operation (a bit-shift) can be quietly \emph{expensive} in a reversible circuit because the
 shifted-out bits must be stored, not discarded --- and re-expressing it in the modular arithmetic you
 already have can dodge that storage entirely.
+
+\subsection{Keep Classical Constants Off the Peak (the $-512$q Q-classical lever)}
+\label{sec:qclassical}
+
+\textbf{The single largest qubit reduction in the circuit's history ($-512$q), and a technique worth
+stating on its own.} The second EC point $Q = (Q_x, Q_y)$ is a \emph{fixed, compile-time-known
+constant} (the generator). Naively you would load its two coordinates into 256-bit quantum registers
+and let them ride through the point-add. But two 256-bit quantum registers that sit \textbf{live
+across the GCD peak} cost \textbf{512 qubits at the binder} --- the most expensive place to spend them.
+
+\textbf{The lever has two halves, and you need both:}
+\begin{enumerate}
+  \item \textbf{Keep the constant \emph{classical}.} Store $Q_x, Q_y$ as classical bit-patterns
+    (\texttt{BitId}s), not qubits. Arithmetic against a classical operand is cheaper anyway --- adding
+    a known constant is a pattern of CNOT-like gates with no quantum operand (\S9.9, the Toffoli side
+    of the same fact).
+  \item \textbf{Materialize it \emph{off-peak} only.} A few steps genuinely need $Q$ as a transient
+    quantum value (the coordinate folds). Load it into a short-lived quantum temp \textbf{only at those
+    off-peak steps}, use it, and free it immediately --- so the 512 qubits exist only during
+    low-occupancy phases and \textbf{never co-reside with the GCD peak}.
+\end{enumerate}
+
+Half (1) alone is not enough: earlier circuits already knew $Q$ was a constant, yet still materialized
+it as resident quantum operands across the peak --- which is exactly why the dialog-GCD frontier
+stalled at the 1168q wall (\S\ref{sec:history}). It was the \emph{ludicrous} restructuring (an
+$a$-independent affine $\lambda$-law that arranges the whole add as two GCD passes, so $Q$ is only ever
+needed transiently at off-peak coordinate steps) that finally delivered half (2). tob-joe's note calls
+this \textbf{``the decisive product-min lever ($-512$q).''}
+
+\textbf{The general principle:} \emph{a value that is (a) a compile-time constant and (b) only needed
+at off-peak moments should be kept classical and reconstructed into a transient quantum temp at its
+point of use --- never held resident at the peak.} The savings scale with the constant's width and how
+long it would otherwise be live; for the two 256-bit $Q$ coordinates across the full GCD, that is the
+whole 512.
 
 % ===========================================================================
 \section{Toffoli Reduction: The Core Loop}
@@ -2415,6 +2450,7 @@ Gate-hosting (\S7.16) & 1 per hosted gate & 0 (clean) / $+1$ Tof (dirty) & Yes i
 Reset-bounded id compaction (\S7.17) & gap (max-id $-$ true peak) & 0 & Yes (relabels wires only) \\
 Windowed/chunked materialization (\S7.18) & many (the \texttt{F\_CUT} dial) & $+$few (boundary cmps) & Yes \\
 Shift-free modular doublings (\S7.19) & $\sim$24 (drops spill$+$flags) & $+$few & Yes \\
+Classical constants off-peak (\S7.20) & \textbf{512} (the Q-classical lever) & 0 & Yes \\
 GCD active-width trim (\S7.6 applied) & varies (deep tail) & small & Partial (graded; nonce-hunted) \\
 \bottomrule
 \end{tabular}

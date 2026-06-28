@@ -22,7 +22,7 @@ Summarized and compiled by **Jieyi Long**, with Claude Code.
 4. [The Challenge Circuit — Elliptic Curve Point Addition](#4-the-challenge-circuit--elliptic-curve-point-addition)
 5. [Measuring Progress — The Peak Qubit Profile and Hot Spots](#5-measuring-progress--the-peak-qubit-profile-and-hot-spots)
 6. [Qubit Reduction: The Core Loop](#6-qubit-reduction-the-core-loop)
-7. [Qubit Reduction Techniques (1–19)](#7-qubit-reduction-techniques-119)
+7. [Qubit Reduction Techniques (1–20)](#7-qubit-reduction-techniques-120)
 8. [Toffoli Reduction: The Core Loop](#8-toffoli-reduction-the-core-loop)
 9. [Toffoli Reduction Techniques (1–19)](#9-toffoli-reduction-techniques-119)
 10. [The Qubit ↔ Toffoli Exchange Rate and the Product Race](#10-the-qubit-↔-toffoli-exchange-rate-and-the-product-race)
@@ -284,8 +284,9 @@ SOTA runs `jump=2` (258 steps).
 
 The second point `Q` is a **fixed constant** (the secp256k1 generator point, known at circuit
 compile time). The current SOTA keeps `Q` as classical bit-patterns (`BitId`s) rather than
-quantum registers, eliminating 512 qubits from the peak — the single largest qubit reduction
-in the circuit's history.
+quantum registers — *and* materializes it into a transient quantum temp only at off-peak steps —
+eliminating 512 qubits from the peak: the single largest qubit reduction in the circuit's history,
+developed as a technique in §7.20.
 
 ### Why secp256k1's prime is cheap: pseudo-Mersenne reduction (the math background)
 
@@ -442,7 +443,7 @@ width cut that's not value-exact will produce all-dirty garbage on every input, 
 
 ---
 
-## 7. Qubit Reduction Techniques (1–19)
+## 7. Qubit Reduction Techniques (1–20)
 
 ### 7.1 Live-Range Holes: Uncompute Early, Recompute Later
 
@@ -1066,6 +1067,39 @@ break-even rate (`KARA_SOL_SHIFT22_DOUBLES`, the 1558q drop).
 The lesson: a "free" classical operation (a bit-shift) can be quietly *expensive* in a reversible
 circuit because the shifted-out bits must be stored, not discarded — and re-expressing it in the
 modular arithmetic you already have can dodge that storage entirely.
+
+---
+
+### 7.20 Keep Classical Constants Off the Peak (the −512q Q-classical lever)
+
+**The single largest qubit reduction in the circuit's history (−512q), and a technique worth stating
+on its own.** The second EC point `Q = (Qx, Qy)` is a *fixed, compile-time-known constant* (the
+generator). Naively you'd load its two coordinates into 256-bit quantum registers and let them ride
+along through the point-add. But two 256-bit quantum registers that sit **live across the GCD peak**
+cost **512 qubits at the binder** — the most expensive place to spend them.
+
+**The lever has two halves, and you need both:**
+
+1. **Keep the constant *classical*.** Store `Qx, Qy` as classical bit-patterns (`BitId`s), not qubits.
+   Arithmetic against a classical operand is cheaper anyway — adding/subtracting a known constant is a
+   pattern of CNOT-like gates with no quantum operand (§9.9, the Toffoli side of the same fact).
+2. **Materialize it *off-peak* only.** A few steps genuinely need `Q` as a transient quantum value
+   (the coordinate folds). Load it into a short-lived quantum temp **only at those off-peak steps**,
+   use it, and free it immediately — so the 512 qubits exist only during low-occupancy phases and
+   **never co-reside with the GCD peak**.
+
+Half (1) alone is not enough: earlier circuits already knew `Q` was a constant, yet still
+materialized it as resident quantum operands across the peak — which is exactly why the dialog-GCD
+frontier stalled at the 1168q wall (§14.1). It was the *ludicrous* restructuring (an `a`-independent
+affine λ-law that arranges the whole add as two GCD passes, so `Q` is only ever needed transiently at
+off-peak coordinate steps) that finally delivered half (2). tob-joe's note calls this **"the decisive
+product-min lever (−512q)."**
+
+**The general principle** (this is why it deserves its own entry, not just "Q is classical"): *a
+value that is (a) a compile-time constant and (b) only needed at off-peak moments should be kept
+classical and reconstructed into a transient quantum temp at its point of use — never held resident
+at the peak.* The savings scale with how wide the constant is and how long it would otherwise be
+live; for the two 256-bit `Q` coordinates across the full GCD, that is the whole 512.
 
 ---
 
@@ -2269,6 +2303,7 @@ compaction** (§7.17). Full analysis: [`pareto-frontier-push.md`](https://github
 | Reset-bounded id compaction (§7.17) | gap (max-id − true peak) | 0 | YES (relabels wires only) |
 | Windowed/chunked materialization (§7.18) | many (the `F_CUT` dial) | +few (boundary comparators) | YES |
 | Shift-free modular doublings (§7.19) | ~24 (drops spill+flags) | +few | YES |
+| Classical constants off-peak (§7.20) | **512** (the Q-classical lever) | 0 | YES |
 | GCD active-width trim (§7.6 applied) | varies (deep tail) | small | PARTIAL (graded; nonce-hunted) |
 
 ### Toffoli reduction techniques
