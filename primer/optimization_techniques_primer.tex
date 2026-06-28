@@ -1885,10 +1885,72 @@ Structural & 6dafa07 pivot (\S8.8/\S\ref{sec:density}) & Replaced empirical dead
 
 \subsection{The low-qubit competition track (a separate objective --- \S\ref{sec:twocomps})}
 
-Running \emph{alongside} the Q$\times$T product-SOTA journey above is the separate \textbf{low-qubit
-competition} line --- the \textbf{Shrunken-PZ / Proos--Zalka divstep} family --- whose objective is
-to minimize peak qubits with Toffoli unconstrained. This is the frontier where EEA register sharing
-(\S\ref{sec:regshare}) shines:
+\subsubsection{What the Shrunken-PZ approach is (the backbone of this track)}
+
+Almost every record on the low-qubit track is built on one architecture, \textbf{Shrunken-PZ}
+(Proos--Zalka). It is worth understanding as a whole, because it is a \emph{fundamentally different
+inversion engine} from the ludicrous/dialog-GCD circuit that holds the product SOTA --- different
+module, different objective, sharing only the problem statement ($P \mathrel{+}= Q$).
+
+\textbf{The core idea.} Where the ludicrous track records a small \textbf{decision tape} and replays
+it (\S\ref{sec:dialog} dialog transcript), Shrunken-PZ runs the \textbf{Proos--Zalka binary-GCD /
+Kaliski divstep inversion directly as a bit-by-bit reversible state machine} --- no big transcript.
+It carries the actual Euclidean state in \textbf{five working registers} and \emph{resizes them every
+step}:
+
+\begin{center}
+\begin{tabular}{p{2.0cm}p{5.0cm}p{6.0cm}}
+\toprule
+\textbf{register} & \textbf{meaning} & \textbf{width over the 530 steps} \\
+\midrule
+$A$, $B$ & the two running GCD magnitudes & start 256, \textbf{shrink toward 1} as the GCD converges \\
+$CA$, $CB$ & the two B\'ezout cofactors (inverse accumulators) & start 1, \textbf{grow toward 256} \\
+$Q$ & the per-step quotient & small, $\sim$21--25 bits \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Why the peak is in the middle, and why register sharing fits.} $A,B$ shrink while $CA,CB$
+grow, so the qubit peak is not at either end --- it is at the \textbf{GCD crossover} ($\sim$step 363),
+where both pairs are mid-sized:
+\[
+  \text{peak} \approx 2\max(|A|,|B|) + 2\max(|CA|,|CB|) + |Q| + \text{FIXED}(\sim267).
+\]
+At the crossover this is $[81,81,248,248,23] = 681$ working bits $+ \sim$267 fixed (the 256-bit
+coordinate passengers, modulus, sign/parity, counter, comparator scratch) $=$ \textbf{948 qubits}.
+Crucially $A$ and its cofactor $CA$ are \textbf{complementary in size} (one shrinks exactly as the
+other grows) --- which is what makes EEA register sharing (\S\ref{sec:regshare}) able to pack
+$A\Vert CA$ into one word and push toward 851/829.
+
+\textbf{The levers that define the track} (each is a \S6 technique, applied to the divstep machine):
+\begin{itemize}
+  \item \textbf{Dynamic-width registers (\S6.6)} --- resize $A,B,CA,CB$ per step; free known-zero
+    high bits.
+  \item \textbf{CLZ-context window narrowing} --- the divstep arithmetic only touches bits above a
+    provably-zero low region, so each op runs over a narrowed window $[lo..len)$. The ``robust width
+    envelope'' projects the tightest per-step window that still covers all sampled inputs --- the
+    qubit-side twin of empirical dead-CCX (\S\ref{sec:deadccx}), and equally \textbf{island-exact}.
+  \item \textbf{Known-constant teardown (\S6.7)} --- at convergence $A{=}0, B{=}1, CA{=}p, Q{=}0$ are
+    constants; XOR them out (0 Toffoli) before the $\lambda$ multiply so they don't co-reside with it.
+  \item \textbf{Passenger ghosting (\S6.14)} --- HMR-ghost $dy$/$\lambda$ so only one 256-bit
+    coordinate co-resides with the EEA peak ($+256$, not $+512$).
+  \item \textbf{Pipelined two-quotient divstep} --- build the \emph{next} quotient while draining the
+    \emph{previous}, so the quotient record stays $\sim$26 bits instead of a full 256-bit tape.
+  \item \textbf{EEA register sharing (\S\ref{sec:regshare})} --- the deepest lever; packs operand and
+    cofactor, reaching 851/829q.
+\end{itemize}
+
+\textbf{Why it is the qubit backbone but not score-competitive.} Running full per-step modular
+arithmetic \emph{without} the transcript-replay and Karatsuba machinery makes the divstep inversion
+inherently gate-heavy: $\sim$33--55M Toffoli at 948--980q ($\sim$40$\times$ the ludicrous SOTA's
+1.36M), and $\sim$460M at 851q. So Shrunken-PZ maps the \textbf{qubit floor} (objective 2) but loses
+the \textbf{product} by a wide margin --- a qubit-lower-bound witness, not a contender on score.
+
+\subsubsection{The record ladder}
+
+Running \emph{alongside} the Q$\times$T product-SOTA journey above is this separate \textbf{low-qubit
+competition} line --- the Shrunken-PZ family --- whose objective is to minimize peak qubits with
+Toffoli unconstrained:
 
 \begin{center}
 \begin{tabular}{p{2.6cm}p{6.0cm}p{4.4cm}}

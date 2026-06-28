@@ -1804,9 +1804,63 @@ Each qubit drop used the technique that fit its specific bottleneck:
 
 ### The low-qubit competition track (a separate objective — §1, track 2)
 
-Running *alongside* the Q×T product-SOTA journey above is the separate **low-qubit competition**
-line — the **Shrunken-PZ / Proos–Zalka divstep** family — whose objective is to minimize peak qubits
-with Toffoli unconstrained. This is the frontier where EEA register sharing (§6.15) shines:
+#### What the Shrunken-PZ approach is (the backbone of this track)
+
+Almost every record on the low-qubit track is built on one architecture, **Shrunken-PZ**
+(Proos–Zalka). It is worth understanding as a whole, because it is a *fundamentally different
+inversion engine* from the ludicrous/dialog-GCD circuit that holds the product SOTA — different
+module, different objective, sharing only the problem statement (`P += Q`).
+
+**The core idea.** Where the ludicrous track records a small **decision tape** and replays it (§3
+dialog transcript), Shrunken-PZ runs the **Proos–Zalka binary-GCD / Kaliski divstep inversion
+directly as a bit-by-bit reversible state machine** — no big transcript. It carries the actual
+Euclidean state in **five working registers** and *resizes them every step*:
+
+| register | meaning | width over the 530 steps |
+|----------|---------|--------------------------|
+| `A`, `B` | the two running GCD magnitudes | start 256, **shrink toward 1** as the GCD converges |
+| `CA`, `CB` | the two Bézout cofactors (the inverse accumulators) | start 1, **grow toward 256** |
+| `Q` | the per-step quotient | small, ~21–25 bits |
+
+**Why the peak is in the middle, and why register sharing fits.** `A,B` shrink while `CA,CB` grow,
+so the qubit peak is not at either end — it is at the **GCD crossover** (~step 363), where both pairs
+are mid-sized. The peak width is
+
+```
+peak ≈ 2·max(|A|,|B|) + 2·max(|CA|,|CB|) + |Q| + FIXED(~267)
+```
+
+At the crossover this is `[81,81,248,248,23] = 681` working bits + ~267 fixed (the 256-bit
+coordinate passengers, modulus, sign/parity, counter, comparator scratch) = **948 qubits**. Crucially
+`A` and its cofactor `CA` are **complementary in size** (one shrinks exactly as the other grows) —
+which is precisely what makes EEA register sharing (§6.15) able to pack `A∥CA` into one word and push
+toward 851/829.
+
+**The levers that define the track** (each is a §6 technique, here applied to the divstep machine):
+- **Dynamic-width registers (§6.6)** — resize `A,B,CA,CB` per step; free known-zero high bits.
+- **CLZ-context window narrowing** — the divstep arithmetic only touches bits above a provably-zero
+  low region, so each op runs over a narrowed window `[lo..len)`. The "robust width envelope" projects
+  the tightest per-step window that still covers all sampled inputs — the qubit-side twin of empirical
+  dead-CCX (§8.8), and equally **island-exact**.
+- **Known-constant teardown (§6.7)** — at convergence `A=0, B=1, CA=p, Q=0` are constants; XOR them
+  out (0 Toffoli) before the λ multiply so they don't co-reside with it.
+- **Passenger ghosting (§6.14)** — HMR-ghost `dy`/`λ` so only one 256-bit coordinate co-resides with
+  the EEA peak (+256, not +512).
+- **Pipelined two-quotient divstep** — build the *next* quotient while draining the *previous*, so the
+  quotient record stays ~26 bits instead of a full 256-bit tape.
+- **EEA register sharing (§6.15)** — the deepest lever; packs operand and cofactor, reaching 851/829q.
+
+**Why it is the qubit backbone but not score-competitive.** Running full per-step modular arithmetic
+*without* the transcript-replay and Karatsuba machinery makes the divstep inversion inherently
+gate-heavy: ~33–55M Toffoli at 948–980q (~40× the ludicrous SOTA's 1.36M), and ~460M at 851q. So
+Shrunken-PZ maps the **qubit floor** (objective 2) but loses the **product** by a wide margin — a
+qubit-lower-bound witness, not a contender on score.
+
+#### The record ladder
+
+Running *alongside* the Q×T product-SOTA journey above is this separate **low-qubit competition**
+line — the Shrunken-PZ family — whose objective is to minimize peak qubits with Toffoli
+unconstrained:
 
 | Qubit record | Technique | Notes |
 |--------------|-----------|-------|
