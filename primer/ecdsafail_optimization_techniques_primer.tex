@@ -1230,12 +1230,12 @@ the point-add. But two 256-bit quantum registers that sit \textbf{live across th
 held $Q$ resident would be $\sim$512 qubits \emph{higher}; keeping $Q$ classical and off-peak is what
 makes ludicrous's operating point viable at all.
 
-A caveat on the ``512'': that is the lever's saving \emph{relative to a same-family circuit holding
-$Q$ quantum} --- \textbf{not} a 512-qubit leaderboard drop. On the board it showed only as
-1168$\to$1167 ($-1$q), because ludicrous is a different family with its own cost structure. Its real
-impact was \textbf{breaking the 1168q wall} and opening the line that then drove to 1152
-(\S\ref{sec:history}, Era 3) --- the lever is decisive for the \emph{family}, not a one-shot $-512$ on
-the record.
+A caveat on the ``512'': that is the lever's saving \emph{relative to the same circuit holding $Q$
+quantum} --- \textbf{not} a 512-qubit leaderboard drop. On the board it showed only as
+1168$\to$1167 ($-1$q): ludicrous is a fresh \emph{reimplementation} of the dialog-GCD inversion (not a
+new engine), with its own cost structure. Its real impact was \textbf{breaking the 1168q wall} and
+opening the headroom that then drove to 1152 (\S\ref{sec:history}, Era 3) --- the lever is decisive
+for the \emph{reimplementation}, not a one-shot $-512$ on the record.
 
 \textbf{The lever has two halves, and you need both:}
 \begin{enumerate}
@@ -2184,11 +2184,14 @@ architecture had no more room. Breaking 1168 needed a different circuit, not ano
 \subsubsection{Era 3 --- The \emph{ludicrous} breakthrough: 1167q $\to$ 1152q}
 
 On 6/18 \textbf{tob-joe (Trail of Bits), \texttt{af5abb1}}, broke the wall by porting trailmix's
-\textbf{``ludicrous''} point-add --- \emph{a new circuit family, distinct from dialog-GCD} --- onto
-the challenge. It landed at \textbf{1167q $\times$ 1{,}422{,}591} (only $-1$q below the wall on day
-one), but the point wasn't the $-1$q: it opened a \textbf{fundamentally lower-headroom family} the
-dialog-GCD line could not reach, and over the next days drove to 1152. Its design (the architecture
-\S\ref{sec:trailmix} describes in full):
+\textbf{``ludicrous''} point-add onto the challenge. It is \emph{not} a new inversion algorithm --- it
+still uses the \textbf{dialog-GCD record/replay} engine (here in its \textbf{jump-2 divstep} variant,
+\S\ref{sec:dialog}) --- but a \textbf{fresh reimplementation} that re-architects the circuit around
+several techniques the in-progress dialog-GCD codebase lacked, \textbf{above all keeping $Q$ off the
+peak (\S\ref{sec:qclassical})}. It landed at \textbf{1167q $\times$ 1{,}422{,}591} (only $-1$q below
+the wall on day one), but the point wasn't the $-1$q: the reimplementation had \textbf{headroom the
+stalled dialog-GCD line had run out of}, and over the next days drove to 1152. Its design (the
+architecture \S\ref{sec:trailmix} describes in full):
 
 \begin{itemize}
   \item \textbf{The decisive lever --- $Q$ classical \emph{and off-peak} ($-512$q).} Hold both 256-bit

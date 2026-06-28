@@ -1080,11 +1080,12 @@ the most expensive place to spend them. A ludicrous circuit that held `Q` reside
 qubits *higher*; keeping `Q` classical and off-peak is what makes ludicrous's operating point viable
 at all.
 
-A caveat on the "512": that is the lever's saving *relative to a same-family circuit holding `Q`
-quantum* — **not** a 512-qubit leaderboard drop. On the board it showed only as 1168→1167 (−1q),
-because ludicrous is a different family with its own cost structure. Its real impact was **breaking the
-1168q wall** and opening the line that then drove to 1152 (§14.1, Era 3) — the lever is decisive for
-the *family*, not a one-shot −512 on the record.
+A caveat on the "512": that is the lever's saving *relative to the same circuit holding `Q`
+quantum* — **not** a 512-qubit leaderboard drop. On the board it showed only as 1168→1167 (−1q):
+ludicrous is a fresh *reimplementation* of the dialog-GCD inversion (not a new engine), with its own
+cost structure. Its real impact was **breaking the 1168q wall** and opening the headroom that then
+drove to 1152 (§14.1, Era 3) — the lever is decisive for the *reimplementation*, not a one-shot −512
+on the record.
 
 **The lever has two halves, and you need both:**
 
@@ -2088,10 +2089,13 @@ architecture simply had no more room. Breaking 1168 needed a different circuit, 
 #### Era 3 — The *ludicrous* breakthrough: 1167q → 1152q
 
 On 6/18 **tob-joe (Trail of Bits), `af5abb1`**, broke the wall by porting trailmix's **"ludicrous"**
-point-add — *a new circuit family, distinct from dialog-GCD* — onto the challenge. It landed at
-**1167q × 1,422,591** (only −1q below the wall on day one), but the point wasn't the −1q: it opened a
-**fundamentally lower-headroom family** that the dialog-GCD line could not reach, and over the next
-days drove to 1152. Its design (the architecture §12 describes in full):
+point-add onto the challenge. It is *not* a new inversion algorithm — it still uses the **dialog-GCD
+record/replay** engine (here in its **jump-2 divstep** variant, §3) — but a **fresh reimplementation**
+that re-architects the circuit around several techniques the in-progress dialog-GCD codebase lacked,
+**above all keeping `Q` off the peak (§7.20)**. It landed at **1167q × 1,422,591** (only −1q below the
+wall on day one), but the point wasn't the −1q: the reimplementation had **headroom the stalled
+dialog-GCD line had run out of**, and over the next days drove to 1152. Its design (the architecture
+§12 describes in full):
 
 - **The decisive lever — `Q` classical *and off-peak* (−512q).** Hold both 256-bit `Q` coordinates as
   *classical* registers and load them into a transient quantum temp **only at off-peak coordinate
