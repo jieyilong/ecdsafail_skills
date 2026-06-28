@@ -1054,27 +1054,53 @@ This halves the adder cost — the most important constant-factor improvement in
 
 ### 9.2 The Vent Dial
 
-MBU gives a precise, tunable dial. In a hybrid carry adder with `k` vents:
+§9.1 showed that MBU can *uncompute* one carry bit for **0 Toffoli** (measure it, then a free
+Clifford fix-up) instead of the 1 Toffoli a coherent uncompute would cost — the catch being that the
+carry qubit has to stay alive a little longer. Applying that choice to *one* carry in an adder is
+called a **vent**. The whole "dial" is just: *how many of an adder's carries do you choose to vent?*
+
+**Where the `3n − 2` comes from.** A reversible n-bit adder builds a chain of carry bits climbing up
+the word (the *forward* pass), uses the final carry, then unwinds that chain (the *reverse* pass) to
+return all the scratch qubits to `|0⟩` (this compute–use–uncompute cycle is the reversibility tax
+from §3). Tallying the Toffoli in that cycle for the hybrid carry adder used here gives a fixed
+baseline of about `3n − 2` Toffoli when *nothing* is vented. Each carry you vent deletes one Toffoli
+from the reverse (uncompute) half. So with `k` vents:
 
 ```
-Toffoli cost = 3n − 2 − k
-Peak qubits  = baseline + k  (held only during forward↔reverse window)
+Toffoli cost = 3n − 2 − k        ← one fewer Toffoli per vented carry
+Peak qubits  = baseline + k      ← but each vented carry stays live a bit longer
 ```
 
-So each vent is exactly: **−1 Toffoli, +1 temporary peak qubit**.
+The dial is therefore perfectly linear and perfectly priced: **each vent = −1 Toffoli, +1 temporary
+peak qubit.**
 
-**When to vent**:
-- **Off-peak phases**: vent aggressively. The +1 qubit is off-peak, no score impact. Pure savings.
-- **On-peak phases**: don't vent, or only if the Toffoli savings outweigh the qubit cost at the
-  current exchange rate.
+**Why the qubit is only *temporary* — the "forward↔reverse window."** A vented carry can't be freed
+the instant it's measured: its measurement outcome is still needed later, when the reverse pass
+reaches that bit position to clean it up. So the qubit is occupied only from when that carry is first
+computed (forward) until it is finally cleaned up (reverse) — the stretch in between is the
+"forward↔reverse window." Outside that window the lane is free, which is exactly why the `+k` qubits
+don't add to the circuit's permanent footprint.
 
-In `trailmix_ludicrous`, the schedule bakes vent budgets per call: each call's vent count is set
-to exactly `TLM_TARGET_Q − active_qubits`, spending every spare qubit below the ceiling on
-Toffoli savings. Calls at the ceiling get 0 vents.
+**When to vent — it depends on *where* the adder sits in the timeline.** Recall from §5 that the
+circuit's qubit peak happens during a few specific phases (the *binder*), while other phases have
+**slack** — spare qubits sitting idle. So:
+- **Off-peak adders** (running during a phase with slack): holding `+1` qubit there does *not* raise
+  the *global* peak, so venting is **pure profit** — free Toffoli savings at zero score cost. Vent
+  every carry you can.
+- **On-peak adders** (running at the binder): every extra qubit pushes the peak — and the score — up.
+  Vent only if the Toffoli saved is worth more than the qubit, judged by the exchange rate (§10).
 
-**Gidney 2025 streaming vented adder** (arXiv:2507.23079): Uses 2 clean + (n−2) dirty ancilla
-for ~3n Toffoli. Partially implemented in `venting.rs` but **currently leaks phase** — the dirty
-ancilla phase correction logic is incomplete. Expected ~n/4 Toffoli savings per adder once fixed.
+**How the SOTA automates it.** `trailmix_ludicrous` doesn't choose by hand. It fixes a circuit-wide
+qubit ceiling `TLM_TARGET_Q`, and for each adder call vents exactly `TLM_TARGET_Q − active_qubits`
+carries — i.e. it spends *all* the spare headroom beneath the ceiling on Toffoli savings, and not one
+qubit more. An adder already sitting at the ceiling gets `0` vents (no room); an adder with lots of
+slack gets vented heavily. This is the dynamic-headroom clamp (§7.10) and the vent dial working
+together.
+
+**Gidney 2025 streaming vented adder** (arXiv:2507.23079): a newer construction that uses 2 clean +
+(n−2) *dirty* (borrowed, §7.16) ancilla for ~3n Toffoli. Partially implemented in `venting.rs` but
+**currently leaks phase** — the phase correction for the dirty ancilla is incomplete — so it is not
+yet in the SOTA. Expected ~n/4 Toffoli savings per adder once fixed.
 
 ---
 
