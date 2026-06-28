@@ -4,9 +4,11 @@
 **What this is:** a deliberate mapping of the **value-exact (qubits, Toffoli) Pareto frontier**
 below the 1153q SOTA, published as a sequence of **clean, dead-CCX-free basis circuits** others can
 fork. This is **objective 3** of the challenge (explore the (Q,T) frontier — especially the *useful
-corner* where both Q and T beat Google/Babbush–Gidney's secp256k1 estimates of ≤1200q / ≤90M
-Toffoli), *not* a product-score bid. Every rung below 1153 is "rejected" on the Q×T product **by
-construction** — judging them by the score is a yardstick error.
+corner* where both Q and T beat the published estimate for a **single secp256k1 point addition**:
+**≤1175q / ~2.69M Toffoli** (2²¹·³⁶), the Babbush et al. space-optimized figure in Schrottenloher
+2026 Table 1, arXiv:2606.02235 — *not* the full-ECDLP ≤1200q/≤90M Toffoli, which is the whole Shor
+run of ~28 point additions). This is *not* a product-score bid. Every rung below 1153 is "rejected"
+on the Q×T product **by construction** — judging them by the score is a yardstick error.
 
 > Companion: this extends `REPORT_1168_wall_revamp.md` §2.13 (which covered 1153→1141 in detail)
 > with the new **1141→1133** rung and a unified frontier view. For the score-track SOTA (1152q ×
@@ -33,11 +35,15 @@ with no island-overfit gate deletion. `T_clean` is the average-executed Toffoli 
 1,368,487. ² Score shown is the promoted dead-CCX-on score. ³ `370fc31` is both the source commit
 and the listed reset base for submission `3d9ce59`.
 
-**The whole curve sits deep in objective-3's "useful corner":** every q ∈ [1133, 1153] is below
-Google's ≤1200q, and every T ≈ 1.37–1.46M is ~**60× below** Google's ≤90M Toffoli. So this is a map
-of the *reachable* frontier in exactly the regime that matters — not a far-off lower-bound witness
-(contrast the 851q low-qubit track, which spends ~460M Toffoli, ~250× over the product break-even
-and ~5× over Google's Toffoli budget).
+**The whole curve sits in objective-3's "useful corner":** the bar is the published *single
+point-addition* estimate — Babbush space-optimized **1175q / 2²¹·³⁶ ≈ 2.69M Toffoli** (Schrottenloher
+2026 Table 1; Schrottenloher's own space-opt is 1192q / 2²¹·¹⁹ ≈ 2.39M). Every rung here clears
+**both** axes: q ∈ [1133, 1153] is under 1175, and every T ≈ 1.37–1.46M is **comfortably under
+2.69M** (~2× headroom). So this is a map of the *reachable* frontier in exactly the regime that
+matters — not a far-off lower-bound witness (contrast the 851q low-qubit track, which spends ~460M
+Toffoli, ~250× over the product break-even and ~170× over the single-PA Toffoli figure). *(Do not
+confuse this with the full-ECDLP estimate ≤1200q / ≤90M Toffoli, arXiv:2603.28846 — that is the
+entire Shor run of ~28 windowed point additions, not the single PA the challenge scores.)*
 
 **Net 1153→1133:** −20 qubits for +67,908 clean Toffoli (~3,395 T/qubit averaged). The curve is
 **jagged and steepens below ~1146** — exactly the signal a future designer wants: it says where the

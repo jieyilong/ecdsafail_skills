@@ -249,13 +249,18 @@ counterproductive --- for another:
     score-competitive). Under this objective, spending 8$\times$ more Toffoli to save 10\% of qubits
     is \emph{free}, because Toffoli never enters the scoring.
   \item \textbf{Explore the (Q, T) Pareto frontier} --- especially the \emph{useful corner} where
-    \textbf{both} Q and T are lower than the published Google Quantum AI / Babbush--Gidney resource
-    estimates for secp256k1 ($\leq$1200q / $\leq$90M Toffoli, arXiv:2603.28846). A point is
-    Pareto-optimal if you cannot lower one of Q or T without raising the other. The goal here is not
-    a single score but a \emph{clean, reusable basis curve}: a value-exact circuit at each qubit
-    count that others can fork and improve (see the 1153q$\to$1133q clean Pareto bases,
-    \S\ref{sec:history}). This track deliberately avoids island-overfit tricks (\S\ref{sec:density})
-    so the curve stays a sound reference.
+    \textbf{both} Q and T are lower than the published resource estimates for a \textbf{single
+    secp256k1 point addition}: \textbf{$\leq$1175 qubits / $\sim$2.69M Toffoli} ($= 2^{21.36}$), the
+    Babbush et al.\ (Google Quantum AI) space-optimized figure tabulated in Schrottenloher 2026
+    (arXiv:2606.02235, Table 1; original arXiv:2603.28846). \emph{(Watch the units: the often-quoted
+    $\leq$1200q / $\leq$90M Toffoli is the \textbf{full} ECDLP/Shor run --- $\sim$28 windowed point
+    additions plus overhead --- whereas the scored circuit here is \textbf{one} point addition, so
+    the per-point-addition figure is the correct reference.)} A point is Pareto-optimal if you cannot
+    lower one of Q or T without raising the other. The goal here is not a single score but a
+    \emph{clean, reusable basis curve}: a value-exact circuit at each qubit count that others can fork
+    and improve (see the 1153q$\to$1133q clean Pareto bases, \S\ref{sec:history}). This track
+    deliberately avoids island-overfit tricks (\S\ref{sec:density}) so the curve stays a sound
+    reference.
 \end{enumerate}
 
 These are genuinely different games. Most of this primer optimizes track 1, but several techniques
@@ -1762,10 +1767,12 @@ is ``best'' depends entirely on which competition you are entering --- see \S\re
 The third track (\S\ref{sec:twocomps}, objective 3) maps the \textbf{value-exact Pareto frontier}
 below the 1153q SOTA as a sequence of \textbf{clean, dead-CCX-free basis circuits} others can fork.
 Unlike the low-qubit witness track above, these stay in the \textbf{useful corner} --- every point
-beats Google's secp256k1 estimate on \emph{both} axes ($q < 1200$, and $T \approx$ 1.37--1.46M is
-$\sim$60$\times$ under the $\leq$90M Toffoli budget). They are ``rejected'' on the Q$\times$T product
-\emph{by construction} (they trade qubits down for Toffoli up); the deliverable is the exchange
-\emph{curve}, not a score.
+beats the published \emph{single point-addition} estimate on \emph{both} axes: $q < 1175$ and
+$T \approx$ 1.37--1.46M, comfortably under the $\sim$2.69M ($2^{21.36}$) Toffoli of the Babbush
+space-optimized secp256k1 point-add (Schrottenloher 2026, Table 1). So the whole curve clears the bar
+with $\sim$20--40 qubits and roughly 2$\times$ Toffoli to spare. They are ``rejected'' on the
+Q$\times$T product \emph{by construction} (they trade qubits down for Toffoli up); the deliverable is
+the exchange \emph{curve}, not a score.
 
 \begin{center}
 \begin{tabular}{p{1.1cm}p{2.2cm}p{2.6cm}p{6.0cm}}
@@ -1917,7 +1924,8 @@ Bennett classical pebbling & Bennett 1989 (SIAM J.\ Comput.\ 18:4) & Classical: 
 Quantum spooky pebbling & Kornerup, Sadun, Soloveichik 2021 (arXiv:2110.08973) & Quantum: polynomial constant (exponential advantage) \\
 Parallel spooky pebbling & Kahanamoku-Meyer et al.\ 2025 (arXiv:2510.08432) & $2.47 \times \log(\ell)$ qubits for $\ell$-step chain \\
 Conditionally-clean ancilla & Khattar \& Gidney 2024 (arXiv:2407.17966) & $3n$ Toffoli MCX with $\log^* n$ clean ancilla \\
-secp256k1 ECDLP frontier & Babbush, Gidney et al.\ 2026 (arXiv:2603.28846) & $\leq1200$q / $\leq90$M Toffoli for 256-bit ECDLP \\
+secp256k1 \emph{full ECDLP} frontier & Babbush, Gidney et al.\ 2026 (arXiv:2603.28846) & $\leq1200$q / $\leq90$M Toffoli for the whole Shor run ($\sim$28 windowed PAs) \\
+secp256k1 \emph{single point-add} (the challenge unit) & Babbush space-opt, via Schrottenloher 2026 Table 1 (arXiv:2606.02235) & \textbf{1175q / $2^{21.36}\approx2.69$M Toffoli} (the ``useful corner''); Schrottenloher space-opt $=$ 1192q / $2^{21.19}\approx2.39$M \\
 Karatsuba algorithm & Karatsuba \& Ofman 1962 & $O(n^{1.585})$ vs $O(n^2)$ for multiplication \\
 EEA register sharing (origin) & Proos \& Zalka 2003 (arXiv:quant-ph/0301141) & Inversion dominates point-add space; operand$+$cofactor packing \\
 Compact exact reversible inversion & Luo et al.\ 2026 (arXiv:2604.02311) & $3n + 4\lfloor\log_2 n\rfloor$ qubits (1333q, $n{=}256$) via bit-length-tracked sharing \\

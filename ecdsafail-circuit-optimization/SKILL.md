@@ -485,8 +485,10 @@ reached an **851→829q** *analysis-oracle* witness — ~400–500M Toffoli, rej
 
 A separate deliberate effort maps the **value-exact (qubits, Toffoli) Pareto frontier** below the
 1153 SOTA as a sequence of **clean, dead-CCX-free basis circuits** (objective 3 — the *useful corner*
-where both Q and T beat Google/Babbush–Gidney's ≤1200q / ≤90M Toffoli; every point here is ~60× under
-that Toffoli budget). These are "rejected" on the Q×T product **by construction** — do not judge them
+where both Q and T beat the published **single point-addition** estimate: **≤1175q / ~2.69M Toffoli**
+(2²¹·³⁶, Babbush space-opt via Schrottenloher 2026 Table 1, arXiv:2606.02235; NOT the full-ECDLP
+≤1200q/≤90M Toffoli, which is the whole Shor run); every rung here clears both axes with ~2× Toffoli
+to spare). These are "rejected" on the Q×T product **by construction** — do not judge them
 by the score. Frontier: `da51a48` (1153) → `3e3966b` (1147) → `e64cdfd` (1146) → `48e6c23` (1143) →
 `0cbc2d7` (1142) → `370fc31` (1141) → **`765ef38` (1133 × 1,460,511)**. The cheap qubits come from
 **fold-vent clamping** (`TLM_FOLD_CALL_CODE_OVERRIDES`); the medium ones from **no-ancilla /
@@ -1217,7 +1219,8 @@ low-qubit route for *score* (answer: no — it is a qubit-witness, ~33× over th
 break-even). Do NOT conflate it with the ludicrous arithmetic.
 
 For the **(Q,T) Pareto-frontier push** (objective 3 — the clean value-exact basis circuits below
-1153q, in the *useful corner* under Google's ≤1200q/≤90M Toffoli), read
+1153q, in the *useful corner* under the single-point-addition estimate ≤1175q / ~2.69M Toffoli,
+Babbush space-opt via Schrottenloher 2026 Table 1 — not the full-ECDLP ≤1200q/≤90M figure), read
 `references/pareto-frontier-push-1153-to-1133.md` when the task involves the 1153→1147→1146→1143→
 1142→1141→1133 clean basis ladder, the lever taxonomy (fold-vent clamp → no-ancilla/dirty-borrow →
 constant-lane loan → active-width trim), `TLM_GCD_ACTIVE_WIDTH_TRIM`, the `compact.rs` reset-bounded

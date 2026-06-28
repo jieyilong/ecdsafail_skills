@@ -97,11 +97,16 @@ counterproductive — for another:
    is *free*, because Toffoli never enters the scoring.
 
 3. **Explore the (Q, T) Pareto frontier** — especially the *useful corner* where **both** Q and T
-   are lower than the published Google Quantum AI / Babbush–Gidney resource estimates for secp256k1
-   (≤1200q / ≤90M Toffoli, arXiv:2603.28846). A point is Pareto-optimal if you cannot lower one of
-   Q or T without raising the other. The goal here is not a single score but a *clean, reusable basis
-   curve*: a value-exact circuit at each qubit count that others can fork and improve (see the
-   1153q→1133q clean Pareto bases, §13). This track deliberately avoids island-overfit tricks (§10)
+   are lower than the published resource estimates for a **single secp256k1 point addition**:
+   **≤1175 qubits / ~2.69M Toffoli** (= 2²¹·³⁶), the Babbush et al. (Google Quantum AI)
+   space-optimized figure tabulated in Schrottenloher 2026 (arXiv:2606.02235, Table 1; original
+   arXiv:2603.28846). *(Watch the units: the often-quoted ≤1200q / ≤90M Toffoli is the **full**
+   ECDLP/Shor run — ~28 windowed point additions plus overhead — whereas the scored circuit here is
+   **one** point addition, so the per-point-addition figure is the correct reference.)* A point is
+   Pareto-optimal if you cannot lower one of Q or T without raising the other. The goal here is not a
+   single score but a *clean, reusable basis curve*: a value-exact circuit at each qubit count that
+   others can fork and improve (see the 1153q→1133q clean Pareto bases, §13). This track deliberately
+   avoids island-overfit tricks (§10)
    so the curve stays a sound reference.
 
 These are genuinely different games. Most of this primer optimizes track 1, but several techniques
@@ -1669,10 +1674,12 @@ entering — see §6.O and §9.
 
 The third track (§1, objective 3) maps the **value-exact Pareto frontier** below the 1153q SOTA as a
 sequence of **clean, dead-CCX-free basis circuits** others can fork. Unlike the low-qubit witness
-track above, these stay in the **useful corner** — every point beats Google's secp256k1 estimate on
-*both* axes (q < 1200, and T ≈ 1.37–1.46M is ~60× under the ≤90M Toffoli budget). They are "rejected"
-on the Q×T product *by construction* (they trade qubits down for Toffoli up); the deliverable is the
-exchange *curve*, not a score.
+track above, these stay in the **useful corner** — every point beats the published *single
+point-addition* estimate on *both* axes: **q < 1175** and **T ≈ 1.37–1.46M, comfortably under the
+~2.69M (2²¹·³⁶) Toffoli** of the Babbush space-optimized secp256k1 point-add (Schrottenloher 2026,
+Table 1). So the whole curve clears the bar with ~20–40 qubits and roughly 2× Toffoli to spare. They
+are "rejected" on the Q×T product *by construction* (they trade qubits down for Toffoli up); the
+deliverable is the exchange *curve*, not a score.
 
 | q | T_clean | clean exchange vs prev | new lever introduced |
 |---|---------|------------------------|----------------------|
@@ -1790,7 +1797,8 @@ compaction** (§6.Q). Full analysis: [`pareto-frontier-push-1153-to-1133.md`](re
 | Parallel spooky pebbling | Kahanamoku-Meyer et al. 2025 (arXiv:2510.08432) | 2.47×log(ℓ) qubits for ℓ-step chain |
 | Conditionally-clean ancilla | Khattar & Gidney 2024 (arXiv:2407.17966) | 3n Toffoli MCX with log*n clean ancilla |
 | Conditionally-clean (co-discovery) | Nie, Zi & Sun 2024 (arXiv:2402.05053) | Independent discovery, Feb 2024 (5 months earlier) |
-| secp256k1 ECDLP frontier | Babbush, Gidney et al. 2026 (arXiv:2603.28846) | ≤1200q / ≤90M Toffoli for 256-bit ECDLP |
+| secp256k1 *full ECDLP* frontier | Babbush, Gidney et al. 2026 (arXiv:2603.28846) | ≤1200q / ≤90M Toffoli for the whole Shor run (~28 windowed PAs) |
+| secp256k1 *single point-add* (the challenge unit) | Babbush space-opt, via Schrottenloher 2026 Table 1 (arXiv:2606.02235) | **1175q / 2²¹·³⁶ ≈ 2.69M Toffoli** (the "useful corner" bar); Schrottenloher space-opt = 1192q / 2²¹·¹⁹ ≈ 2.39M |
 | Karatsuba algorithm | Karatsuba & Ofman 1962 | O(n^1.585) vs O(n²) for multiplication |
 | EEA register sharing (origin) | Proos & Zalka 2003 (arXiv:quant-ph/0301141) | Inversion dominates point-add space; operand+cofactor packing |
 | Compact exact reversible inversion | Luo et al. 2026 (arXiv:2604.02311) | 3n + 4⌊log₂n⌋ qubits (1333q, n=256) via bit-length-tracked register sharing |
