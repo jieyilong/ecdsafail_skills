@@ -1434,6 +1434,15 @@ A `−2^k` digit means *that* fold step is a **shifted subtraction** instead of 
 reversible circuit a controlled modular subtract costs exactly the same as a controlled add (it is the
 adder run backwards), so a signed digit is as cheap as a binary one.
 
+**It is baked in at compile time.** `977` (and `c = 2^32 + 977`) is the secp256k1 prime — a *fixed
+constant known when the circuit is built*. So its NAF is computed **once at build time**, and those
+positions become a **fixed gate sequence**: every Solinas fold emits exactly the same four shifted
+operations (`+2^10`, `−2^6`, `+2^4`, `+2^0`). Nothing is stored in qubits or decided at runtime, and
+it is not recomputed per input or per GCD step — it is *structure*. This is the constant-folding fact
+of §9.9: arithmetic against a *known* constant compiles to a fixed pattern of gates. (Were the
+multiplier a *quantum* value instead, you couldn't bake in a NAF — you'd need per-bit controlled
+operations or windowed table lookups.)
+
 **The payoff.** 6 non-zero digits → 4: **four shifted add/subtracts per fold instead of six, ~33% off
 the 977 part of every Solinas reduction.** That reduction runs on essentially every modular
 multiply/square across all ~530 GCD steps, so the saving compounds. The same recoding is applied to

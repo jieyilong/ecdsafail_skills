@@ -1556,6 +1556,15 @@ A $-2^k$ digit means \emph{that} fold step is a \textbf{shifted subtraction} ins
 and in a reversible circuit a controlled modular subtract costs exactly the same as a controlled add
 (it is the adder run backwards), so a signed digit is as cheap as a binary one.
 
+\textbf{It is baked in at compile time.} $977$ (and $c = 2^{32} + 977$) is the secp256k1 prime --- a
+\emph{fixed constant known when the circuit is built}. So its NAF is computed \textbf{once at build
+time}, and those positions become a \textbf{fixed gate sequence}: every Solinas fold emits exactly the
+same four shifted operations ($+2^{10}$, $-2^6$, $+2^4$, $+2^0$). Nothing is stored in qubits or
+decided at runtime, and it is not recomputed per input or per GCD step --- it is \emph{structure}.
+This is the constant-folding fact of \S9.9: arithmetic against a \emph{known} constant compiles to a
+fixed pattern of gates. (Were the multiplier a \emph{quantum} value instead, you couldn't bake in a
+NAF --- you'd need per-bit controlled operations or windowed table lookups.)
+
 \textbf{The payoff.} 6 non-zero digits $\to$ 4: \textbf{four shifted add/subtracts per fold instead of
 six, $\approx33\%$ off the 977 part of every Solinas reduction.} That reduction runs on essentially
 every modular multiply/square across all $\sim$530 GCD steps, so the saving compounds. The same
