@@ -161,8 +161,13 @@ from circuit-level first principles, with concrete examples from actual research
 {\small As of 2026-06-27\par}
 \end{titlepage}
 
-\section*{Introduction: What Is the ecdsa.fail Challenge?}
-\addcontentsline{toc}{section}{Introduction: What Is the ecdsa.fail Challenge?}
+\tableofcontents
+\newpage
+
+% ===========================================================================
+\section{Introduction: What Is the ecdsa.fail Challenge?}
+\label{sec:intro}
+% ===========================================================================
 
 Elliptic-curve cryptography (ECC) secures essentially all of today's digital signatures --- including
 the keys that control Bitcoin and Ethereum funds. A large enough quantum computer would break it:
@@ -199,10 +204,6 @@ tricks for shaving qubits and Toffoli gates. \textbf{This primer is a guided tou
 techniques}, explained from quantum-circuit first principles for a reader who has just learned the
 basics --- covering all three of the challenge's objectives (minimize the spacetime product, minimize
 qubits alone, and map the clean (qubit, Toffoli) Pareto frontier; see \S\ref{sec:score}).
-
-\newpage
-\tableofcontents
-\newpage
 
 % ===========================================================================
 \section{What We Are Optimizing --- The Score and Why Toffoli Gates Are Expensive}
@@ -423,7 +424,7 @@ registers $r, s$ co-reside:
   \approx 4.355n.
 \]
 So \emph{both} score factors are set by the reconstruction step --- that is where transcript
-compression (\S6.8) and the vented adders (\S8.1) are aimed. And one clean knob sits behind the whole
+compression (\S7.8) and the vented adders (\S9.1) are aimed. And one clean knob sits behind the whole
 (Q, T) Pareto curve: spending \textbf{n extra ancilla during reconstruction} lets you use a cheap
 Gidney adder (2n Toffoli) instead of a CDKM adder (3n) --- that single choice \emph{is} the
 space-optimized-vs-gate-optimized split in both Babbush and Schrottenloher.
@@ -471,7 +472,7 @@ $2^{21.78}$).
 The intuition to carry forward: a modular reduction is normally ``subtract $p$ until in range,'' but
 for a pseudo-Mersenne prime it becomes \textbf{``fold the top bits into the bottom bits,''} cheap
 precisely because $c$ is small. \S\ref{sec:pmarith} turns this into the actual reversible gadgets
-(mod-double, mod-add, the $+f$ fold); \S8.7 (NAF) makes the fold constant itself cheaper.
+(mod-double, mod-add, the $+f$ fold); \S9.7 (NAF) makes the fold constant itself cheaper.
 
 % ===========================================================================
 \section{Measuring Progress --- The Peak Qubit Profile and Hot Spots}
@@ -1605,7 +1606,7 @@ the vented path.
 reconstruction does thousands of them. Pseudo-Mersenne turns each into a short $+f$ fold $+$ a
 top-bits compare --- the entire secp256k1 advantage (constant-adder 15\% vs 34\%, modular-double 8\%
 vs 24\%, \S\ref{sec:pmmath}). \textbf{No Montgomery form is used} --- both the paper and trailmix
-keep plain integer representation and fold directly. NAF recoding (\S8.7) is the next layer: it makes
+keep plain integer representation and fold directly. NAF recoding (\S9.7) is the next layer: it makes
 the fold constant $c$ itself cheaper (4 signed terms instead of 6).
 
 % ===========================================================================
@@ -1776,21 +1777,21 @@ Naming the move tells you its exact cost and risk:
 \toprule
 \textbf{Technique} & \textbf{Pebble-game move} & \textbf{Which game} & \textbf{Cost to un-pebble} \\
 \midrule
-Live-range hole (\S6.1) & remove a pebble by \textbf{uncompute}, re-place later by \textbf{recompute} & Bennett & full Toffoli, \emph{twice} \\
-Free-and-recompute cy0 (\S6.5) & same, on one cheap pebble & Bennett & $\approx$0 (a few CNOTs) \\
-MBU / carry vent (\S8.1--B) & remove a carry pebble by \textbf{X-measurement $+$ CZ} & spooky & \textbf{0 Toffoli} \\
-Conditional replay (\S8.3) & measure the pebble; recompute only on the firing branch & spooky & $\Pr[\text{fire}] \times$ cost \\
-HMR ghosting (\S6.14) & measure, leave a \textbf{ghost}, recompute $+$ phase-fix & spooky & one recompute \\
-Transcript compression (\S6.8) & \textbf{don't pebble it} --- shrink the data so fewer pebbles persist & (out of the game) & codec only \\
+Live-range hole (\S7.1) & remove a pebble by \textbf{uncompute}, re-place later by \textbf{recompute} & Bennett & full Toffoli, \emph{twice} \\
+Free-and-recompute cy0 (\S7.5) & same, on one cheap pebble & Bennett & $\approx$0 (a few CNOTs) \\
+MBU / carry vent (\S9.1--B) & remove a carry pebble by \textbf{X-measurement $+$ CZ} & spooky & \textbf{0 Toffoli} \\
+Conditional replay (\S9.3) & measure the pebble; recompute only on the firing branch & spooky & $\Pr[\text{fire}] \times$ cost \\
+HMR ghosting (\S7.14) & measure, leave a \textbf{ghost}, recompute $+$ phase-fix & spooky & one recompute \\
+Transcript compression (\S7.8) & \textbf{don't pebble it} --- shrink the data so fewer pebbles persist & (out of the game) & codec only \\
 Parallel GCD schedule (\S\ref{sec:trailmix}) & optimal pebble \emph{placement} over the 530-step chain & parallel spooky & --- (already optimal) \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \textbf{The Bennett$\to$spooky upgrade is the single biggest constant-factor lever.} A live-range
-hole (\S6.1) is a \emph{Bennett} move: to free a pebble you uncompute it (paying its Toffoli) and
+hole (\S7.1) is a \emph{Bennett} move: to free a pebble you uncompute it (paying its Toffoli) and
 later recompute it (paying again) --- the classical-reversible game, where un-pebbling is expensive.
-MBU (\S8.1) is the \emph{spooky} move on the same kind of pebble: you remove it by \textbf{measuring}
+MBU (\S9.1) is the \emph{spooky} move on the same kind of pebble: you remove it by \textbf{measuring}
 it, and a measurement costs no Toffoli. That is exactly why an $n$-bit adder drops from $\sim$2n
 Toffoli (compute $+$ coherent uncompute) to $\sim$n (compute $+$ measured uncompute) --- \textbf{MBU
 is the pebble game's quantum advantage cashed out on every carry bit.}
@@ -1802,15 +1803,15 @@ only pays when $\texttt{recompute\_Toffoli} < \texttt{qubits\_freed} \times \tex
   \item \textbf{The transcript is firmly in the ``never recompute'' regime.} Bennett's
     exponentially-growing constant is why: re-deriving it costs $\sim$3.8M Toffoli to free $\sim$370
     qubits ($\sim$8$\times$ over break-even). So take it \emph{out} of the game by \textbf{compressing
-    the data} (\S6.8), not by recomputing it.
+    the data} (\S7.8), not by recomputing it.
   \item \textbf{A scratch pebble like \texttt{cy0} is deep in the ``always recompute'' regime.} It is
     a cheap function of live qubits, so recompute costs $\sim$0 Toffoli --- free it without hesitation
-    (\S6.5).
+    (\S7.5).
 \end{itemize}
 
 And the parallel-spooky bound says the \textbf{GCD control chain is already done} ($\approx$22q vs
 the $2.47\cdot\log(530) \approx 23$q floor). So the theory aims every remaining qubit lever at the
-\textbf{data pebbles} --- transcript, passengers, coordinate registers --- exactly where \S6 and
+\textbf{data pebbles} --- transcript, passengers, coordinate registers --- exactly where \S7 and
 \S\ref{sec:trailmix} spend their effort. In short: \emph{recompute the cheap pebbles (Bennett), measure
 the carry pebbles (spooky), compress the expensive data instead of pebbling it, and stop optimizing
 the control chain.}
@@ -1898,20 +1899,20 @@ Each qubit drop used the technique that fit its specific bottleneck:
 \textbf{Transition} & \textbf{Technique} & \textbf{What was released} \\
 \midrule
 1211$\to$1193 ($-18$q) & Live-range hole (\S\ref{sec:liverange}) & GCD-apply scratch block freed during shift sub-phase; reacquired after \\
-1193$\to$1192 ($-1$q) & Truncation (\S6.4) & Square segment one notch tighter \\
+1193$\to$1192 ($-1$q) & Truncation (\S7.4) & Square segment one notch tighter \\
 1192$\to$1185 ($-7$q) & Transcript codec (\S\ref{sec:transcript}) & Per-step fold carry scheduling + exact 11-bit head codec \\
-1185$\to$1170 ($-15$q) & Plateau decomp (\S6.9) + 5 techniques & Tail codec, streaming apply, square rebalance, 5 co-binders \\
+1185$\to$1170 ($-15$q) & Plateau decomp (\S7.9) + 5 techniques & Tail codec, streaming apply, square rebalance, 5 co-binders \\
 1170$\to$1169 & MBU vent on fold carry (\S\ref{sec:mbu}/8.B) & \texttt{hmr+cz\_if} on the $-f$ fold peak owner: 0 Toffoli to vent it \\
 1167$\to$1166 & Step-0 swap\_flag elimination & \texttt{swap\_flag} becomes \texttt{Option<QubitId>}, lazy-alloc; freed one tape lane \\
 1166$\to$1165 & Odd-u0 parking (\S\ref{sec:liverange}) & \texttt{u[0]} is provably 1; park+loan the lane, restore in 2 gates \\
 1164$\to$1163 & Source-as-carry suffix & Paid drop: surrendered apply-phase vents to free one carry lane \\
-Toffoli: $-22.4$M & Karatsuba square (\S8.6) & 3 sub-squares instead of 4 \\
-Toffoli: $-1.33$M & GAP\_J2 narrowing (\S8.11) & 22-line per-step comparator table edit \\
-Toffoli: $-377$k & Constprop deeper (\S8.16) & \texttt{CONSTPROP\_MAX\_ITERS} $16\to256$ \\
-1163$\to$1159$\to$1156 & Headroom clamp returns (\S6.10 + shelved-lever \S\ref{sec:exchange}) & Same clamp that lost early now wins on the cheap Karatsuba$+$dead-CCX base ($\sim$527 T/qubit) \\
-1156$\to$1153 & Clamp $+$ zero-cin fold $+$ FFG cap (\S6.10), paid by cinc (\S\ref{sec:cinc}) $+$ iterated dead-CCX (\S\ref{sec:deadccx}) & Qubit drop alone cost $+11{,}369$ avgT (rejected); Toffoli levers stacked back to win \\
-\textbf{1153$\to$1152} & Free-and-recompute cy0 (\S6.5) & \texttt{cy0 = ctrl \& !a0}; loan lane for 40 binding folds \\
-Structural & 6dafa07 pivot (\S8.8/\S\ref{sec:density}) & Replaced empirical dead-CCX with $\approx15$ structural predicates \\
+Toffoli: $-22.4$M & Karatsuba square (\S9.6) & 3 sub-squares instead of 4 \\
+Toffoli: $-1.33$M & GAP\_J2 narrowing (\S9.11) & 22-line per-step comparator table edit \\
+Toffoli: $-377$k & Constprop deeper (\S9.16) & \texttt{CONSTPROP\_MAX\_ITERS} $16\to256$ \\
+1163$\to$1159$\to$1156 & Headroom clamp returns (\S7.10 + shelved-lever \S\ref{sec:exchange}) & Same clamp that lost early now wins on the cheap Karatsuba$+$dead-CCX base ($\sim$527 T/qubit) \\
+1156$\to$1153 & Clamp $+$ zero-cin fold $+$ FFG cap (\S7.10), paid by cinc (\S\ref{sec:cinc}) $+$ iterated dead-CCX (\S\ref{sec:deadccx}) & Qubit drop alone cost $+11{,}369$ avgT (rejected); Toffoli levers stacked back to win \\
+\textbf{1153$\to$1152} & Free-and-recompute cy0 (\S7.5) & \texttt{cy0 = ctrl \& !a0}; loan lane for 40 binding folds \\
+Structural & 6dafa07 pivot (\S9.8/\S\ref{sec:density}) & Replaced empirical dead-CCX with $\approx15$ structural predicates \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1971,17 +1972,17 @@ Crucially $A$ and its cofactor $CA$ are \textbf{complementary in size} (one shri
 other grows) --- which is what makes EEA register sharing (\S\ref{sec:regshare}) able to pack
 $A\Vert CA$ into one word and push toward 851/829.
 
-\textbf{The levers that define the track} (each is a \S6 technique, applied to the divstep machine):
+\textbf{The levers that define the track} (each is a \S7 technique, applied to the divstep machine):
 \begin{itemize}
-  \item \textbf{Dynamic-width registers (\S6.6)} --- resize $A,B,CA,CB$ per step; free known-zero
+  \item \textbf{Dynamic-width registers (\S7.6)} --- resize $A,B,CA,CB$ per step; free known-zero
     high bits.
   \item \textbf{CLZ-context window narrowing} --- the divstep arithmetic only touches bits above a
     provably-zero low region, so each op runs over a narrowed window $[lo..len)$. The ``robust width
     envelope'' projects the tightest per-step window that still covers all sampled inputs --- the
     qubit-side twin of empirical dead-CCX (\S\ref{sec:deadccx}), and equally \textbf{island-exact}.
-  \item \textbf{Known-constant teardown (\S6.7)} --- at convergence $A{=}0, B{=}1, CA{=}p, Q{=}0$ are
+  \item \textbf{Known-constant teardown (\S7.7)} --- at convergence $A{=}0, B{=}1, CA{=}p, Q{=}0$ are
     constants; XOR them out (0 Toffoli) before the $\lambda$ multiply so they don't co-reside with it.
-  \item \textbf{Passenger ghosting (\S6.14)} --- HMR-ghost $dy$/$\lambda$ so only one 256-bit
+  \item \textbf{Passenger ghosting (\S7.14)} --- HMR-ghost $dy$/$\lambda$ so only one 256-bit
     coordinate co-resides with the EEA peak ($+256$, not $+512$).
   \item \textbf{Pipelined two-quotient divstep} --- build the \emph{next} quotient while draining the
     \emph{previous}, so the quotient record stays $\sim$26 bits instead of a full 256-bit tape.
@@ -2055,12 +2056,12 @@ the exchange \emph{curve}, not a score.
 \end{center}
 
 The qubits sort by exchange rate into four lever classes: \textbf{fold-vent clamping} (the cheap
-qubits --- clamp a peak fold's measured-vent windows, \S8.2), \textbf{no-ancilla / dirty-borrow
+qubits --- clamp a peak fold's measured-vent windows, \S9.2), \textbf{no-ancilla / dirty-borrow
 substitution} (convert a carry ancilla into Toffoli, cf.\ \S\ref{sec:borrowcarry}),
 \textbf{constant-lane loan $+$ recompute} (the Bennett pebble move on provably-constant GCD low bits,
-\S6.1/\S\ref{sec:pebbling}), and --- new at 1133 --- \textbf{GCD active-width trimming}: per-step
+\S7.1/\S\ref{sec:pebbling}), and --- new at 1133 --- \textbf{GCD active-width trimming}: per-step
 shrinking of the live GCD operand width in the convergence tail
-(\texttt{TLM\_GCD\_ACTIVE\_WIDTH\_TRIM=3} after step 205), the dynamic-width-register idea (\S6.6)
+(\texttt{TLM\_GCD\_ACTIVE\_WIDTH\_TRIM=3} after step 205), the dynamic-width-register idea (\S7.6)
 applied to the ludicrous GCD. The 1133 rung is a \emph{value-exact repair} of an over-aggressive 1131
 attempt: trimming the active width is a \textbf{graded} correctness lever (\S\ref{sec:qubitloop}) ---
 push until the residual breaks, then give back one notch (1131$\to$1133) so a clean nonce is
@@ -2109,7 +2110,7 @@ compaction} (\S\ref{sec:compact}). Full analysis:
   \item \textbf{The co-bind plateau at 1152q}: Multiple independent phases all tie at 1152q.
     Each needs a local reduction before the global peak drops.
 
-  \item \textbf{FFG cy0-style recompute on other binders}: The cy0 trick (\S6.5) worked because
+  \item \textbf{FFG cy0-style recompute on other binders}: The cy0 trick (\S7.5) worked because
     \texttt{cy0} was a cheap function of live qubits. Other binder qubits may have similar
     cheap-function properties not yet identified.
 
@@ -2131,24 +2132,24 @@ compaction} (\S\ref{sec:compact}). Full analysis:
 \toprule
 \textbf{Technique} & \textbf{Qubits saved} & \textbf{Toffoli cost} & \textbf{Density-neutral} \\
 \midrule
-Live-range hole (\S6.1) & $k$ qubits & $+2 \times C_V$ & Yes \\
-Passenger relocation (\S6.2) & $k$ qubits & 0 & Yes \\
-Range-bound guard removal (\S6.3) & 1 per register & 0 & Yes \\
-Truncation (\S6.4) & varies & 0 & Partial \\
-Free-and-recompute cheap value (\S6.5) & 1 & $\approx0$ (CNOTs) & Yes \\
-Dynamic-width registers (\S6.6) & varies & small & Partial \\
-Known-constant teardown (\S6.7) & $k$ & 0 (CNOT $=$ Clifford) & Yes \\
-Transcript compression (\S6.8) & varies & decode overhead & Yes \\
-Plateau decomposition (\S6.9) & 1 (global) & combined cost & Yes \\
-Dynamic headroom clamp (\S6.10) & 1 per ceiling drop & small & Yes \\
-Lazy carry liveness (\S6.11) & 1/chunk & 0 & Yes \\
-In-place decode (\S6.12) & varies & codec overhead & Yes \\
-Borrowed-carry fusion (\S6.13) & $k$ & 0 & Yes \\
-HMR ghosting (\S6.14) & 256 & $+1$ modular multiply & Yes \\
-EEA register sharing (\S6.15) & $\sim$97--119 (to 851$\to$829q) & high (irrelevant to low-q objective) & Yes --- low-qubit competition \\
-Gate-hosting (\S6.16) & 1 per hosted gate & 0 (clean) / $+1$ Tof (dirty) & Yes if host-zero \emph{proven}; island-exact if \emph{sampled} \\
-Reset-bounded id compaction (\S6.17) & gap (max-id $-$ true peak) & 0 & Yes (relabels wires only) \\
-GCD active-width trim (\S6.6 applied) & varies (deep tail) & small & Partial (graded; nonce-hunted) \\
+Live-range hole (\S7.1) & $k$ qubits & $+2 \times C_V$ & Yes \\
+Passenger relocation (\S7.2) & $k$ qubits & 0 & Yes \\
+Range-bound guard removal (\S7.3) & 1 per register & 0 & Yes \\
+Truncation (\S7.4) & varies & 0 & Partial \\
+Free-and-recompute cheap value (\S7.5) & 1 & $\approx0$ (CNOTs) & Yes \\
+Dynamic-width registers (\S7.6) & varies & small & Partial \\
+Known-constant teardown (\S7.7) & $k$ & 0 (CNOT $=$ Clifford) & Yes \\
+Transcript compression (\S7.8) & varies & decode overhead & Yes \\
+Plateau decomposition (\S7.9) & 1 (global) & combined cost & Yes \\
+Dynamic headroom clamp (\S7.10) & 1 per ceiling drop & small & Yes \\
+Lazy carry liveness (\S7.11) & 1/chunk & 0 & Yes \\
+In-place decode (\S7.12) & varies & codec overhead & Yes \\
+Borrowed-carry fusion (\S7.13) & $k$ & 0 & Yes \\
+HMR ghosting (\S7.14) & 256 & $+1$ modular multiply & Yes \\
+EEA register sharing (\S7.15) & $\sim$97--119 (to 851$\to$829q) & high (irrelevant to low-q objective) & Yes --- low-qubit competition \\
+Gate-hosting (\S7.16) & 1 per hosted gate & 0 (clean) / $+1$ Tof (dirty) & Yes if host-zero \emph{proven}; island-exact if \emph{sampled} \\
+Reset-bounded id compaction (\S7.17) & gap (max-id $-$ true peak) & 0 & Yes (relabels wires only) \\
+GCD active-width trim (\S7.6 applied) & varies (deep tail) & small & Partial (graded; nonce-hunted) \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -2161,25 +2162,25 @@ GCD active-width trim (\S6.6 applied) & varies (deep tail) & small & Partial (gr
 \toprule
 \textbf{Technique} & \textbf{Toffoli saved} & \textbf{Qubit cost} & \textbf{Density-neutral} \\
 \midrule
-MBU / carry vent (\S8.1/2) & 1 per vent & $+1$ temporary & Yes \\
-Conditional replay (\S8.3) & $(1-f)\times\text{block}$ & 0 & Yes \\
-Algebraic fusion (\S8.4) & varies & 0 & Yes \\
-Witness-first dataflow (\S8.5) & $\approx13$M / instance & 0 & Yes \\
-Karatsuba square (\S8.6) & $\approx22$M (one change) & 0 & Yes \\
-NAF recoding (\S8.7) & $\approx5$--10\% of fold cost & 0 & Yes \\
-Pseudo-Mersenne reduction (\S8.18) & huge (15\% vs 34\% of CCX) & 0 & Yes (fold); Partial (lsbs/msbs trunc) \\
-Structural dead-gate skip (\S8.8) & varies & 0 & Yes \\
-Classical constant ops (\S8.9) & significant & 0 & Yes \\
-Converged-tail elision (\S8.10) & hundreds/iter $\times K$ & 0 & No \\
-GAP\_J2 narrowing (\S8.11) & $\approx1.33$M / 22-line edit & 0 & No \\
-Ancilla-free majority (\S8.12) & 1 per majority & 0 & Yes \\
-Exact-adder recovery (\S8.13) & $\approx2{,}600$/call & 0 & Yes \\
-Redundant cleanup skip (\S8.14) & varies & 0 & Risky \\
-Off-peak loosening (\S8.15) & free refund & 0 & Yes \\
-Constprop deeper (\S8.16) & $\approx377$k & 0 & Yes \\
-Cinc cascade replacement (\S8.17) & $\approx5{,}175$ ($O(t^2)\to O(t)$) & 0 & Yes \\
-Empirical dead-CCX drop (\S8.8) & $\approx13{,}000+$ (1st pass) & 0 & No (island-overfit) \\
-Iterated 2-pass dead-CCX (\S8.8) & $\approx2{,}400$/extra pass & 0 & No (island-overfit) \\
+MBU / carry vent (\S9.1/2) & 1 per vent & $+1$ temporary & Yes \\
+Conditional replay (\S9.3) & $(1-f)\times\text{block}$ & 0 & Yes \\
+Algebraic fusion (\S9.4) & varies & 0 & Yes \\
+Witness-first dataflow (\S9.5) & $\approx13$M / instance & 0 & Yes \\
+Karatsuba square (\S9.6) & $\approx22$M (one change) & 0 & Yes \\
+NAF recoding (\S9.7) & $\approx5$--10\% of fold cost & 0 & Yes \\
+Pseudo-Mersenne reduction (\S9.18) & huge (15\% vs 34\% of CCX) & 0 & Yes (fold); Partial (lsbs/msbs trunc) \\
+Structural dead-gate skip (\S9.8) & varies & 0 & Yes \\
+Classical constant ops (\S9.9) & significant & 0 & Yes \\
+Converged-tail elision (\S9.10) & hundreds/iter $\times K$ & 0 & No \\
+GAP\_J2 narrowing (\S9.11) & $\approx1.33$M / 22-line edit & 0 & No \\
+Ancilla-free majority (\S9.12) & 1 per majority & 0 & Yes \\
+Exact-adder recovery (\S9.13) & $\approx2{,}600$/call & 0 & Yes \\
+Redundant cleanup skip (\S9.14) & varies & 0 & Risky \\
+Off-peak loosening (\S9.15) & free refund & 0 & Yes \\
+Constprop deeper (\S9.16) & $\approx377$k & 0 & Yes \\
+Cinc cascade replacement (\S9.17) & $\approx5{,}175$ ($O(t^2)\to O(t)$) & 0 & Yes \\
+Empirical dead-CCX drop (\S9.8) & $\approx13{,}000+$ (1st pass) & 0 & No (island-overfit) \\
+Iterated 2-pass dead-CCX (\S9.8) & $\approx2{,}400$/extra pass & 0 & No (island-overfit) \\
 \bottomrule
 \end{tabular}
 \end{center}
