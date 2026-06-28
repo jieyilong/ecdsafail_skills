@@ -6,11 +6,11 @@
 participants and leaderboard contributors of the [ecdsa.fail](https://ecdsa.fail) challenge**.
 Summarized and compiled by **Jieyi Long**, with Claude Code.
 
-> **Audience**: An undergrad who has learned the basics of quantum computing — superposition,
-> entanglement, Toffoli/CNOT/Hadamard gates, quantum circuits, and the idea of reversible
-> computation. This document explains every optimization technique used in the ecdsa.fail
-> quantum circuit challenge from circuit-level first principles, with concrete examples from
-> the actual research.
+> **Audience**: This primer is written for an undergrad who has just learned the basics of quantum
+> computing — superposition, entanglement, Toffoli/CNOT/Hadamard gates, quantum circuits, and
+> reversible computation. It explains every optimization technique used in the ecdsa.fail quantum
+> circuit challenge from circuit-level first principles, with concrete examples from the actual
+> research.
 
 ---
 
@@ -1949,7 +1949,7 @@ The challenge has three distinct objectives (§2), and each has its own history 
 constructions. This section walks all three: the **score track** (minimize Q×T), the **low-qubit
 track** (minimize Q alone), and the **Pareto-frontier track** (map the clean (Q, T) curve).
 
-### The score track (Q×T): the 1211→1152 journey
+### The score track (Q×T): the 2715q→1152q journey
 
 #### Pre-history: 2715q → 1211q (where the circuit came from)
 
