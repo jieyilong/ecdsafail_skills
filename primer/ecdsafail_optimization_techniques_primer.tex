@@ -449,8 +449,8 @@ absorbs. The SOTA runs \texttt{jump=2} (258 steps).
 The second point $Q$ is a \textbf{fixed constant} (the secp256k1 generator point, known at circuit
 compile time). The current SOTA keeps $Q$ as classical bit-patterns (\texttt{BitId}s) rather than
 quantum registers --- \emph{and} materializes it into a transient quantum temp only at off-peak steps
---- eliminating \textbf{512 qubits} from the peak: the single largest qubit reduction in the circuit's
-history, developed as a technique in \S\ref{sec:qclassical}.
+--- keeping all \textbf{512} of its qubits off the GCD peak. This is the decisive product-min lever of
+the ludicrous design (it broke the 1168q wall; \S\ref{sec:qclassical} develops it as a technique).
 
 \subsection{Why secp256k1's prime is cheap: pseudo-Mersenne reduction (the math background)}
 \label{sec:pmmath}
@@ -1222,11 +1222,20 @@ already have can dodge that storage entirely.
 \subsection{Keep Classical Constants Off the Peak (the $-512$q Q-classical lever)}
 \label{sec:qclassical}
 
-\textbf{The single largest qubit reduction in the circuit's history ($-512$q), and a technique worth
-stating on its own.} The second EC point $Q = (Q_x, Q_y)$ is a \emph{fixed, compile-time-known
-constant} (the generator). Naively you would load its two coordinates into 256-bit quantum registers
-and let them ride through the point-add. But two 256-bit quantum registers that sit \textbf{live
-across the GCD peak} cost \textbf{512 qubits at the binder} --- the most expensive place to spend them.
+\textbf{A $-512$q lever \emph{within the ludicrous design} --- and the move that broke the 1168q wall.}
+The second EC point $Q = (Q_x, Q_y)$ is a \emph{fixed, compile-time-known constant} (the generator).
+Naively you would load its two coordinates into 256-bit quantum registers and let them ride through
+the point-add. But two 256-bit quantum registers that sit \textbf{live across the GCD peak} cost
+\textbf{512 qubits at the binder} --- the most expensive place to spend them. A ludicrous circuit that
+held $Q$ resident would be $\sim$512 qubits \emph{higher}; keeping $Q$ classical and off-peak is what
+makes ludicrous's operating point viable at all.
+
+A caveat on the ``512'': that is the lever's saving \emph{relative to a same-family circuit holding
+$Q$ quantum} --- \textbf{not} a 512-qubit leaderboard drop. On the board it showed only as
+1168$\to$1167 ($-1$q), because ludicrous is a different family with its own cost structure. Its real
+impact was \textbf{breaking the 1168q wall} and opening the line that then drove to 1152
+(\S\ref{sec:history}, Era 3) --- the lever is decisive for the \emph{family}, not a one-shot $-512$ on
+the record.
 
 \textbf{The lever has two halves, and you need both:}
 \begin{enumerate}
@@ -2477,7 +2486,7 @@ Gate-hosting (\S7.16) & 1 per hosted gate & 0 (clean) / $+1$ Tof (dirty) & Yes i
 Reset-bounded id compaction (\S7.17) & gap (max-id $-$ true peak) & 0 & Yes (relabels wires only) \\
 Windowed/chunked materialization (\S7.18) & many (the \texttt{F\_CUT} dial) & $+$few (boundary cmps) & Yes \\
 Shift-free modular doublings (\S7.19) & $\sim$24 (drops spill$+$flags) & $+$few & Yes \\
-Classical constants off-peak (\S7.20) & \textbf{512} (the Q-classical lever) & 0 & Yes \\
+Classical constants off-peak (\S7.20) & 512 \emph{within ludicrous} (broke the 1168 wall) & 0 & Yes \\
 GCD active-width trim (\S7.6 applied) & varies (deep tail) & small & Partial (graded; nonce-hunted) \\
 \bottomrule
 \end{tabular}
