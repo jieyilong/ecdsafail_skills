@@ -134,7 +134,7 @@ TLM_FOLD_CALL_CODE_OVERRIDES = <~60 calls, almost all clamped to code 0>
 operands `u, v` lose high bits; a naive circuit keeps full width for all ~530 steps. Active-width
 trimming **shrinks the live operand width per step** in the late tail (−3 bits after step 205,
 −4 at steps 254–257), so the GCD body adders/folds in that tail run on fewer lanes. This is exactly
-the **dynamic-width-register idea** (see primer §6.F) applied per-step to the ludicrous GCD tail —
+the **dynamic-width-register idea** (see primer §6.6) applied per-step to the ludicrous GCD tail —
 the structural source of the deepest qubits on the frontier.
 
 **Why 1133 and not lower — a value-exact repair.** The team first pushed to a **1131** "PairRaw1
@@ -150,7 +150,7 @@ then back off one notch and hunt.
 **Supporting levers at 1133:** `TLM_FOLD_FINAL_NO_COUT` drops the final fold carry-out; the
 `*_ZERO_DIRECT` + `*_BORROW_CIN_C0` pair measurement-erases the fold boundary and borrows its
 carry-in rather than allocating one (a fold-local instance of borrowed-carry / direct-zero, primer
-§6.K/§6.M); `TLM_CMP_CARRY_K_DELTA=-6` narrows the comparator carry chunk; the ~60-call fold override
+§6.11/§6.13); `TLM_CMP_CARRY_K_DELTA=-6` narrows the comparator carry chunk; the ~60-call fold override
 clamps essentially every fold's vent count (most to 0). Together these clear the lanes the
 active-width trim needs.
 
