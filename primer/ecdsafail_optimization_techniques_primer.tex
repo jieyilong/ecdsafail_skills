@@ -1526,14 +1526,21 @@ into a single subtraction}, using $1 + 2 + 4 + \dots + 2^{k-1} = 2^k - 1$ shifte
 \[
   2^6 + 2^7 + 2^8 + 2^9 = 2^{10} - 2^6 \quad\text{(four terms become two)}.
 \]
-Applying that to the run inside 977:
+Applying that to 977: its 1-bits sit at positions $\{0,4,6,7,8,9\}$, and only the \emph{run}
+$\{6,7,8,9\}$ collapses (to $+2^{10}-2^6$); the lone bits at 4 and 0 are already isolated, so they
+carry over unchanged:
 \[
-  \mathrm{NAF}(977) = 2^{10} - 2^6 + 2^4 + 2^0 \quad\text{(four signed terms: } +,\,-,\,+,\,+\text{)}
+  \underbrace{2^9 + 2^8 + 2^7 + 2^6}_{\text{the run}} + 2^4 + 2^0
+  \;=\; \underbrace{2^{10} - 2^6}_{\text{collapsed}} + 2^4 + 2^0 .
 \]
-(check: $1024 - 64 + 16 + 1 = 977$). The $-2^6$ digit means \emph{that} fold step is a \textbf{shifted
-subtraction} instead of an addition --- and in a reversible circuit a controlled modular subtract
-costs exactly the same as a controlled add (it is the adder run backwards), so a signed digit is as
-cheap as a binary one.
+So $\mathbf{NAF(977) = +2^{10} - 2^6 + 2^4 + 2^0}$ (check: $1024 - 64 + 16 + 1 = 977$). Note the
+exponents $10, 6, 4, 0$ are \emph{not} a free choice and each sign is glued to its own power: the
+run-collapse \emph{produces} $+2^{10}$ and $-2^6$, and the untouched bits stay at $+2^4$ and $+2^0$.
+(That is why it is not, say, ``signs $+,-,+,+$ on $9,8,5,1$'' --- those powers don't come out of the
+derivation and wouldn't sum to 977.) A $-2^k$ digit simply means \emph{that} fold step is a
+\textbf{shifted subtraction} instead of an addition --- and in a reversible circuit a controlled
+modular subtract costs exactly the same as a controlled add (it is the adder run backwards), so a
+signed digit is as cheap as a binary one.
 
 \textbf{The payoff.} 6 non-zero digits $\to$ 4: \textbf{four shifted add/subtracts per fold instead of
 six, $\approx33\%$ off the 977 part of every Solinas reduction.} That reduction runs on essentially

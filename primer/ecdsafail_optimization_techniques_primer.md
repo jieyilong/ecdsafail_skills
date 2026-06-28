@@ -1405,14 +1405,21 @@ subtraction**, using the schoolboy fact `1 + 2 + 4 + … + 2^(k−1) = 2^k − 1
 ```
 2^6 + 2^7 + 2^8 + 2^9  =  2^10 − 2^6      ← four terms become two
 ```
-Applying that to the run inside 977:
+Applying that to 977: its 1-bits sit at positions `{0, 4, 6, 7, 8, 9}`, and only the *run* `{6,7,8,9}`
+collapses (to `+2^10 − 2^6`); the lone bits at 4 and 0 are already isolated, so they carry over
+unchanged:
 ```
-NAF(977) = 2^10 − 2^6 + 2^4 + 2^0          ← four signed terms:  +, −, +, +
+  binary:   2^9 + 2^8 + 2^7 + 2^6   +   2^4   +   2^0          (positions 9,8,7,6, 4, 0)
+            └──── the run ─────┘
+  NAF:        2^10  −  2^6        +   2^4   +   2^0          (positions 10, 6, 4, 0)
 ```
-(Check: 1024 − 64 + 16 + 1 = 977.) The `−2^6` digit simply means *that* fold step is a **shifted
-subtraction** instead of an addition — and in a reversible circuit a controlled modular subtract costs
-exactly the same as a controlled add (it is the adder run backwards). So a signed digit is as cheap as
-a binary one.
+so **`NAF(977) = +2^10 − 2^6 + 2^4 + 2^0`** (check: 1024 − 64 + 16 + 1 = 977). Note the exponents
+`10, 6, 4, 0` are not a free choice and each sign is glued to its own power: the run-collapse *produces*
+`+2^10` and `−2^6`, and the untouched bits stay at `+2^4` and `+2^0`. (That is why it is not, say,
+"signs +,−,+,+ on 9,8,5,1" — those powers don't come out of the derivation and wouldn't sum to 977.)
+A `−2^k` digit simply means *that* fold step is a **shifted subtraction** instead of an addition — and
+in a reversible circuit a controlled modular subtract costs exactly the same as a controlled add (it
+is the adder run backwards), so a signed digit is as cheap as a binary one.
 
 **The payoff.** 6 non-zero digits → 4: **four shifted add/subtracts per fold instead of six, ~33% off
 the 977 part of every Solinas reduction.** That reduction runs on essentially every modular
