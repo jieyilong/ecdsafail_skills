@@ -10,6 +10,24 @@ reversible (`0 classical / 0 phase / 0 ancilla` violations). A free 96-gate iden
 (`DIALOG_TAIL_NONCE`) reseeds those shots, so any config change requires re-hunting a clean
 "island" nonce.
 
+## 📘 Start here: the Optimization Techniques Primer
+
+New to this work? Read the **[Qubit & Toffoli Reduction Techniques Primer](primer/optimization_techniques_primer.md)**
+([**PDF**](primer/optimization_techniques_primer.pdf)) first. It's a self-contained, undergrad-level
+tour of *every* optimization technique used in the challenge, explained from quantum-circuit first
+principles with concrete examples and ablation numbers from real submissions:
+
+- **What the challenge is** and why one elliptic-curve point addition is the thing being optimized.
+- **17 qubit-reduction techniques** and **18 Toffoli-reduction techniques** — live-range holes, MBU /
+  measurement-based uncompute, venting, Karatsuba squaring, gate-hosting, pseudo-Mersenne (Solinas)
+  reduction, structural dead-gate skipping, and more.
+- The **theory** (Bennett vs. spooky pebbling), the **density-neutral vs. island-exact** correctness
+  split, and how the SOTA `trailmix_ludicrous` and low-qubit **Shrunken-PZ** circuits actually work.
+- All **three competition objectives** — minimize the Q×T product, minimize qubits alone, and map the
+  clean (qubit, Toffoli) Pareto frontier — and the full history of how the records were won.
+
+The skills below are the operating playbooks; the primer is the conceptual foundation behind them.
+
 ## How to Use
 
 ### 1. Install the skills
@@ -210,6 +228,10 @@ the general skills hand off to `ecdsafail-circuit-optimization` / `ecdsafail-isl
 the concrete knobs and the GPU search.
 
 ## References
+
+**Primer (start here):** [`primer/optimization_techniques_primer.md`](primer/optimization_techniques_primer.md)
+· [PDF](primer/optimization_techniques_primer.pdf) — a comprehensive, undergrad-level explanation of
+every qubit/Toffoli reduction technique used in the challenge (see the callout near the top).
 
 Deep-dive analyses backing the circuit-optimization skill (under
 [`ecdsafail-circuit-optimization/references/`](ecdsafail-circuit-optimization/references/)):
