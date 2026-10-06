@@ -4,11 +4,22 @@ Agent skills for optimizing the [ecdsa.fail](https://ecdsa.fail) challenge — a
 quantum circuit that adds a quantum elliptic-curve point to a classical one on secp256k1 — plus
 the **general, transferable quantum-circuit-optimization skills** distilled from that work.
 
-**Objective (the challenge):** minimize `score = peak_qubits × average_executed_Toffoli` (lower
-is better). The circuit is validated on 9,024 SHAKE256-derived shots and must be perfectly
-reversible (`0 classical / 0 phase / 0 ancilla` violations). A free 96-gate identity tail
-(`DIALOG_TAIL_NONCE`) reseeds those shots, so any config change requires re-hunting a clean
-"island" nonce.
+**Objective (the challenge):** minimize `S = Q × round(mean executed Toffoli)` (lower
+is better), where Q is the scored referenced physical width. The official 9,024-shot
+source-derived evaluation requires `0 classical / 0 phase / 0 ancilla` violations;
+passing that finite corpus is not an all-input theorem. Changing the emitted stream
+changes its derived corpus. Identity-tail nonce mechanisms and prescreens are
+source-family-specific, not universally interchangeable.
+
+## October 6, 2026 refresh
+
+Read [current evidence and route selection](references/frontier-refresh-2026-10-06.md)
+before using historical recipes. The refresh reviews all 586 submissions after commit
+`08a60e4` (June 28), including product rejections and regional Pareto improvements:
+557 public source diffs with exact parents, plus 29 explicit public-source limitations.
+The [audit ledger and per-submission conclusions](audit/2026-10-06/README.md) separate
+official outcomes, measured resources, local proofs, sampled evidence and private
+generation boundaries. The seven skill packages retain their references and scripts.
 
 ## 📘 Start here: the Optimization Techniques Primer
 
@@ -26,7 +37,9 @@ principles with concrete examples and ablation numbers from real submissions:
 - All **three competition objectives** — minimize the Q×T product, minimize qubits alone, and map the
   clean (qubit, Toffoli) Pareto frontier — and the full history of how the records were won.
 
-The skills below are the operating playbooks; the primer is the conceptual foundation behind them.
+The skills below are the operating playbooks; the primer is a historical June conceptual
+foundation, not a complete account of the newer PingPong, low-Q EEA, cofactor and Skywalk
+lineages. Its dated records and empirical impossibility claims do not override the refresh.
 
 ## How to Use
 
@@ -145,16 +158,19 @@ runs, failures, submission candidates) so the shared pool compounds.
    `qubits × Toffoli` against SOTA; keep the few that plausibly beat it.
 
 3. **Small-scale test first.** Build each surviving candidate and check structural correctness on
-   **random inputs** with **`reversible-circuit-validation`** — a width cut must be `0/0/0`
-   value-exact *before* any hunt. Then a short GPU triage scan (**5–10M nonces**) to read the
-   **GCD-clean candidate density**.
+   **`reversible-circuit-validation`**. Check values, relative phase, forward scratch and
+   arbitrary borrowed-state restoration against an independent specification. Distinguish
+   exhaustive promised-domain proofs from sampled regressions and disclosed approximations.
+   Then calibrate a short source-matched prescreen triage before choosing scan size.
 
 4. **Triage / bake-off** with **`ecdsafail-island-hunting`**. Per candidate route, collect the two
    landability signals: **GCD-clean density** (candidates/Mnonce) and the **`cls/pha/anc`
    distribution** of its candidates (validate the whole batch, full mode). Rank by:
-   - **density gate** — GREEN `> 0.5`, YELLOW `0.2–0.5`, RED `< 0.2` candidates/Mnonce;
-   - **per-channel-zero** — each of `cls`, `pha`, `anc` must independently reach 0 *somewhere*, or
-     that channel is floored and `0/0/0` is unreachable no matter the nonce;
+   - **density gate** — price the measured source-matched pass rate, throughput and conditional
+     joint-clean probability; old numerical thresholds are route-specific heuristics;
+   - **channel diagnosis** — observed zeros and near-misses help triage but do not prove a
+     structural floor or channel independence. Only an actual invariant can rule out every
+     clean packet; a finite zero-free sample cannot;
    - prefer low near-misses clustered toward `0/0/0`.
    If a route is too dirty, repair the errors (restore a carry/compare bit, widen an envelope)
    until real near-misses appear, then re-triage.

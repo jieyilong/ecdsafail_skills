@@ -16,6 +16,36 @@ description: >-
 
 # Peak Qubit Reduction
 
+## Refreshed circuit evidence
+
+For ECDSA.Fail, read [the October audit](references/frontier-refresh-2026-10-06.md)
+and the relevant [early](references/refresh-early.md),
+[middle](references/refresh-middle.md), or [late](references/refresh-late.md)
+mechanism review. The June worked examples below are historical, not current defaults.
+The latest product winner and the minimum-width Pareto point use different architectures.
+Do not confuse a product rejection with a failed width optimization.
+
+The newer reusable width levers extend the live-range method:
+
+- Interleave field replay with the integer walk and its inverse. Price every co-binding
+  transient ladder, endpoint batch, and persistent history, not just the rails-only pass.
+- Loan terminal registers only after their converged value is known and before their
+  independent reconstruction. A sign-extension or +/-1 promise is a real precondition.
+- Compress state jointly when a recurrence bounds value/cofactor products or combines
+  rails and history. Pay for boundary decoding, masked updates, and restoration of every
+  dirty passenger. A smaller logical information model does not by itself allocate fewer wires.
+- Keep partial transcript groups and phase receipts live only where needed. A shared
+  witness or measured qubit can release quantum capacity while retaining a classical
+  correction obligation; include that obligation in the dependency graph.
+- On narrow fixed-schedule EEA layouts, distinguish arithmetic support from public
+  quotient-address support. Small-chart adapters, absent-leaf cancellation, and inverse
+  lender return are part of the interface, not optional overhead.
+
+Trace the active dispatcher even if a module header says “inert.” Compare local algebra,
+actual emitter support/lifetime, and the official complete packet separately. A finite
+width envelope or truncated endpoint is an approximation even when neighboring loans
+are exact. Do not transfer a scalar bound to a different modulus without checking it.
+
 A circuit's qubit cost is not how many qubits it *names* — it is the **most qubits alive at
 any single instant**. Lay the computation out left-to-right in time and plot how many qubits
 are live at each moment; you get a mountain range, and the **single tallest peak** is what you
@@ -23,8 +53,9 @@ pay. This skill is the playbook for finding that peak and shaving it down.
 
 The whole discipline follows from two facts of reversible/quantum computing:
 
-- **You cannot delete information.** A qubit holding a value can't just be discarded; the only
-  way to free it is to **uncompute** — run gates backward until it returns to a known |0⟩.
+- **Preserve information and coherence.** Clean scratch can be cleared by coherent
+  uncompute or a valid measurement-and-phase-correction construction. Arbitrary borrowed
+  data must be restored to its original quantum state, not reset to zero.
 - **Width is a MAX over time, not a sum.** Lowering qubit usage somewhere that *isn't* the peak
   does nothing for the width score. Only the tallest moment counts.
 
@@ -32,11 +63,16 @@ Together these mean: the qubit prize comes from shrinking whatever is alive at *
 instant*, and every byte of "freeing" you do costs gates to uncompute and recompute. That
 trade is the heart of everything below.
 
+Match that liveness model to the scored allocation contract. In ECDSA.Fail the emitted
+physical qubit IDs determine the official Q; peak live count alone can differ from maximum
+referenced ID plus one. A lifetime hole must enable actual ID reuse/compaction to reduce
+that metric. Record both allocator live occupancy and the official emitted width.
+
 ## The core loop
 
 Work this loop; each pass lowers the peak by one increment and usually moves it somewhere new.
 
-1. **Measure** — get the live-qubits-vs-time profile; find the peak height and the operation/phase that owns it (the *binder*).
+1. **Measure** — get live occupancy and scored emitted width under the actual allocation contract; find the peak operation/phase and whether physical-ID reuse can lower Q.
 2. **Inventory** — list the qubits alive at the binder instant.
 3. **Classify** — label each one (essential data / scratch / transcript-log / passenger / alias-candidate / truncatable).
 4. **Brainstorm** — for each non-essential qubit at the peak, propose a shave (the moves below).
@@ -55,33 +91,27 @@ co-binder ledger and build a package of compatible reductions across all of them
 
 ## Match the method to the lever's failure mode
 
-Before reaching for a lever, know *how it can fail* — because that decides whether you "tweak
-and iterate" or "prove correct, then commit." There are two fundamentally different kinds:
+Separate the intended semantic obligation from the observed failure frequency:
 
-- **Graded-failure levers** (truncate a carry/compare width, drop a loop iteration, approximate
-  a reduction). Correctness degrades *continuously*: a small, characterizable fraction of inputs
-  go wrong, by a little. These usually reduce *gate* cost, and you can **iterate on the
-  dirtiness** — measure the per-input error, restore one bit, re-measure — and, when the input
-  set is fixed, **search for an input subset / seed that dodges the failures**. This is the
-  domain of triage / search loops: low near-misses are progress.
+- **Precision/approximation levers** intentionally change behavior on an exceptional set:
+  narrower carries/comparisons, fewer rounds, or approximate reductions. Characterize that
+  set and its measured frequency. One more removed bit can cause a discontinuous failure
+  increase, and the resulting numerical error need not be small.
+- **Structural lifetime/representation levers** intend to preserve the original operation
+  under a specified interface. Freeing, overlapping, streaming, or borrowing a register
+  requires a value/support/phase/restoration argument. A faulty structural edit can fail
+  on a rare support slice, not necessarily on every input. Error frequency alone does not
+  tell you whether a defect is structural or deliberately approximate.
 
-- **Binary-failure levers** (free, overlap, stream, or hole a register to cut *peak width*).
-  Correctness is **all-or-nothing**: the edit is value-exact (right on every input) or it
-  corrupts phase/ancilla on essentially *every* input. There is **no graded near-miss ladder to
-  climb.** So you cannot tweak-and-triage a width cut — you must get it value-exact, **validate
-  clean (e.g. classical/phase/ancilla all zero on random inputs) BEFORE any downstream search**,
-  and only then proceed.
+Establish the local invariant, compare explicit matched inputs and complete boundaries,
+then validate all final channels before hunting. A clean finite sample is useful evidence,
+not a universal proof. Repair a broken support or lifetime premise rather than treating
+its rare failures as automatically permissible approximation.
 
-**The trap:** applying the graded-failure playbook to a binary-failure lever. A structural width
-cut that isn't value-exact yields all-dirty garbage, not near-misses — there is nothing to
-iterate *toward*. Cutting peak width is therefore "write a correct value-exact edit, validate it
-clean, then search," not "turn a knob and triage."
-
-**Corollary — when no parameter moves the target, the cost is allocation-bound.** If *every*
-available knob leaves the peak unchanged, the registers are declared full-width and the only
-remaining lever is a **structural code change** — which is the binary kind. Escalate to it
-deliberately: inventory the binder's live set (next step), make the *smallest* value-exact edit,
-validate, and only then re-measure/search. Don't keep turning knobs once they've gone flat.
+**When tested parameters do not move the target**, first verify that they reach the active
+emitter and change the intended operation stream. Check every co-binding peak. If the live
+register allocation is truly the bottleneck, inventory that live set and make a structural
+change deliberately. An ineffective or overwritten knob is not an allocation lower bound.
 
 **A peak can be several independent binders, not one shared floor.** The inventory (Step 2) may
 show that two or ten *unrelated* phases each independently reach the peak (e.g. an arithmetic core,
@@ -220,10 +250,13 @@ The general tactic is:
 2. Enumerate its reachable states for the narrow phase/tail where it is used.
 3. Build an explicit reversible encoder/decoder for only that support.
 4. Stream each apply slot from the code, recomputing only the slot's local controls, then clear it.
-5. Add a self-test proving bijection, support coverage, and phase-clean forward/reverse behavior.
+5. Check the encoder/decoder's complete finite promised support and phase/measurement
+   interface, or provide an explicit symbolic argument. Sampled tests do not prove complete
+   support coverage. Bind the emitter's actual reachable support to that checked model.
 
-This is a width lever, so it is binary-failure: if the codec or streaming apply is not exactly
-reversible, the circuit is structurally dirty. Validate the codec first, then re-measure the peak.
+Validate representation, restoration and phase obligations before remeasuring the peak.
+A support mismatch can affect only rare states; its frequency does not classify it as
+a harmless approximation or an all-input structural failure.
 
 ### Shrunken-PZ dynamic state and passenger ghosting
 
@@ -350,8 +383,9 @@ Use this protocol:
    package on together and remeasure peak qubits, emitted gates, estimated average gates, score,
    and validation dirt. If the combined route fails, bisect by family while preserving the ledger.
 7. **Self-test new arithmetic primitives before hunting.** A plateau cut that introduces a new
-   reversible primitive is a binary-failure lever. Prove the primitive value-exact on focused tests,
-   then run full circuit validation, then consider island hunting.
+   primitive needs a stated support/restoration argument. Distinguish exhaustive finite-domain
+   or symbolic operator checks from sampled focused tests. Bind the component to its caller,
+   validate the complete circuit, and only then consider island hunting.
 
 The working mental model is: **one local peak reduction is a lemma; the combined package is the
 theorem.** Do not declare the route impossible just because any single lemma leaves the global peak
@@ -441,9 +475,9 @@ the companion **ecdsafail-circuit-optimization** skill, which applies this loop 
 
 ---
 
-## Live-frontier peak levers (trailmix_ludicrous family, 2026-06)
+## Historical peak levers (trailmix_ludicrous family, 2026-06)
 
-The current `trailmix_ludicrous` SOTA sits at **1159q**. Its qubit levers, beyond the classic
+The June snapshot's `trailmix_ludicrous` record sat at **1159q**. Its qubit levers, beyond the classic
 free/recompute and range-bound moves above, are worth knowing verbatim. Source: per-commit analysis
 in `ecdsafail-circuit-optimization/references/REPORT_1168_wall_revamp.md` §2.6–§2.7.
 

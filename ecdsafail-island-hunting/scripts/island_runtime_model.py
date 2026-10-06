@@ -5,15 +5,16 @@ Island-hunt runtime model (two-stage: cheap GPU classical screen -> expensive fu
 A nonce becomes a SUBMITTABLE island only if it is clean in ALL three channels
 (cls=pha=anc=0) under the trusted 9024-shot evaluator. The hunt is two stages:
 
-  Stage 1  (cheap, GPU classical GCD pre-filter):
+  Stage 1  (cheap, architecture-matched GPU prescreen):
        screens nonces at aggregate rate R (nonce/s); a nonce passes
-       ("GCD-clean" / classical-clean) with probability  d = e^(-lambda_cls).
-       d is the GCD-CLEAN CANDIDATE DENSITY  (input #1).
+       ("screen pass") with measured probability d. The optional e^(-lambda_cls)
+       parameterization is a planning approximation, not a soundness theorem.
+       d is the SCREEN-PASS CANDIDATE DENSITY (input #1).
 
   Stage 2  (expensive, full 9024-shot evaluator, cost T_eval s/candidate):
        each Stage-1 pass is fully evaluated for cls(confirm)/pha/anc; it is a
        real island with conditional probability
-            q = P(pha=0 AND anc=0 | cls-clean)
+            q = P(final cls=pha=anc=0 | screen pass)
        q is derived from the CLS/PHA/ANC DISTRIBUTION of GCD-clean
        candidates (input #2). This is the term density-only estimates ignore.
 
@@ -26,10 +27,12 @@ Amortized cost per screened nonce:    (1/R) + d * T_eval      [sequential resour
 Expected total time (sequential):     (1/p) * (1/R + d*T_eval)
                                      = screen_time + eval_time
    screen_time = 1/(d*q*R)         (Stage-1 dominated by rare density)
-   eval_time   = T_eval / q        (Stage-2 dominated by independent pha/anc thinning)
+   eval_time   = T_eval / q        (Stage-2 dominated by confirmation yield)
 If screen and eval run on SEPARATE hardware (concurrent): total = max(screen, eval).
 
-Number of trials to first success ~ Geometric(p); time is ~exponential, heavy tail:
+For stationary independent nonce trials, success count is geometric; time is
+approximately exponential with a broad right tail (mathematically light-tailed).
+These are model assumptions:
    percentile P  ->  k_nonces = ln(1/(1-P)) / p   (median ~0.69/p, p99 ~4.6/p).
 """
 import argparse, math, sys
@@ -132,9 +135,9 @@ def funnel_from_counts(path, model="auto", min_subset=5):
         fp = fit_channel(pha, model)
         fp_mode = f"MARGINAL (c=0 subset too small: n={len(cclean)}) -> assumes cls-pha independence"
     if max(anc) == 0:
-        fa = dict(p0=1.0, model="deterministic-0", mu=0.0, var=0.0, disp=float("nan"),
+        fa = dict(p0=1.0, model="observed-all-zero", mu=0.0, var=0.0, disp=float("nan"),
                   zeros=len(anc), emp=1.0, n=len(anc), p0_pois=1.0, p0_nb=None, r3=None)
-        fa_mode = "anc deterministically 0"
+        fa_mode = "anc zero in this finite panel; empirical point estimate, not a deterministic guarantee"
     else:
         cpclean = [r for r in rows if r[0] == 0 and r[1] == 0]
         if len(cpclean) >= min_subset:
@@ -142,7 +145,7 @@ def funnel_from_counts(path, model="auto", min_subset=5):
             fa_mode = f"conditional on c=0,p=0 (subset n={len(cpclean)})"
         else:
             fa = fit_channel(anc, model)
-            fa_mode = f"MARGINAL (c=0,p=0 subset too small: n={len(cpclean)})"
+            fa_mode = f"MARGINAL (c=0,p=0 subset too small: n={len(cpclean)}) -> assumes independence from conditioning channels"
     q = fc["p0"] * fp["p0"] * fa["p0"]
     return q, dict(n=len(rows), cls=fc, pha=fp, pha_mode=fp_mode, anc=fa, anc_mode=fa_mode)
 
@@ -150,7 +153,7 @@ def funnel_from_counts(path, model="auto", min_subset=5):
 def _chan_line(name, f, mode):
     s = (f"  {name:<10} mu={f['mu']:.2f} var={f['var']:.2f} disp={f['disp']:.2f} "
          f"zeros={f['zeros']}/{f['n']} -> P({name}=0)={f['p0']:.3e} [{f['model']}]")
-    if f.get("p0_nb") is not None and f["model"] != "deterministic-0":
+    if f.get("p0_nb") is not None and f["model"] != "observed-all-zero":
         s += f"  (Poisson {f['p0_pois']:.3e} / NB {f['p0_nb']:.3e})"
     if f.get("r3") is not None:
         flag = "  <-- fitted P0 > 3/n: OPTIMISTIC" if f["p0"] > f["r3"] else ""
@@ -163,10 +166,10 @@ def _chan_line(name, f, mode):
 def main():
     ap = argparse.ArgumentParser(description="Island-hunt runtime model")
     g = ap.add_mutually_exclusive_group(required=True)
-    g.add_argument("--density", type=float, help="GCD-clean density d (Stage-1 pass rate)")
+    g.add_argument("--density", type=float, help="matching prescreen pass rate d")
     g.add_argument("--lambda-cls", type=float, help="classical displacement lambda_cls (d=e^-lambda)")
     gq = ap.add_mutually_exclusive_group(required=True)
-    gq.add_argument("--q", type=float, help="P(pha=0 & anc=0 | cls-clean), the Stage-2 survival rate")
+    gq.add_argument("--q", type=float, help="P(final cls=pha=anc=0 | screen pass), the Stage-2 survival rate")
     gq.add_argument("--qpanel", type=str, help="panel 'cls pha anc' -> q as the empirical 0/0/0 fraction (needs observed zeros)")
     gq.add_argument("--from-counts", type=str, dest="from_counts",
                     help="panel 'cls pha anc' -> q via conditional funnel + Poisson/NB EXTRAPOLATION (works with no observed zeros)")
@@ -180,8 +183,9 @@ def main():
                     help="screen and eval on separate hardware (total=max instead of sum)")
     args = ap.parse_args()
 
+    if args.lambda_cls is not None and (not math.isfinite(args.lambda_cls) or args.lambda_cls < 0):
+        ap.error("lambda must be a finite nonnegative planning parameter")
     d = args.density if args.density is not None else math.exp(-args.lambda_cls)
-    lam = -math.log(d)
     panel_stats = None
     funnel = None
     if args.from_counts:
@@ -192,8 +196,11 @@ def main():
         q = args.q
     R, Te, K = args.rate, args.t_eval, args.k
 
-    if d <= 0 or d > 1 or q <= 0 or q > 1:
-        raise SystemExit("d and q must be in (0,1]")
+    if not math.isfinite(d) or not math.isfinite(q) or d <= 0 or d > 1 or q <= 0 or q > 1:
+        ap.error("d and q must be finite and in (0,1]; zero observed q is not a population impossibility proof")
+    if not all(math.isfinite(x) for x in (R, Te, K)) or R <= 0 or Te < 0 or K <= 0:
+        ap.error("rate and calibration must be positive; evaluation time must be nonnegative")
+    lam = -math.log(d)
 
     p = d * q
     N = K / p
@@ -204,7 +211,7 @@ def main():
     print("=" * 64)
     print("ISLAND-HUNT RUNTIME MODEL")
     print("=" * 64)
-    print(f"  [1] GCD-clean density   d        = {d:.3e}   (lambda_cls = {lam:.2f})")
+    print(f"  [1] screen-pass density d        = {d:.3e}   (effective lambda = {lam:.2f})")
     if panel_stats:
         s = panel_stats
         print(f"  [2] cls/pha/anc panel: n={s['n']}  fully-clean={s['clean']}")
@@ -212,15 +219,15 @@ def main():
         print(f"        pha-fail-with-cls-clean (LEAK past screen) = {s['pha_only']}")
         print(f"        anc-fail-with-cls-clean (LEAK past screen) = {s['anc_only']}")
         if s['pha_only'] == 0 and s['anc_only'] == 0:
-            print(f"        -> pha/anc subset of cls: density IS a good predictor (q~1 path)")
+            print("        -> no phase/ancilla leaks observed in this panel; no population subset or q=1 guarantee")
         else:
-            print(f"        -> INDEPENDENT pha/anc mode present: density alone is OPTIMISTIC")
+            print("        -> phase/ancilla leaks observed; density alone omits measured Stage-2 losses (independence not established)")
     if funnel:
         print(f"  [2] conditional funnel  q = P(c=0)*P(p=0|c=0)*P(a=0|c=0,p=0)  (n={funnel['n']} candidates)")
         print(_chan_line("cls", funnel["cls"], None))
         print(_chan_line("pha", funnel["pha"], funnel["pha_mode"]))
         print(_chan_line("anc", funnel["anc"], funnel["anc_mode"]))
-    print(f"  [2] Stage-2 survival    q        = {q:.3e}   (P(pha=0,anc=0|cls-clean))")
+    print(f"  [2] Stage-2 survival    q        = {q:.3e}   (P(final cls=pha=anc=0|screen pass))")
     print(f"  [3] screen throughput   R        = {R:.3e} nonce/s")
     print(f"      full-eval cost      T_eval   = {Te:.1f} s/candidate")
     print("-" * 64)
@@ -228,10 +235,10 @@ def main():
     if K != 1.0:
         print(f"  calibration factor      k        = {K:g}  (E[N]=k/p; from landed-hunt actual/predicted)")
     print(f"  expected nonces         N = k/p  = {N:.3e}")
-    print(f"  Stage-1 passes to eval  1/q      = {1.0/q:.3e}")
+    print(f"  Stage-1 passes to eval  N*d      = {N*d:.3e}")
     print("-" * 64)
-    print(f"  Stage-1 screen time  1/(d q R)   = {fmt_time(screen_time)}")
-    print(f"  Stage-2 eval time    T_eval/q    = {fmt_time(eval_time)}")
+    print(f"  Stage-1 screen time  k/(d q R)   = {fmt_time(screen_time)}")
+    print(f"  Stage-2 eval time    k*T_eval/q  = {fmt_time(eval_time)}")
     dom = "SCREEN (density-bound)" if screen_time >= eval_time else "EVAL (pha/anc-bound)"
     print(f"  bottleneck                        = {dom}")
     mode = "max (concurrent HW)" if args.concurrent else "sum (shared HW)"

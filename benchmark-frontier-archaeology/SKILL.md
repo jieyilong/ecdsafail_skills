@@ -1,21 +1,21 @@
 ---
 name: benchmark-frontier-archaeology
 description: >-
-  Reverse-engineer a competitive optimization benchmark's advancing frontier: when a competitor
-  or new SOTA submission beats your score and the winning entries are visible (a git history of
-  accepted submissions, public leaderboard solutions, released configs), extract exactly which
-  lever drove the improvement and whether it transfers to you. Use whenever "a new SOTA was
-  submitted, analyze it", "diff the new leaderboard winner", "what did they change / what lever
-  did they use", "reverse-engineer their improvement", "figure out what drove the score jump",
-  or you need to learn from a competitor's accepted entry on a benchmark you're optimizing.
-  Covers diffing consecutive winners, walking every intermediate submission (not just
-  endpoints), re-measuring the metrics yourself, decomposing a multi-factor score delta,
-  separating a transferable lever from a non-transferable search artifact, and tracking the
-  moving bottleneck so you know the next target. For DOING the optimization, use
-  peak-qubit-reduction / toffoli-reduction; this skill is the forensic analysis that feeds them.
+  Analyze an optimization benchmark's public submissions and code history. Use to explain a new
+  SOTA, identify the mechanism behind a score change, or reconstruct a Pareto frontier including
+  rejected submissions. Inspect submission notes and parent-relative diffs, walk adjacent winners,
+  verify the active implementation, distinguish measured results from projections, and identify
+  reusable mechanisms and the next bottleneck. For implementing circuit changes, use
+  peak-qubit-reduction or toffoli-reduction.
 ---
 
 # Benchmark Frontier Archaeology
+
+For the post-June ECDSA.Fail corpus, read
+[the October evidence](references/frontier-refresh-2026-10-06.md) and the relevant
+tranche review in this skill's references directory. The audit covers promoted,
+rejected, failed, and cancelled entries. Use its explicit per-row coverage rather
+than treating source acquisition or repeated headline metrics as completed review.
 
 When you compete on a benchmark whose accepted submissions are visible — a git history of
 accepted entries, public leaderboard solutions, released configs — every time the frontier
@@ -24,7 +24,8 @@ forensic procedure for turning "they beat me by 0.1%" into "they pulled lever X,
 (or doesn't), and the next target is Y."
 
 The output you want from each advance is three things:
-1. **The lever** — the single change that drove the improvement (not the noise around it).
+1. **The mechanism package** — the active changes that drove the improvement, and any
+   interactions or unisolated contributions (not formatting or inherited noise).
 2. **Whether it transfers** — a reusable knob/structural idea, or a one-off search artifact.
 3. **The next target** — where the binding constraint moved, so you know where to push.
 
@@ -41,6 +42,20 @@ The output you want from each advance is three things:
 
 ## Step 1 — Detect, sync, and re-verify
 
+For a repository refresh, pin the repository commit and its UTC timestamp as the cutoff.
+Enumerate every subsequent submission before selecting examples. Preserve one coverage row per
+submission, including failures, cancellations, missing notes, and submissions without a public
+commit. Record note and diff hashes, the candidate SHA, its actual parent, official metrics,
+promotion status, and review completion. Extraction is not analysis: leave a row pending until
+its available note and relevant code changes have been inspected.
+
+Keep the score winner and the Pareto frontier separate. A candidate rejected because its product
+score did not improve may still be nondominated in qubits and Toffolis. Compute dominance from
+official positive metrics for evaluated accepted/rejected submissions; exclude failed or merely
+claimed results. Keep equal-coordinate ties. Record both the frontier at submission time and the
+frontier at the pinned inventory snapshot. Retain historically useful mechanisms even after a
+later candidate dominates their resource point.
+
 Pull the new accepted submission onto a clean tree (stash your local diagnostics/instrumentation
 first so they don't contaminate the diff). Then **re-measure the headline number yourself.** A
 submission's claimed metric is a starting point, not ground truth — you need your own measurement
@@ -54,12 +69,15 @@ This is the step everyone gets wrong, and it's the most important rule here:
 
 > **Diff *adjacent* accepted submissions, never two non-adjacent endpoints.**
 
-Competitions advance in small steps, and each accepted submission is usually *one* lever. If you
-diff submission N against submission N−5, you bundle five independent levers into one blob and
-invent a false causal story — attributing the qubit win to the knob that actually only cut gates,
+Competitions often advance in small steps, but one accepted submission can combine interacting
+levers. If you diff submission N against submission N−5, you can bundle several mechanisms into
+one blob and invent a false causal story — attributing the qubit win to the knob that only cut gates,
 etc. Enumerate **every** accepted submission between your last-understood point and the new
 frontier, and diff each adjacent pair (`diff <S_k> <S_{k+1}>`), scoped to the **editable/submitted
-paths** only (ignore graders, harness, and generated files). If there are eight intermediate
+paths** for candidate attribution, and separately verify harness/interface changes that alter
+metric meaning. Compiled envelopes, rewrite tables, HIR shards and other generated runtime
+artifacts are part of the implementation, not disposable noise. Inspect their consumers and
+provenance; exclude only irrelevant build output. If there are eight intermediate
 submissions, you do eight diffs. The extra work is exactly what stops you from misreading the
 frontier.
 
@@ -70,15 +88,38 @@ different entries.)
 
 ## Step 3 — Isolate the lever in each step
 
+Also inspect each candidate against its own Git parent. A parent-relative patch can contain an
+entire older route, so it does not by itself identify the new optimization. Establish the
+candidate's architectural lineage from its dispatcher, active defaults, and source, then compare
+against the relevant prior implementation as an additional diff. Do not substitute that lineage
+comparison for the submission's own patch.
+
+Follow the active build path into the emitter. A named module can delegate to the incumbent, a
+selftest can be a stub returning success, and a later configuration block can be ineffective
+because an earlier default already set the variable. Do not credit a projected algorithm as
+implemented merely because its wrapper appears in the patch. June 29 submission `68f90fe`
+labels a deferred-Lehmer route but calls the unchanged TrailMix emitter; its official metrics
+tie the incumbent. July 2 submission `78f8c2b` documents the same route and adds no executable
+circuit change.
+
+Treat claimed global optima, entropy floors, and impossibility statements in notes as claims to
+check. An unsuccessful local sweep establishes a limitation of that experiment, not a theorem
+that later architectures cannot improve. A score tie with an empty patch is a reproduction or
+platform experiment, not another optimization technique.
+
 Within each adjacent diff, separate signal from noise:
 - **Config/knob changes** — the changed parameter values (the usual lever).
 - **Structural code changes** — a new function, a replaced primitive, a changed schedule.
-- **Noise** — formatting, comments, re-baked defaults, regenerated artifacts.
+- **Potential noise** — formatting or comments after confirming no semantic effect.
+  Changed defaults and regenerated runtime artifacts require consumer inspection before
+  classifying them as unchanged behavior.
 
-Most steps reduce to **one** real lever. If a single submission genuinely changed several coupled
-things, note that explicitly — but your prior should be "one lever per accepted step," and a diff
-that looks like five levers is usually one real change plus re-baked noise (or you skipped an
-intermediate — go back to Step 2).
+Small recipe-ladder steps may reduce to one real lever. Architectural replacements, coupled
+width/gate packages, and large snapshot reinstalls may change several mechanisms at once.
+Record that coupling instead of forcing a single-lever causal story. Keep inherited source,
+formatting noise, approximation changes, local identities, and nonce selection separate.
+When attributing an error-neutral or cost delta, use explicit matched inputs and aligned
+simulator randomness; the same nonce on different hashed streams does not hold the corpus fixed.
 
 ## Step 4 — Re-measure the metrics yourself
 
@@ -88,6 +129,9 @@ plus its sub-components. Two tricks recur:
   factor_B`) and you can measure one factor, the other often falls out as an exact integer
   division — a clean way to get a sub-metric the submission didn't report. If the division is
   *not* exact, your assumption about the formula or your measurement is wrong; stop and reconcile.
+- **Retain the score's rounding rule.** ECDSA.Fail publishes `Q × round(mean executed Toffoli)`.
+  Dividing the official score by Q recovers the rounded gate metric, not the unrounded mean.
+  Record both when available and use the rounded integer for strict product-score gates.
 - **Instrument the binding constraint directly** if the toolchain supports it (a peak/hot-spot
   trace), so you can see not just *that* the metric changed but *which part of the artifact* now
   dominates it.
@@ -121,14 +165,15 @@ has to land."
 ## Step 7 — Classify the lever: transferable vs search artifact
 
 Decide what you can actually reuse:
-- **Transferable** — a knob value or a structural change (a fused stage, a denser encoding, a
-  per-step schedule). These port to your own line directly.
+- **Reusable mechanism** — a knob, fused stage, encoding or schedule worth testing on your
+  line after re-establishing its interface, support, lifetime, source binding and cost.
+  A structural idea is not automatically portable across architectures or ABIs.
 - **Non-transferable search artifact** — a value that is only valid *because they searched for it
   against their exact configuration*: a hunted random seed/nonce, an island, a fitted constant, a
   data-order that happens to dodge a failure on their setup. Re-using their artifact on your
   (different) configuration will not reproduce the win and may silently break correctness. When a
-  competitor's entry is "structural knob change + a re-hunted artifact," **only the knob transfers**
-  — you must re-run the search for the artifact against your own config.
+  competitor's entry is "structural knob change + a re-hunted artifact," evaluate the mechanism
+  under its port contract and re-run/revalidate the artifact against the exact new configuration.
 
 This split is what separates "I learned their technique" from "I copied a number that won't work
 for me."

@@ -7,7 +7,7 @@ description: >-
   test but I'm not sure it's right in superposition", or someone needs to test a reversible
   adder/multiplier/modular-arithmetic block before trusting it inside Shor's. Covers the
   classical/phase/ancilla (cls/pha/anc) three-channel decomposition, differential testing
-  against a trusted reference on RANDOM inputs, the forward-inverse identity check, telling a
+  against an independent reference on random inputs, promised-support checks, telling a
   designed approximation failure apart from a real bug, and localizing the first broken op.
   Fires on informal phrasing ("my uncompute is dirty", "results get corrupted when I compose
   it", "is 0.3% failure expected?"). For making a correct circuit SMALLER use peak-qubit-reduction
@@ -16,7 +16,29 @@ description: >-
 
 # Reversible Circuit Validation
 
-A reversible/quantum circuit is correct only if it is correct in **three independent channels
+## Refreshed evidence and proof scope
+
+Read [the October audit](references/frontier-refresh-2026-10-06.md) for source-backed
+examples and corrections. Keep local Boolean/algebraic identities, reachable-support
+and lifetime premises, source/operation binding, and full benchmark packets separate.
+An empirical census or one clean nonce is not an all-input certificate.
+
+Compare variants on explicit identical inputs and aligned HMR/random outcomes. Changing
+the operation stream changes the Fiat–Shamir corpus even with the same nonce, and equal
+failure totals can hide different failing states. Inspect every final channel and, for
+a mechanism-level claim, the full differential state or independently proved relation.
+
+When a valid transformation adds or deletes measurements, identical sequential PRNG
+positions are not the correct requirement. Couple surviving measurement events by their
+logical role, or compare the resulting channels. Include every live classical output in
+the interface; a measured bit may differ safely only when it is overwritten before any read.
+
+Bind ordinal/tuple-occurrence certificates to the complete source recipe, schedule and
+round count. Retire or reprove stale tables rather than trusting a matching gate tuple.
+Report packaging, workflow and resource-limit failures separately from arithmetic faults.
+A failed official run does not inherit a local proof or become a clean Pareto point.
+
+A reversible/quantum circuit is correct only if it passes **three distinct checks
 at once** — and the trap that bites everyone is that the easiest test (feed a basis state,
 check the output bits) only exercises *one* of them. The other two fail silently in the
 computational basis and only bite once the circuit runs in superposition, which is exactly
@@ -28,7 +50,7 @@ where you can no longer see them by inspection.
 |---|---|---|---|
 | **cls** (classical) | the output *value* is wrong on some inputs | — (a basis-state test catches it) | wrong answer |
 | **pha** (phase) | output value is right, but a spurious **relative phase** was stamped on the state | invisible to any value/output check | destroys the interference Shor/QPE depend on |
-| **anc** (ancilla) | scratch qubits don't return to **\|0⟩** — they stay **entangled** with the data | output register still reads correct | the leftover entanglement decoheres the computation and breaks reversibility/uncompute |
+| **anc** (ancilla) | scratch is not restored to its promised state or retains input-dependent data | output register can still read correctly | tracing out input-dependent scratch can destroy coherence; even fixed nonzero scratch violates a promised zero interface |
 
 The headline rule: **a value check is necessary but not sufficient.** A circuit can pass
 "basis state in → correct bits out" on every input you try and still be broken in `pha` or
@@ -51,7 +73,7 @@ different causes and different fixes.
 ## Step 2 — Differential testing, on random inputs
 
 Run the circuit and compare its output to a **trusted classical reference** that computes the
-same function (e.g. compute `P+Q` classically and check the circuit's output register equals
+same function (e.g. compute `R'=R+A` classically and check the circuit's output register equals
 it). Two disciplines matter:
 
 - **Use random inputs, seeded for reproducibility — not only the structured/graded set.** A
@@ -64,21 +86,26 @@ it). Two disciplines matter:
 
 ## Step 3 — How to actually measure each channel
 
-- **anc** — after the circuit runs, every ancilla must be provably back to **\|0⟩**. Assert it
-  (measure them, or check the statevector). Non-zero, or *entangled-but-happens-to-read-zero*,
-  both count as dirty: cleanliness means **disentangled and \|0⟩**, not "value unused." The
-  sharpest single test: run the circuit **forward then its exact inverse** (`U† U`) and confirm
-  you recover the input state *exactly* — any ancilla left entangled makes `U†U ≠ I`.
-- **pha** — a value check can't see relative phase, so test it directly: (a) the same
-  **forward-inverse identity** `U†U = I` catches a stray phase (you won't return to the exact
-  input state, including global/relative phase); or (b) run on a **superposition** input and
+- **anc/borrowed state** — owned clean scratch must return to **\|0⟩** at its forward
+  boundary. A borrowed dirty register must implement identity on its incoming state,
+  including when entangled with spectators. Do not measure/reset arbitrary borrowed
+  data to test it. Inspect the full promised interface or its independent reference,
+  not merely one observed zero bit. Cleanliness is not "value unused." The
+  useful round-trip test uses an independently implemented inverse of the intended operation.
+  Also inspect scratch immediately after the forward operation. Applying a unitary's own exact
+  adjoint always gives `U†U = I`, even when U implements the wrong function or leaves garbage.
+- **pha** — a value check can't see relative phase, so test it directly: (a) compare the
+  forward action to an independent reference with phase tracked; or (b) run on a **superposition** input and
   check the output interferes as the reference unitary predicts; or (c) compare against the
   reference unitary on basis states *with phase tracked*, not just bit-values.
 - **cls** — compare the output register to the classical reference value on each input.
 
-The **forward-inverse identity (`U†U = I`)** is the highest-leverage single check: it exercises
-`pha` and `anc` together and needs no superposition machinery — if the composed circuit doesn't
-return every input exactly to itself, something is dirty. Make it your first reflex.
+An independently specified forward/reverse composition can expose implementation inconsistencies,
+but reversing the same emitted gate list proves neither the intended arithmetic nor clean scratch
+at the forward boundary. Unitaries with incorrect relative phases still satisfy `U†U = I`.
+For measurement-based uncompute, validate the measurement outcomes and conditional corrections
+as a channel or instrument rather than assuming the operation has a unitary adjoint. Global
+phase alone is physically irrelevant; unintended relative phase is the correctness issue.
 
 ## Step 4 — Designed approximation failure vs. real bug
 
@@ -107,27 +134,27 @@ designed level, no higher.
 ### Per-channel zero-reachability: a cheap go/no-go for that search
 
 When you are *searching* a candidate set (seeds, nonces, parameters) for one instance clean in
-**all** channels at once, you can read the verdict off a modest sample before committing to a
-long search:
+**all** channels at once, a modest sample can guide diagnosis and search allocation:
 
-> A jointly-clean candidate (`0/0/0`) needs every channel at 0 **simultaneously**. A *necessary*
-> condition is that each channel reaches 0 **independently** somewhere in your sample. If a
-> channel is **never** 0 across many candidates, it has a **per-channel floor** — a defect no
-> choice of seed removes — and the joint-clean is **unreachable**, no matter how the other
-> channels behave.
+> A jointly-clean candidate (`0/0/0`) needs every channel at 0 **simultaneously** in the
+> candidate domain. Observing individual zeros in a finite panel is useful evidence, not
+> a necessary sample condition for an unseen rare clean packet. If a
+> channel is **never** 0 across many candidates, investigate a possible structural floor or
+> a rare tail before extending the search. A finite sample with no zeros does not prove that
+> a clean instance is impossible.
 
 So rank candidate sets by whether **{cls→0, pha→0, anc→0} each occur somewhere**, even over a set
 with lower *average* severity:
 
 - `A = {(2,0,0), (0,1,1), (0,2,0)}` — every channel hits 0 in some row → `0/0/0` is plausibly
   reachable; keep searching.
-- `B = {(2,0,0), (1,2,0), (2,1,0)}` — `cls` is *never* 0 (a non-zero floor) → `0/0/0` is
-  unreachable; **stop searching and fix the `cls` mechanism** (a real bug or an over-aggressive
-  truncation), then resample.
+- `B = {(2,0,0), (1,2,0), (2,1,0)}` has no sampled `cls=0` result. Diagnose the classical
+  mechanism and estimate its tail probability before spending more search time. Three observations
+  are insufficient to establish an unreachable `0/0/0` state.
 
-This is *necessary, not sufficient*: each channel reaching 0 separately doesn't prove they reach
-0 *together* (the coverage caveats above still apply). But it is the cheapest screen there is — a
-single floored channel kills the search outright, and it names *which* channel to repair (use the
+This is a diagnostic heuristic: separate observed zeros do not prove a joint zero, and absent
+sampled zeros do not prove impossibility. A proven positive lower bound on a channel
+kills the search outright; absent such a proof, the sample identifies which channel to investigate (use the
 Step 5 channel→cause map). The best outcome is the strongest version of this: near-misses
 clustered close to `0/0/0` **and** each channel touching 0.
 
@@ -161,14 +188,15 @@ random inputs at the designed failure rate.
 - **Random inputs expose what structured inputs hide.** If you only ever test the graded/derived
   set, a bug can hide in the gap; random differential testing is the cheapest way to find it.
 - **Clean ≠ value-unused.** An ancilla can hold the "right" value and still be entangled — that's
-  an `anc` failure. Demand provable \|0⟩ and disentanglement (the `U†U=I` test proves it).
+  an `anc` failure. Demand provable \|0⟩ and disentanglement at the forward boundary; an exact
+  inverse of the same implementation does not establish that property.
 - **Don't over-trust your approximation model.** "Unexpected-clean" failures may be designed
   truncations the model doesn't cover; confirm by localizing rather than assuming a bug.
 
 ## Worked example (this lineage, for grounding)
 
-Validating a space-optimized reversible point-add (output `P+Q`): generate 10,000 **random,
-non-graded** inputs (seeded), run each through the circuit, compare to the classical `P+Q`, and
+Validating a space-optimized reversible point-add (output `R'=R+A`): generate 10,000 **random,
+non-graded** inputs (seeded), run each through the circuit, compare to the classical `R+A`, and
 report `cls/pha/anc` per batch. Result pattern: **`anc` always 0** (the circuit is structurally
 clean — every scratch uncomputes), and the only `cls` failures were ~0.16% of inputs that hit
 the **designed** carry/width truncation. Each failure was run through the classical GCD filter

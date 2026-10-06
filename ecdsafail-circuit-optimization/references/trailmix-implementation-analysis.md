@@ -7,7 +7,7 @@ venting, or sub-1175-qubit EC point-addition routes.
 ## Source Snapshot
 
 - GitHub: `https://github.com/trailofbits/trailmix`
-- Local analyzed checkout: `/Users/jieyilong/Personal/research/ShorOptimization/shor_optimization_workspace/repos/trailmix`
+- Analyzed from the public TrailMix repository at the commit below.
 - Analyzed commit: `cd961ff088243f4a49097867fb053b80675e0ad5`
 - Commit subject: `release: version 1.0.0`
 - Crate version: `trailmix 1.0.0`

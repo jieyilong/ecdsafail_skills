@@ -17,3 +17,17 @@
 .DS_Store
 peak-qubit-reduction-workspace/
 *-workspace/
+
+# Reproducible audit intermediates and publication staging stay local.
+**/__pycache__/
+audit/**/evidence-index.json
+publication-staging/
+audit/**/notes/
+audit/**/state/
+audit/**/WORKLOG.md
+audit/**/baseline-reviews.json
+audit/**/primary-review-cases.json
+audit/**/reviews-early.json
+audit/**/reviews-middle*.json
+audit/**/reviews-late*.json
+audit/**/reviews-closing.json

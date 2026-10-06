@@ -1,0 +1,54 @@
+{
+  "cutoff": "2026-06-28T19:15:59Z",
+  "cutoff_commit": "08a60e4f8fafb26363b43a9d206d815e3f7d618a",
+  "inventory_sha256": "590d4e4a32d4923e3152824469d9518ac292bc7ba6af80c42f27732a2cfb437f",
+  "inventory_total": 1363,
+  "post_cutoff": 586,
+  "status_counts": {
+    "rejected": 334,
+    "failed": 72,
+    "accepted": 177,
+    "cancelled": 3
+  },
+  "diff_counts": {
+    "collected": 557,
+    "no_public_commit": 29
+  },
+  "review_counts": {
+    "reviewed": 586
+  },
+  "all_current_pareto": [
+    "05f08d8f-ac0a-494c-be11-ccb5cd3f7c97",
+    "17250b2e-ac81-4cb5-a4b3-a0029a8d5da4",
+    "1c0e0e91-de6a-4348-bd4a-3b6351fdc70b",
+    "1d1a9f72-49b1-40cc-aeac-2b3bf79dee3e",
+    "1d602397-0e14-4314-8834-3e80db97b02c",
+    "3170f7bc-2f1f-44cf-b846-facce53c6e0e",
+    "3ab4f864-67ae-4aea-957b-bca4e5bd53b4",
+    "3d9ce591-8f26-4b76-8abf-0d41728e3939",
+    "3ea65f6d-7915-41a2-9d89-7c8df85d996a",
+    "4188053f-fb77-4c92-aa42-8629a9eec283",
+    "48d934d4-db99-405f-b738-7f9afe3a0d3b",
+    "57aa8aee-d821-4d72-b5bc-8eb6f59871a2",
+    "5c4ec19c-06c8-4619-92c5-6cc7b64a381b",
+    "71b9cc45-8b14-4655-9b59-d6de5af1ceea",
+    "73c5e2a8-f15c-4b01-a3ac-8d0ac1807391",
+    "87cffbdd-5d17-4eb0-a59a-a9c51462ee3a",
+    "8d26593c-54a0-439c-993f-20e7bd8ebd9d",
+    "9d4282b2-de59-4ff7-8535-31bbf974dfac",
+    "a21ec672-90db-4ecf-ade0-892e526bc680",
+    "a9d89c26-7c8b-4244-8073-5c540f47c91e",
+    "ab11959f-df67-4472-ac53-2d613e28bffc",
+    "ae98f360-073d-49b5-a3b5-f82e2b2442c8",
+    "c1c0da9f-3038-4cde-b0e2-6820791b6fcc",
+    "c60617f8-2f18-4139-a94a-b0bf0f46e0be",
+    "dd3621dc-a432-412b-bf9d-3c5d52774147",
+    "e37cd0cb-ef31-4a17-9887-483b671ee311",
+    "e631a577-9d9b-4354-8a25-e10e5c104455",
+    "ee410040-42fd-4a53-bcea-1150b7e2c5bf",
+    "fbf19a87-a6b2-4dd0-ae66-fda2b7d1513e"
+  ],
+  "patches_published": false,
+  "generated_at": "2026-10-06T04:34:17.783911+00:00",
+  "all_technical_reviews_complete": true
+}

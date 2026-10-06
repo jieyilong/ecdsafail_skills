@@ -13,13 +13,10 @@ paper-level architecture, formulas, source map, or route-design lessons.
 
 - Paper: Andre Schrottenloher, "Optimized Point Addition Circuits for Elliptic
   Curve Discrete Logarithms", arXiv:2606.02235v1, 1 Jun 2026.
-- Local PDF: `/Users/jieyilong/Personal/research/ShorOptimization/shor_optimization_workspace/readings/Schrottenloher_EC_point_addition.pdf`
-- Local extracted text:
-  `/Users/jieyilong/Personal/research/ShorOptimization/shor_optimization_workspace/research/papers/2606.02235v1.clean.txt`
+- Paper source: `https://arxiv.org/abs/2606.02235`
 - Reference implementation:
   `https://gitlab.inria.fr/capsule/qarton-projects/ec-point-addition`
-- Local analyzed checkout:
-  `/Users/jieyilong/Personal/research/ShorOptimization/shor_optimization_workspace/repos/ec-point-addition`
+- Analyzed from the public reference implementation at the commit below.
 - Analyzed implementation commit:
   `d8d2473cb43cf9c8fef349630dbdabfd8bd49a05`
 - Commit date/subject: `2026-06-01 19:26:51 +0200`, `testing script`
