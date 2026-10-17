@@ -256,6 +256,9 @@ Deep-dive analyses backing the circuit-optimization skill (under
   arithmetic / EEA-dialog in-place multiplication / pseudo-Mersenne reduction (arXiv 2606.02235).
 - **`trailmix-implementation-analysis.md`** — Trail of Bits TrailMix: transcript compression,
   jump-GCD, venting, whole-register ghosting, and verification discipline.
+- **`anthropic-divstep-decoding-q850.md`** — Gu–Kemeny–Yelin–Lukin divstep branch
+  recovery, released resource context, and a guarded transfer workflow for
+  consumer-specific predicate fusion in Lilypad-G/Q850 work.
 
 ## Notes
 

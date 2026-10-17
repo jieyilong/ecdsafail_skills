@@ -81,6 +81,28 @@ resource set. Track depth/reaction cost separately for fault-tolerant runtime cl
   and fewer rounds can change error probability. A no-fire census, equal coarse
   failure counts, and one clean packet do not prove zero added error.
 
+## Anthropic divstep decoding: transfer predicates, not architectures
+
+When evaluating Gu, Kemeny, Yelin, and Lukin's divstep branch-decoding method,
+read [the Q850 transfer note](references/anthropic-divstep-decoding-q850.md).
+Theorem A.6 recovers one ambiguous branch bit from a specific divstep successor
+under signed-counter, parity, determinant, and window premises. It is not a
+drop-in decoder for a differently framed GCD walk.
+
+For Lilypad-G or another existing low-page codec, first inspect the active
+consumer. Some consumers already materialize only selected bits. Prefer a
+consumer-specific Boolean predicate directly from preserved low bits, frame and
+rho over another generic page decoder. Price the complete
+producer-consumer-cleanup sequence, including phase correction and owner
+lifetime. A hybrid decode/store threshold is a hypothesis until the receiving
+walk proves its own information and cost boundary.
+
+Do not infer a Q850 win from the released Anthropic family: its complete rows
+include 935Q/4,006,673T, 897Q/5,331,729T, 893Q/7,866,779T and
+843Q/20,521,949T. The family demonstrates a transferable mechanism, not a
+Q<=850 and T<5.6M point. Require source-bound integration, full point-add
+resources and matched correctness evidence before promotion.
+
 ## Diagnose, repair, then search
 
 Freeze the route and reproduce the failure. Trace convergence/width/compare
